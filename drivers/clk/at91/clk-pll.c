@@ -297,14 +297,14 @@ static const struct clk_ops pll_ops = {
 	.set_rate = clk_pll_set_rate,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_pll(struct at91_pmc *pmc, unsigned int irq, const char *name,
 		      const char *parent_name, u8 id,
 		      const struct clk_pll_layout *layout,
 		      const struct clk_pll_characteristics *characteristics)
 {
 	struct clk_pll *pll;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 	int ret;
 	int offset = PLL_REG(id);
@@ -474,7 +474,7 @@ of_at91_clk_pll_setup(struct device_node *np, struct at91_pmc *pmc,
 {
 	u32 id;
 	unsigned int irq;
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name;
 	const char *name = np->name;
 	struct clk_pll_characteristics *characteristics;

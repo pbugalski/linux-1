@@ -35,7 +35,7 @@ static int sun6i_a31_apb0_clk_probe(struct platform_device *pdev)
 	const char *clk_parent;
 	struct resource *r;
 	void __iomem *reg;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	reg = devm_ioremap_resource(&pdev->dev, r);

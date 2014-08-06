@@ -65,13 +65,13 @@ struct clk_ops clk_fixed_factor_ops = {
 };
 EXPORT_SYMBOL_GPL(clk_fixed_factor_ops);
 
-struct clk *clk_register_fixed_factor(struct device *dev, const char *name,
+struct clk_core *clk_register_fixed_factor(struct device *dev, const char *name,
 		const char *parent_name, unsigned long flags,
 		unsigned int mult, unsigned int div)
 {
 	struct clk_fixed_factor *fix;
 	struct clk_init_data init;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	fix = kmalloc(sizeof(*fix), GFP_KERNEL);
 	if (!fix) {
@@ -105,7 +105,7 @@ EXPORT_SYMBOL_GPL(clk_register_fixed_factor);
  */
 void __init of_fixed_factor_clk_setup(struct device_node *node)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *clk_name = node->name;
 	const char *parent_name;
 	u32 div, mult;

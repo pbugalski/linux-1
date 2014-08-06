@@ -138,7 +138,7 @@ static const struct clk_ops main_osc_ops = {
 	.is_prepared = clk_main_osc_is_prepared,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_main_osc(struct at91_pmc *pmc,
 			   unsigned int irq,
 			   const char *name,
@@ -147,7 +147,7 @@ at91_clk_register_main_osc(struct at91_pmc *pmc,
 {
 	int ret;
 	struct clk_main_osc *osc;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	if (!pmc || !irq || !name || !parent_name)
@@ -192,7 +192,7 @@ at91_clk_register_main_osc(struct at91_pmc *pmc,
 void __init of_at91rm9200_clk_main_osc_setup(struct device_node *np,
 					     struct at91_pmc *pmc)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	unsigned int irq;
 	const char *name = np->name;
 	const char *parent_name;
@@ -291,7 +291,7 @@ static const struct clk_ops main_rc_osc_ops = {
 	.recalc_accuracy = clk_main_rc_osc_recalc_accuracy,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_main_rc_osc(struct at91_pmc *pmc,
 			      unsigned int irq,
 			      const char *name,
@@ -299,7 +299,7 @@ at91_clk_register_main_rc_osc(struct at91_pmc *pmc,
 {
 	int ret;
 	struct clk_main_rc_osc *osc;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	if (!pmc || !irq || !name || !frequency)
@@ -340,7 +340,7 @@ at91_clk_register_main_rc_osc(struct at91_pmc *pmc,
 void __init of_at91sam9x5_clk_main_rc_osc_setup(struct device_node *np,
 						struct at91_pmc *pmc)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	unsigned int irq;
 	u32 frequency = 0;
 	u32 accuracy = 0;
@@ -424,13 +424,13 @@ static const struct clk_ops rm9200_main_ops = {
 	.recalc_rate = clk_rm9200_main_recalc_rate,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_rm9200_main(struct at91_pmc *pmc,
 			      const char *name,
 			      const char *parent_name)
 {
 	struct clk_rm9200_main *clkmain;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	if (!pmc || !name)
@@ -462,7 +462,7 @@ at91_clk_register_rm9200_main(struct at91_pmc *pmc,
 void __init of_at91rm9200_clk_main_setup(struct device_node *np,
 					 struct at91_pmc *pmc)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name;
 	const char *name = np->name;
 
@@ -555,7 +555,7 @@ static const struct clk_ops sam9x5_main_ops = {
 	.get_parent = clk_sam9x5_main_get_parent,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_sam9x5_main(struct at91_pmc *pmc,
 			      unsigned int irq,
 			      const char *name,
@@ -564,7 +564,7 @@ at91_clk_register_sam9x5_main(struct at91_pmc *pmc,
 {
 	int ret;
 	struct clk_sam9x5_main *clkmain;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	if (!pmc || !irq || !name)
@@ -607,7 +607,7 @@ at91_clk_register_sam9x5_main(struct at91_pmc *pmc,
 void __init of_at91sam9x5_clk_main_setup(struct device_node *np,
 					 struct at91_pmc *pmc)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_names[2];
 	int num_parents;
 	unsigned int irq;

@@ -42,7 +42,7 @@ struct hisi_clock_data __init *hisi_clk_init(struct device_node *np,
 					     int nr_clks)
 {
 	struct hisi_clock_data *clk_data;
-	struct clk **clk_table;
+	struct clk_core **clk_table;
 	void __iomem *base;
 
 	if (np) {
@@ -63,7 +63,7 @@ struct hisi_clock_data __init *hisi_clk_init(struct device_node *np,
 	}
 	clk_data->base = base;
 
-	clk_table = kzalloc(sizeof(struct clk *) * nr_clks, GFP_KERNEL);
+	clk_table = kzalloc(sizeof(struct clk_core *) * nr_clks, GFP_KERNEL);
 	if (!clk_table) {
 		pr_err("%s: could not allocate clock lookup table\n", __func__);
 		goto err_data;
@@ -81,7 +81,7 @@ err:
 void __init hisi_clk_register_fixed_rate(struct hisi_fixed_rate_clock *clks,
 					 int nums, struct hisi_clock_data *data)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	int i;
 
 	for (i = 0; i < nums; i++) {
@@ -102,7 +102,7 @@ void __init hisi_clk_register_fixed_factor(struct hisi_fixed_factor_clock *clks,
 					   int nums,
 					   struct hisi_clock_data *data)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	int i;
 
 	for (i = 0; i < nums; i++) {
@@ -122,7 +122,7 @@ void __init hisi_clk_register_fixed_factor(struct hisi_fixed_factor_clock *clks,
 void __init hisi_clk_register_mux(struct hisi_mux_clock *clks,
 				  int nums, struct hisi_clock_data *data)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	void __iomem *base = data->base;
 	int i;
 
@@ -151,7 +151,7 @@ void __init hisi_clk_register_mux(struct hisi_mux_clock *clks,
 void __init hisi_clk_register_divider(struct hisi_divider_clock *clks,
 				      int nums, struct hisi_clock_data *data)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	void __iomem *base = data->base;
 	int i;
 
@@ -180,7 +180,7 @@ void __init hisi_clk_register_divider(struct hisi_divider_clock *clks,
 void __init hisi_clk_register_gate(struct hisi_gate_clock *clks,
 				       int nums, struct hisi_clock_data *data)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	void __iomem *base = data->base;
 	int i;
 
@@ -208,7 +208,7 @@ void __init hisi_clk_register_gate(struct hisi_gate_clock *clks,
 void __init hisi_clk_register_gate_sep(struct hisi_gate_clock *clks,
 				       int nums, struct hisi_clock_data *data)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	void __iomem *base = data->base;
 	int i;
 

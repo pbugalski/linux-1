@@ -163,7 +163,7 @@ static const struct clk_ops clk_psc_ops = {
  * @psc_data: platform data to configure this clock
  * @lock: spinlock used by this clock
  */
-static struct clk *clk_register_psc(struct device *dev,
+static struct clk_core *clk_register_psc(struct device *dev,
 			const char *name,
 			const char *parent_name,
 			struct clk_psc_data *psc_data,
@@ -171,7 +171,7 @@ static struct clk *clk_register_psc(struct device *dev,
 {
 	struct clk_init_data init;
 	struct clk_psc *psc;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	psc = kzalloc(sizeof(*psc), GFP_KERNEL);
 	if (!psc)
@@ -204,7 +204,7 @@ static void __init of_psc_clk_init(struct device_node *node, spinlock_t *lock)
 	const char *clk_name = node->name;
 	const char *parent_name;
 	struct clk_psc_data *data;
-	struct clk *clk;
+	struct clk_core *clk;
 	int i;
 
 	data = kzalloc(sizeof(*data), GFP_KERNEL);

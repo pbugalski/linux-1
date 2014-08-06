@@ -67,8 +67,8 @@ enum zynq_clk {
 	i2c0_aper, i2c1_aper, uart0_aper, uart1_aper, gpio_aper, lqspi_aper,
 	smc_aper, swdt, dbg_trc, dbg_apb, clk_max};
 
-static struct clk *ps_clk;
-static struct clk *clks[clk_max];
+static struct clk_core *ps_clk;
+static struct clk_core *clks[clk_max];
 static struct clk_onecell_data clk_data;
 
 static DEFINE_SPINLOCK(armpll_lock);
@@ -108,7 +108,7 @@ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
 		const char *clk_name, void __iomem *fclk_ctrl_reg,
 		const char **parents, int enable)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	u32 enable_reg;
 	char *mux_name;
 	char *div0_name;
@@ -154,7 +154,7 @@ static void __init zynq_clk_register_fclk(enum zynq_clk fclk,
 			0, CLK_GATE_SET_TO_DISABLE, fclk_gate_lock);
 	enable_reg = clk_readl(fclk_gate_reg) & 1;
 	if (enable && !enable_reg) {
-		if (clk_prepare_enable(clks[fclk]))
+		if (clk_provider_prepare_enable(clks[fclk]))
 			pr_warn("%s: FCLK%u enable failed\n", __func__,
 					fclk - fclk0);
 	}
@@ -181,7 +181,7 @@ static void __init zynq_clk_register_periph_clk(enum zynq_clk clk0,
 		const char *clk_name1, void __iomem *clk_ctrl,
 		const char **parents, unsigned int two_gates)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	char *mux_name;
 	char *div_name;
 	spinlock_t *lock;
@@ -222,7 +222,7 @@ static void __init zynq_clk_setup(struct device_node *np)
 	int i;
 	u32 tmp;
 	int ret;
-	struct clk *clk;
+	struct clk_core *clk;
 	char *clk_name;
 	unsigned int fclk_enable = 0;
 	const char *clk_output_name[clk_max];
@@ -333,13 +333,13 @@ static void __init zynq_clk_setup(struct device_node *np)
 			CLK_DIVIDER_ALLOW_ZERO, &ddrclk_lock);
 	clks[ddr2x] = clk_register_gate(NULL, clk_output_name[ddr2x],
 			"ddr2x_div", 0, SLCR_DDR_CLK_CTRL, 1, 0, &ddrclk_lock);
-	clk_prepare_enable(clks[ddr2x]);
+	clk_provider_prepare_enable(clks[ddr2x]);
 	clk = clk_register_divider(NULL, "ddr3x_div", "ddrpll", 0,
 			SLCR_DDR_CLK_CTRL, 20, 6, CLK_DIVIDER_ONE_BASED |
 			CLK_DIVIDER_ALLOW_ZERO, &ddrclk_lock);
 	clks[ddr3x] = clk_register_gate(NULL, clk_output_name[ddr3x],
 			"ddr3x_div", 0, SLCR_DDR_CLK_CTRL, 0, 0, &ddrclk_lock);
-	clk_prepare_enable(clks[ddr3x]);
+	clk_provider_prepare_enable(clks[ddr3x]);
 
 	clk = clk_register_divider(NULL, "dci_div0", "ddrpll", 0,
 			SLCR_DCI_CLK_CTRL, 8, 6, CLK_DIVIDER_ONE_BASED |
@@ -351,7 +351,7 @@ static void __init zynq_clk_setup(struct device_node *np)
 	clks[dci] = clk_register_gate(NULL, clk_output_name[dci], "dci_div1",
 			CLK_SET_RATE_PARENT, SLCR_DCI_CLK_CTRL, 0, 0,
 			&dciclk_lock);
-	clk_prepare_enable(clks[dci]);
+	clk_provider_prepare_enable(clks[dci]);
 
 	/* Peripheral clocks */
 	for (i = fclk0; i <= fclk3; i++) {
@@ -505,10 +505,10 @@ static void __init zynq_clk_setup(struct device_node *np)
 	/* leave debug clocks in the state the bootloader set them up to */
 	tmp = clk_readl(SLCR_DBG_CLK_CTRL);
 	if (tmp & DBG_CLK_CTRL_CLKACT_TRC)
-		if (clk_prepare_enable(clks[dbg_trc]))
+		if (clk_provider_prepare_enable(clks[dbg_trc]))
 			pr_warn("%s: trace clk enable failed\n", __func__);
 	if (tmp & DBG_CLK_CTRL_CPU_1XCLKACT)
-		if (clk_prepare_enable(clks[dbg_apb]))
+		if (clk_provider_prepare_enable(clks[dbg_apb]))
 			pr_warn("%s: debug APB clk enable failed\n", __func__);
 
 	/* One gated clock for all APER clocks. */

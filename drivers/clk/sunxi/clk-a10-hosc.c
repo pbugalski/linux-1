@@ -25,7 +25,7 @@ static DEFINE_SPINLOCK(hosc_lock);
 
 static void __init sun4i_osc_clk_setup(struct device_node *node)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_fixed_rate *fixed;
 	struct clk_gate *gate;
 	const char *clk_name = node->name;

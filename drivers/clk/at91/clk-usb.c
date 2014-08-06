@@ -162,12 +162,12 @@ static const struct clk_ops at91sam9n12_usb_ops = {
 	.set_rate = at91sam9x5_clk_usb_set_rate,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91sam9x5_clk_register_usb(struct at91_pmc *pmc, const char *name,
 			    const char **parent_names, u8 num_parents)
 {
 	struct at91sam9x5_clk_usb *usb;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	usb = kzalloc(sizeof(*usb), GFP_KERNEL);
@@ -190,12 +190,12 @@ at91sam9x5_clk_register_usb(struct at91_pmc *pmc, const char *name,
 	return clk;
 }
 
-static struct clk * __init
+static struct clk_core * __init
 at91sam9n12_clk_register_usb(struct at91_pmc *pmc, const char *name,
 			     const char *parent_name)
 {
 	struct at91sam9x5_clk_usb *usb;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	usb = kzalloc(sizeof(*usb), GFP_KERNEL);
@@ -295,12 +295,12 @@ static const struct clk_ops at91rm9200_usb_ops = {
 	.set_rate = at91rm9200_clk_usb_set_rate,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91rm9200_clk_register_usb(struct at91_pmc *pmc, const char *name,
 			    const char *parent_name, const u32 *divisors)
 {
 	struct at91rm9200_clk_usb *usb;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	usb = kzalloc(sizeof(*usb), GFP_KERNEL);
@@ -327,7 +327,7 @@ at91rm9200_clk_register_usb(struct at91_pmc *pmc, const char *name,
 void __init of_at91sam9x5_clk_usb_setup(struct device_node *np,
 					struct at91_pmc *pmc)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	int i;
 	int num_parents;
 	const char *parent_names[USB_SOURCE_MAX];
@@ -355,7 +355,7 @@ void __init of_at91sam9x5_clk_usb_setup(struct device_node *np,
 void __init of_at91sam9n12_clk_usb_setup(struct device_node *np,
 					 struct at91_pmc *pmc)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name;
 	const char *name = np->name;
 
@@ -375,7 +375,7 @@ void __init of_at91sam9n12_clk_usb_setup(struct device_node *np,
 void __init of_at91rm9200_clk_usb_setup(struct device_node *np,
 					struct at91_pmc *pmc)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name;
 	const char *name = np->name;
 	u32 divisors[4] = {0, 0, 0, 0};

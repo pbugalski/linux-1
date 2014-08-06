@@ -365,10 +365,10 @@ static int __init omap3xxx_dt_clk_init(int soc_type)
 				     ARRAY_SIZE(enable_init_clks));
 
 	pr_info("Clocking rate (Crystal/Core/MPU): %ld.%01ld/%ld/%ld MHz\n",
-		(clk_get_rate(clk_get_sys(NULL, "osc_sys_ck")) / 1000000),
-		(clk_get_rate(clk_get_sys(NULL, "osc_sys_ck")) / 100000) % 10,
-		(clk_get_rate(clk_get_sys(NULL, "core_ck")) / 1000000),
-		(clk_get_rate(clk_get_sys(NULL, "arm_fck")) / 1000000));
+		(clk_provider_get_rate(clk_provider_get_sys(NULL, "osc_sys_ck")) / 1000000),
+		(clk_provider_get_rate(clk_provider_get_sys(NULL, "osc_sys_ck")) / 100000) % 10,
+		(clk_provider_get_rate(clk_provider_get_sys(NULL, "core_ck")) / 1000000),
+		(clk_provider_get_rate(clk_provider_get_sys(NULL, "arm_fck")) / 1000000));
 
 	if (soc_type != OMAP3_SOC_TI81XX && soc_type != OMAP3_SOC_OMAP3430_ES1)
 		omap3_clk_lock_dpll5();

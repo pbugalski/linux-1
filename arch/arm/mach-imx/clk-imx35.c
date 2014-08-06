@@ -67,7 +67,7 @@ enum mx35_clks {
 	gpu2d_gate, clk_max
 };
 
-static struct clk *clk[clk_max];
+static struct clk_core *clk[clk_max];
 
 int __init mx35_clocks_init(void)
 {
@@ -100,7 +100,7 @@ int __init mx35_clocks_init(void)
 	else
 		clk[arm] = imx_clk_fixed_factor("arm", "mpll", 1, aad->arm);
 
-	if (clk_get_rate(clk[arm]) > 400000000)
+	if (clk_provider_get_rate(clk[arm]) > 400000000)
 		hsp_div = hsp_div_532;
 	else
 		hsp_div = hsp_div_400;
@@ -261,14 +261,14 @@ int __init mx35_clocks_init(void)
 	clk_register_clkdev(clk[csi_gate], NULL, "mx3-camera.0");
 	clk_register_clkdev(clk[admux_gate], "audmux", NULL);
 
-	clk_prepare_enable(clk[spba_gate]);
-	clk_prepare_enable(clk[gpio1_gate]);
-	clk_prepare_enable(clk[gpio2_gate]);
-	clk_prepare_enable(clk[gpio3_gate]);
-	clk_prepare_enable(clk[iim_gate]);
-	clk_prepare_enable(clk[emi_gate]);
-	clk_prepare_enable(clk[max_gate]);
-	clk_prepare_enable(clk[iomuxc_gate]);
+	clk_provider_prepare_enable(clk[spba_gate]);
+	clk_provider_prepare_enable(clk[gpio1_gate]);
+	clk_provider_prepare_enable(clk[gpio2_gate]);
+	clk_provider_prepare_enable(clk[gpio3_gate]);
+	clk_provider_prepare_enable(clk[iim_gate]);
+	clk_provider_prepare_enable(clk[emi_gate]);
+	clk_provider_prepare_enable(clk[max_gate]);
+	clk_provider_prepare_enable(clk[iomuxc_gate]);
 
 	/*
 	 * SCC is needed to boot via mmc after a watchdog reset. The clock code
@@ -276,7 +276,7 @@ int __init mx35_clocks_init(void)
 	 * handled here and not needed for mmc) and IIM (which is enabled
 	 * unconditionally above).
 	 */
-	clk_prepare_enable(clk[scc_gate]);
+	clk_provider_prepare_enable(clk[scc_gate]);
 
 	imx_print_silicon_rev("i.MX35", mx35_revision());
 

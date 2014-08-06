@@ -2699,7 +2699,7 @@ static void msm8974_pro_clock_override(void)
 
 static int gcc_msm8974_probe(struct platform_device *pdev)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct device *dev = &pdev->dev;
 	bool pro;
 	const struct of_device_id *id;

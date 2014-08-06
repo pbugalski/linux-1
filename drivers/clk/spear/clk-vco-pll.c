@@ -272,16 +272,16 @@ static struct clk_ops clk_vco_ops = {
 	.set_rate = clk_vco_set_rate,
 };
 
-struct clk *clk_register_vco_pll(const char *vco_name, const char *pll_name,
+struct clk_core *clk_register_vco_pll(const char *vco_name, const char *pll_name,
 		const char *vco_gate_name, const char *parent_name,
 		unsigned long flags, void __iomem *mode_reg, void __iomem
 		*cfg_reg, struct pll_rate_tbl *rtbl, u8 rtbl_cnt,
-		spinlock_t *lock, struct clk **pll_clk,
-		struct clk **vco_gate_clk)
+		spinlock_t *lock, struct clk_core **pll_clk,
+		struct clk_core **vco_gate_clk)
 {
 	struct clk_vco *vco;
 	struct clk_pll *pll;
-	struct clk *vco_clk, *tpll_clk, *tvco_gate_clk;
+	struct clk_core *vco_clk, *tpll_clk, *tvco_gate_clk;
 	struct clk_init_data vco_init, pll_init;
 	const char **vco_parent_name;
 

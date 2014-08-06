@@ -94,7 +94,7 @@ static void __init _of_ti_gate_clk_setup(struct device_node *node,
 					 const struct clk_ops *ops,
 					 const struct clk_hw_omap_ops *hw_ops)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init = { NULL };
 	struct clk_hw_omap *clk_hw;
 	const char *clk_name = node->name;

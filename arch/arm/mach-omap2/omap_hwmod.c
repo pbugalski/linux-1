@@ -753,7 +753,7 @@ static int _del_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
 }
 
 /**
- * _init_main_clk - get a struct clk * for the the hwmod's main functional clk
+ * _init_main_clk - get a struct clk_core * for the the hwmod's main functional clk
  * @oh: struct omap_hwmod *
  *
  * Called from _init_clocks().  Populates the @oh _clk (main
@@ -767,7 +767,7 @@ static int _init_main_clk(struct omap_hwmod *oh)
 	if (!oh->main_clk)
 		return 0;
 
-	oh->_clk = clk_get(NULL, oh->main_clk);
+	oh->_clk = clk_provider_get(NULL, oh->main_clk);
 	if (IS_ERR(oh->_clk)) {
 		pr_warning("omap_hwmod: %s: cannot clk_get main_clk %s\n",
 			   oh->name, oh->main_clk);
@@ -781,7 +781,7 @@ static int _init_main_clk(struct omap_hwmod *oh)
 	 * some point where subsystems like i2c and pmic become
 	 * available.
 	 */
-	clk_prepare(oh->_clk);
+	clk_provider_prepare(oh->_clk);
 
 	if (!_get_clkdm(oh))
 		pr_debug("omap_hwmod: %s: missing clockdomain for %s.\n",
@@ -791,7 +791,7 @@ static int _init_main_clk(struct omap_hwmod *oh)
 }
 
 /**
- * _init_interface_clks - get a struct clk * for the the hwmod's interface clks
+ * _init_interface_clks - get a struct clk_core * for the the hwmod's interface clks
  * @oh: struct omap_hwmod *
  *
  * Called from _init_clocks().  Populates the @oh OCP slave interface
@@ -801,7 +801,7 @@ static int _init_interface_clks(struct omap_hwmod *oh)
 {
 	struct omap_hwmod_ocp_if *os;
 	struct list_head *p;
-	struct clk *c;
+	struct clk_core *c;
 	int i = 0;
 	int ret = 0;
 
@@ -812,7 +812,7 @@ static int _init_interface_clks(struct omap_hwmod *oh)
 		if (!os->clk)
 			continue;
 
-		c = clk_get(NULL, os->clk);
+		c = clk_provider_get(NULL, os->clk);
 		if (IS_ERR(c)) {
 			pr_warning("omap_hwmod: %s: cannot clk_get interface_clk %s\n",
 				   oh->name, os->clk);
@@ -828,14 +828,14 @@ static int _init_interface_clks(struct omap_hwmod *oh)
 		 * some point where subsystems like i2c and pmic become
 		 * available.
 		 */
-		clk_prepare(os->_clk);
+		clk_provider_prepare(os->_clk);
 	}
 
 	return ret;
 }
 
 /**
- * _init_opt_clk - get a struct clk * for the the hwmod's optional clocks
+ * _init_opt_clk - get a struct clk_core * for the the hwmod's optional clocks
  * @oh: struct omap_hwmod *
  *
  * Called from _init_clocks().  Populates the @oh omap_hwmod_opt_clk
@@ -844,12 +844,12 @@ static int _init_interface_clks(struct omap_hwmod *oh)
 static int _init_opt_clks(struct omap_hwmod *oh)
 {
 	struct omap_hwmod_opt_clk *oc;
-	struct clk *c;
+	struct clk_core *c;
 	int i;
 	int ret = 0;
 
 	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++) {
-		c = clk_get(NULL, oc->clk);
+		c = clk_provider_get(NULL, oc->clk);
 		if (IS_ERR(c)) {
 			pr_warning("omap_hwmod: %s: cannot clk_get opt_clk %s\n",
 				   oh->name, oc->clk);
@@ -865,7 +865,7 @@ static int _init_opt_clks(struct omap_hwmod *oh)
 		 * some point where subsystems like i2c and pmic become
 		 * available.
 		 */
-		clk_prepare(oc->_clk);
+		clk_provider_prepare(oc->_clk);
 	}
 
 	return ret;
@@ -887,7 +887,7 @@ static int _enable_clocks(struct omap_hwmod *oh)
 	pr_debug("omap_hwmod: %s: enabling clocks\n", oh->name);
 
 	if (oh->_clk)
-		clk_enable(oh->_clk);
+		clk_provider_enable(oh->_clk);
 
 	p = oh->slave_ports.next;
 
@@ -895,7 +895,7 @@ static int _enable_clocks(struct omap_hwmod *oh)
 		os = _fetch_next_ocp_if(&p, &i);
 
 		if (os->_clk && (os->flags & OCPIF_SWSUP_IDLE))
-			clk_enable(os->_clk);
+			clk_provider_enable(os->_clk);
 	}
 
 	/* The opt clocks are controlled by the device driver. */
@@ -918,7 +918,7 @@ static int _disable_clocks(struct omap_hwmod *oh)
 	pr_debug("omap_hwmod: %s: disabling clocks\n", oh->name);
 
 	if (oh->_clk)
-		clk_disable(oh->_clk);
+		clk_provider_disable(oh->_clk);
 
 	p = oh->slave_ports.next;
 
@@ -926,7 +926,7 @@ static int _disable_clocks(struct omap_hwmod *oh)
 		os = _fetch_next_ocp_if(&p, &i);
 
 		if (os->_clk && (os->flags & OCPIF_SWSUP_IDLE))
-			clk_disable(os->_clk);
+			clk_provider_disable(os->_clk);
 	}
 
 	/* The opt clocks are controlled by the device driver. */
@@ -945,7 +945,7 @@ static void _enable_optional_clocks(struct omap_hwmod *oh)
 		if (oc->_clk) {
 			pr_debug("omap_hwmod: enable %s:%s\n", oc->role,
 				 __clk_get_name(oc->_clk));
-			clk_enable(oc->_clk);
+			clk_provider_enable(oc->_clk);
 		}
 }
 
@@ -960,7 +960,7 @@ static void _disable_optional_clocks(struct omap_hwmod *oh)
 		if (oc->_clk) {
 			pr_debug("omap_hwmod: disable %s:%s\n", oc->role,
 				 __clk_get_name(oc->_clk));
-			clk_disable(oc->_clk);
+			clk_provider_disable(oc->_clk);
 		}
 }
 
@@ -2585,7 +2585,7 @@ static void __init _setup_iclk_autoidle(struct omap_hwmod *oh)
 			/* XXX omap_iclk_deny_idle(c); */
 		} else {
 			/* XXX omap_iclk_allow_idle(c); */
-			clk_enable(os->_clk);
+			clk_provider_enable(os->_clk);
 		}
 	}
 
@@ -3389,7 +3389,7 @@ static void __init _ensure_mpu_hwmod_is_setup(struct omap_hwmod *oh)
  * Initialize and set up a single hwmod.  Intended to be used for a
  * small number of early devices, such as the timer IP blocks used for
  * the scheduler clock.  Must be called after omap2_clk_init().
- * Resolves the struct clk names to struct clk pointers for each
+ * Resolves the struct clk_core names to struct clk_core pointers for each
  * registered omap_hwmod.  Also calls _setup() on each hwmod.  Returns
  * -EINVAL upon error or 0 upon success.
  */
@@ -3418,7 +3418,7 @@ int __init omap_hwmod_setup_one(const char *oh_name)
  *
  * Initialize and set up all IP blocks registered with the hwmod code.
  * Must be called after omap2_clk_init().  Resolves the struct clk
- * names to struct clk pointers for each registered omap_hwmod.  Also
+ * names to struct clk_core pointers for each registered omap_hwmod.  Also
  * calls _setup() on each hwmod.  Returns 0 upon success.
  */
 static int __init omap_hwmod_setup_all(void)
@@ -3785,7 +3785,7 @@ int omap_hwmod_get_resource_byname(struct omap_hwmod *oh, unsigned int type,
  */
 struct powerdomain *omap_hwmod_get_pwrdm(struct omap_hwmod *oh)
 {
-	struct clk *c;
+	struct clk_core *c;
 	struct omap_hwmod_ocp_if *oi;
 	struct clockdomain *clkdm;
 	struct clk_hw_omap *clk;

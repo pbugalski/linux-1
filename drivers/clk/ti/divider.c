@@ -246,7 +246,7 @@ const struct clk_ops ti_clk_divider_ops = {
 	.set_rate = ti_clk_divider_set_rate,
 };
 
-static struct clk *_register_divider(struct device *dev, const char *name,
+static struct clk_core *_register_divider(struct device *dev, const char *name,
 				     const char *parent_name,
 				     unsigned long flags, void __iomem *reg,
 				     u8 shift, u8 width, u8 clk_divider_flags,
@@ -254,7 +254,7 @@ static struct clk *_register_divider(struct device *dev, const char *name,
 				     spinlock_t *lock)
 {
 	struct clk_divider *div;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	if (clk_divider_flags & CLK_DIVIDER_HIWORD_MASK) {
@@ -434,7 +434,7 @@ static int __init ti_clk_divider_populate(struct device_node *node,
  */
 static void __init of_ti_divider_clk_setup(struct device_node *node)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name;
 	void __iomem *reg;
 	u8 clk_divider_flags = 0;

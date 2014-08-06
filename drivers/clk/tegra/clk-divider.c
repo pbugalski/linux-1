@@ -147,13 +147,13 @@ const struct clk_ops tegra_clk_frac_div_ops = {
 	.round_rate = clk_frac_div_round_rate,
 };
 
-struct clk *tegra_clk_register_divider(const char *name,
+struct clk_core *tegra_clk_register_divider(const char *name,
 		const char *parent_name, void __iomem *reg,
 		unsigned long flags, u8 clk_divider_flags, u8 shift, u8 width,
 		u8 frac_width, spinlock_t *lock)
 {
 	struct tegra_clk_frac_div *divider;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	divider = kzalloc(sizeof(*divider), GFP_KERNEL);

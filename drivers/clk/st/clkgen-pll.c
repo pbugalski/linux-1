@@ -390,13 +390,13 @@ static const struct clk_ops st_pll1200c32_ops = {
 	.recalc_rate	= recalc_stm_pll1200c32,
 };
 
-static struct clk * __init clkgen_pll_register(const char *parent_name,
+static struct clk_core * __init clkgen_pll_register(const char *parent_name,
 				struct clkgen_pll_data	*pll_data,
 				void __iomem *reg,
 				const char *clk_name)
 {
 	struct clkgen_pll *pll;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
@@ -422,16 +422,16 @@ static struct clk * __init clkgen_pll_register(const char *parent_name,
 
 	pr_debug("%s: parent %s rate %lu\n",
 			__clk_get_name(clk),
-			__clk_get_name(clk_get_parent(clk)),
-			clk_get_rate(clk));
+			__clk_get_name(clk_provider_get_parent(clk)),
+			clk_provider_get_rate(clk));
 
 	return clk;
 }
 
-static struct clk * __init clkgen_c65_lsdiv_register(const char *parent_name,
+static struct clk_core * __init clkgen_c65_lsdiv_register(const char *parent_name,
 						     const char *clk_name)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0, 1, 2);
 	if (IS_ERR(clk))
@@ -439,8 +439,8 @@ static struct clk * __init clkgen_c65_lsdiv_register(const char *parent_name,
 
 	pr_debug("%s: parent %s rate %lu\n",
 			__clk_get_name(clk),
-			__clk_get_name(clk_get_parent(clk)),
-			clk_get_rate(clk));
+			__clk_get_name(clk_provider_get_parent(clk)),
+			clk_provider_get_rate(clk));
 	return clk;
 }
 
@@ -484,7 +484,7 @@ static void __init clkgena_c65_pll_setup(struct device_node *np)
 		return;
 
 	clk_data->clk_num = num_pll_outputs;
-	clk_data->clks = kzalloc(clk_data->clk_num * sizeof(struct clk *),
+	clk_data->clks = kzalloc(clk_data->clk_num * sizeof(struct clk_core *),
 				 GFP_KERNEL);
 
 	if (!clk_data->clks)
@@ -543,14 +543,14 @@ err:
 CLK_OF_DECLARE(clkgena_c65_plls,
 	       "st,clkgena-plls-c65", clkgena_c65_pll_setup);
 
-static struct clk * __init clkgen_odf_register(const char *parent_name,
+static struct clk_core * __init clkgen_odf_register(const char *parent_name,
 					       void * __iomem reg,
 					       struct clkgen_pll_data *pll_data,
 					       int odf,
 					       spinlock_t *odf_lock,
 					       const char *odf_name)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	unsigned long flags;
 	struct clk_gate *gate;
 	struct clk_divider *div;
@@ -588,8 +588,8 @@ static struct clk * __init clkgen_odf_register(const char *parent_name,
 
 	pr_debug("%s: parent %s rate %lu\n",
 			__clk_get_name(clk),
-			__clk_get_name(clk_get_parent(clk)),
-			clk_get_rate(clk));
+			__clk_get_name(clk_provider_get_parent(clk)),
+			clk_provider_get_rate(clk));
 	return clk;
 }
 
@@ -640,7 +640,7 @@ static struct of_device_id c32_pll_of_match[] = {
 static void __init clkgen_c32_pll_setup(struct device_node *np)
 {
 	const struct of_device_id *match;
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name, *pll_name;
 	void __iomem *pll_base;
 	int num_odfs, odf;
@@ -676,14 +676,14 @@ static void __init clkgen_c32_pll_setup(struct device_node *np)
 		return;
 
 	clk_data->clk_num = num_odfs;
-	clk_data->clks = kzalloc(clk_data->clk_num * sizeof(struct clk *),
+	clk_data->clks = kzalloc(clk_data->clk_num * sizeof(struct clk_core *),
 				 GFP_KERNEL);
 
 	if (!clk_data->clks)
 		goto err;
 
 	for (odf = 0; odf < num_odfs; odf++) {
-		struct clk *clk;
+		struct clk_core *clk;
 		const char *clk_name;
 
 		if (of_property_read_string_index(np, "clock-output-names",
@@ -723,7 +723,7 @@ static struct of_device_id c32_gpu_pll_of_match[] = {
 static void __init clkgengpu_c32_pll_setup(struct device_node *np)
 {
 	const struct of_device_id *match;
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name;
 	void __iomem *reg;
 	const char *clk_name;

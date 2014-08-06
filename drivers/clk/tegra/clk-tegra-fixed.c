@@ -36,8 +36,8 @@ int __init tegra_osc_clk_init(void __iomem *clk_base,
 				unsigned long *osc_freq,
 				unsigned long *pll_ref_freq)
 {
-	struct clk *clk;
-	struct clk **dt_clk;
+	struct clk_core *clk;
+	struct clk_core **dt_clk;
 	u32 val, pll_ref_div;
 	unsigned osc_idx;
 
@@ -81,8 +81,8 @@ int __init tegra_osc_clk_init(void __iomem *clk_base,
 
 void __init tegra_fixed_clk_init(struct tegra_clk *tegra_clks)
 {
-	struct clk *clk;
-	struct clk **dt_clk;
+	struct clk_core *clk;
+	struct clk_core **dt_clk;
 
 	/* clk_32k */
 	dt_clk = tegra_lookup_dt_id(tegra_clk_clk_32k, tegra_clks);

@@ -21,7 +21,7 @@
 static int lpt_clk_probe(struct platform_device *pdev)
 {
 	struct lpss_clk_data *drvdata;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	drvdata = devm_kzalloc(&pdev->dev, sizeof(*drvdata), GFP_KERNEL);
 	if (!drvdata)

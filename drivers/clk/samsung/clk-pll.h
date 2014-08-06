@@ -97,7 +97,7 @@ struct samsung_pll_rate_table {
 	unsigned int vsel;
 };
 
-extern struct clk * __init samsung_clk_register_pll2550x(const char *name,
+extern struct clk_core * __init samsung_clk_register_pll2550x(const char *name,
 			const char *pname, const void __iomem *reg_base,
 			const unsigned long offset);
 

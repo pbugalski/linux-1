@@ -124,13 +124,13 @@ const struct clk_ops xgene_clk_pll_ops = {
 	.recalc_rate = xgene_clk_pll_recalc_rate,
 };
 
-static struct clk *xgene_register_clk_pll(struct device *dev,
+static struct clk_core *xgene_register_clk_pll(struct device *dev,
 	const char *name, const char *parent_name,
 	unsigned long flags, void __iomem *reg, u32 pll_offset,
 	u32 type, spinlock_t *lock)
 {
 	struct xgene_clk_pll *apmclk;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	/* allocate the APM clock structure */
@@ -166,7 +166,7 @@ static struct clk *xgene_register_clk_pll(struct device *dev,
 static void xgene_pllclk_init(struct device_node *np, enum xgene_pll_type pll_type)
 {
         const char *clk_name = np->full_name;
-        struct clk *clk;
+        struct clk_core *clk;
         void *reg;
 
         reg = of_iomap(np, 0);
@@ -395,12 +395,12 @@ const struct clk_ops xgene_clk_ops = {
 	.round_rate = xgene_clk_round_rate,
 };
 
-static struct clk *xgene_register_clk(struct device *dev,
+static struct clk_core *xgene_register_clk(struct device *dev,
 		const char *name, const char *parent_name,
 		struct xgene_dev_parameters *parameters, spinlock_t *lock)
 {
 	struct xgene_clk *apmclk;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 	int rc;
 
@@ -442,7 +442,7 @@ static struct clk *xgene_register_clk(struct device *dev,
 static void __init xgene_devclk_init(struct device_node *np)
 {
 	const char *clk_name = np->full_name;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct resource res;
 	int rc;
 	struct xgene_dev_parameters parameters;

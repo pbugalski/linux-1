@@ -202,7 +202,7 @@ static DEFINE_SPINLOCK(pll_d_lock);
 			_clk_num, _gate_flags,	\
 			_clk_id)
 
-static struct clk **clks;
+static struct clk_core **clks;
 
 /*
  * Structure defining the fields for USB UTMI clocks Parameters.
@@ -918,7 +918,7 @@ static const char *pll_e_parents[] = {"pll_ref", "pll_p"};
 
 static void __init tegra30_pll_init(void)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	/* PLLC */
 	clk = tegra_clk_register_pll("pll_c", "pll_ref", clk_base, pmc_base, 0,
@@ -1009,7 +1009,7 @@ static const char *sclk_parents[] = { "clk_m", "pll_c_out1", "pll_p_out4",
 
 static void __init tegra30_super_clk_init(void)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	/*
 	 * Clock input to cclk_g divided from pll_p using
@@ -1131,7 +1131,7 @@ static struct tegra_periph_init_data tegra_periph_nodiv_clk_list[] = {
 static void __init tegra30_periph_clk_init(void)
 {
 	struct tegra_periph_init_data *data;
-	struct clk *clk;
+	struct clk_core *clk;
 	int i;
 
 	/* dsia */

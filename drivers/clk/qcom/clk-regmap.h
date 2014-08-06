@@ -39,7 +39,7 @@ struct clk_regmap {
 int clk_is_enabled_regmap(struct clk_hw *hw);
 int clk_enable_regmap(struct clk_hw *hw);
 void clk_disable_regmap(struct clk_hw *hw);
-struct clk *
+struct clk_core *
 devm_clk_register_regmap(struct device *dev, struct clk_regmap *rclk);
 
 #endif

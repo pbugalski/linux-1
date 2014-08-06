@@ -16,7 +16,7 @@
 
 #define CMU_HFPERCLKEN0		0x44
 
-static struct clk *clk[37];
+static struct clk_core *clk[37];
 static struct clk_onecell_data clk_data = {
 	.clks = clk,
 	.clk_num = ARRAY_SIZE(clk),

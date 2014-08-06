@@ -243,7 +243,7 @@ static struct clk_ops clk_prcmu_opp_volt_scalable_ops = {
 	.set_rate = clk_prcmu_set_rate,
 };
 
-static struct clk *clk_reg_prcmu(const char *name,
+static struct clk_core *clk_reg_prcmu(const char *name,
 				 const char *parent_name,
 				 u8 cg_sel,
 				 unsigned long rate,
@@ -252,7 +252,7 @@ static struct clk *clk_reg_prcmu(const char *name,
 {
 	struct clk_prcmu *clk;
 	struct clk_init_data clk_prcmu_init;
-	struct clk *clk_reg;
+	struct clk_core *clk_reg;
 
 	if (!name) {
 		pr_err("clk_prcmu: %s invalid arguments passed\n", __func__);
@@ -292,7 +292,7 @@ free_clk:
 	return ERR_PTR(-ENOMEM);
 }
 
-struct clk *clk_reg_prcmu_scalable(const char *name,
+struct clk_core *clk_reg_prcmu_scalable(const char *name,
 				   const char *parent_name,
 				   u8 cg_sel,
 				   unsigned long rate,
@@ -302,7 +302,7 @@ struct clk *clk_reg_prcmu_scalable(const char *name,
 			&clk_prcmu_scalable_ops);
 }
 
-struct clk *clk_reg_prcmu_gate(const char *name,
+struct clk_core *clk_reg_prcmu_gate(const char *name,
 			       const char *parent_name,
 			       u8 cg_sel,
 			       unsigned long flags)
@@ -311,7 +311,7 @@ struct clk *clk_reg_prcmu_gate(const char *name,
 			&clk_prcmu_gate_ops);
 }
 
-struct clk *clk_reg_prcmu_scalable_rate(const char *name,
+struct clk_core *clk_reg_prcmu_scalable_rate(const char *name,
 					const char *parent_name,
 					u8 cg_sel,
 					unsigned long rate,
@@ -321,7 +321,7 @@ struct clk *clk_reg_prcmu_scalable_rate(const char *name,
 			&clk_prcmu_scalable_rate_ops);
 }
 
-struct clk *clk_reg_prcmu_rate(const char *name,
+struct clk_core *clk_reg_prcmu_rate(const char *name,
 			       const char *parent_name,
 			       u8 cg_sel,
 			       unsigned long flags)
@@ -330,7 +330,7 @@ struct clk *clk_reg_prcmu_rate(const char *name,
 			&clk_prcmu_rate_ops);
 }
 
-struct clk *clk_reg_prcmu_opp_gate(const char *name,
+struct clk_core *clk_reg_prcmu_opp_gate(const char *name,
 				   const char *parent_name,
 				   u8 cg_sel,
 				   unsigned long flags)
@@ -339,7 +339,7 @@ struct clk *clk_reg_prcmu_opp_gate(const char *name,
 			&clk_prcmu_opp_gate_ops);
 }
 
-struct clk *clk_reg_prcmu_opp_volt_scalable(const char *name,
+struct clk_core *clk_reg_prcmu_opp_volt_scalable(const char *name,
 					    const char *parent_name,
 					    u8 cg_sel,
 					    unsigned long rate,

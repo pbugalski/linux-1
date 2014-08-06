@@ -164,7 +164,7 @@ void __init mv78xx0_map_io(void)
 /*****************************************************************************
  * CLK tree
  ****************************************************************************/
-static struct clk *tclk;
+static struct clk_core *tclk;
 
 static void __init clk_init(void)
 {

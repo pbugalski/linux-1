@@ -29,7 +29,7 @@
  */
 void __init bcm2835_init_clocks(void)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	int ret;
 
 	clk = clk_register_fixed_rate(NULL, "sys_pclk", NULL, CLK_IS_ROOT,

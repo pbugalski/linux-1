@@ -34,7 +34,7 @@
 #include "cm3xxx.h"
 #include "cm-regbits-34xx.h"
 
-static struct clk *mcbsp_iclks[5];
+static struct clk_core *mcbsp_iclks[5];
 
 static int omap3_enable_st_clock(unsigned int id, bool enable)
 {
@@ -98,7 +98,7 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
 		(struct omap_mcbsp_dev_attr *)(oh->dev_attr))->sidetone);
 		pdata->enable_st_clock = omap3_enable_st_clock;
 		sprintf(clk_name, "mcbsp%d_ick", id);
-		mcbsp_iclks[id] = clk_get(NULL, clk_name);
+		mcbsp_iclks[id] = clk_provider_get(NULL, clk_name);
 		count++;
 	}
 	pdev = omap_device_build_ss(name, id, oh_device, count, pdata,

@@ -25,7 +25,7 @@ struct clk_sp810;
 
 struct clk_sp810_timerclken {
 	struct clk_hw hw;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_sp810 *sp810;
 	int channel;
 };
@@ -36,8 +36,8 @@ struct clk_sp810 {
 	void __iomem *base;
 	spinlock_t lock;
 	struct clk_sp810_timerclken timerclken[4];
-	struct clk *refclk;
-	struct clk *timclk;
+	struct clk_core *refclk;
+	struct clk_core *timclk;
 };
 
 static u8 clk_sp810_timerclken_get_parent(struct clk_hw *hw)
@@ -79,29 +79,31 @@ static int clk_sp810_timerclken_prepare(struct clk_hw *hw)
 {
 	struct clk_sp810_timerclken *timerclken = to_clk_sp810_timerclken(hw);
 	struct clk_sp810 *sp810 = timerclken->sp810;
-	struct clk *old_parent = __clk_get_parent(hw->clk);
-	struct clk *new_parent;
+	struct clk_core *old_parent = __clk_get_parent(hw->clk);
+	struct clk_core *new_parent;
 
 	if (!sp810->refclk)
-		sp810->refclk = of_clk_get(sp810->node, sp810->refclk_index);
+		sp810->refclk = of_clk_provider_get(sp810->node,
+						    sp810->refclk_index);
 
 	if (!sp810->timclk)
-		sp810->timclk = of_clk_get(sp810->node, sp810->timclk_index);
+		sp810->timclk = of_clk_provider_get(sp810->node,
+						    sp810->timclk_index);
 
 	if (WARN_ON(IS_ERR(sp810->refclk) || IS_ERR(sp810->timclk)))
 		return -ENOENT;
 
 	/* Select fastest parent */
-	if (clk_get_rate(sp810->refclk) > clk_get_rate(sp810->timclk))
+	if (clk_provider_get_rate(sp810->refclk) > clk_provider_get_rate(sp810->timclk))
 		new_parent = sp810->refclk;
 	else
 		new_parent = sp810->timclk;
 
 	/* Switch the parent if necessary */
 	if (old_parent != new_parent) {
-		clk_prepare(new_parent);
-		clk_set_parent(hw->clk, new_parent);
-		clk_unprepare(old_parent);
+		clk_provider_prepare(new_parent);
+		clk_provider_set_parent(hw->clk, new_parent);
+		clk_provider_unprepare(old_parent);
 	}
 
 	return 0;
@@ -112,8 +114,8 @@ static void clk_sp810_timerclken_unprepare(struct clk_hw *hw)
 	struct clk_sp810_timerclken *timerclken = to_clk_sp810_timerclken(hw);
 	struct clk_sp810 *sp810 = timerclken->sp810;
 
-	clk_put(sp810->timclk);
-	clk_put(sp810->refclk);
+	__clk_put(sp810->timclk);
+	__clk_put(sp810->refclk);
 }
 
 static const struct clk_ops clk_sp810_timerclken_ops = {
@@ -123,7 +125,7 @@ static const struct clk_ops clk_sp810_timerclken_ops = {
 	.set_parent = clk_sp810_timerclken_set_parent,
 };
 
-static struct clk *clk_sp810_timerclken_of_get(struct of_phandle_args *clkspec,
+static struct clk_core *clk_sp810_timerclken_of_get(struct of_phandle_args *clkspec,
 		void *data)
 {
 	struct clk_sp810 *sp810 = data;

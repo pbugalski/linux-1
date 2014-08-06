@@ -95,7 +95,7 @@ static struct clk_div_table pll4_main_div_table[] = {
 	{ }
 };
 
-static struct clk *clk[VF610_CLK_END];
+static struct clk_core *clk[VF610_CLK_END];
 static struct clk_onecell_data clk_data;
 
 static void __init vf610_clocks_init(struct device_node *ccm_node)
@@ -303,20 +303,32 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
 	clk[VF610_CLK_DMAMUX2] = imx_clk_gate2("dmamux2", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(1));
 	clk[VF610_CLK_DMAMUX3] = imx_clk_gate2("dmamux3", "platform_bus", CCM_CCGR6, CCM_CCGRx_CGn(2));
 
-	clk_set_parent(clk[VF610_CLK_QSPI0_SEL], clk[VF610_CLK_PLL1_PFD4]);
-	clk_set_rate(clk[VF610_CLK_QSPI0_X4_DIV], clk_get_rate(clk[VF610_CLK_QSPI0_SEL]) / 2);
-	clk_set_rate(clk[VF610_CLK_QSPI0_X2_DIV], clk_get_rate(clk[VF610_CLK_QSPI0_X4_DIV]) / 2);
-	clk_set_rate(clk[VF610_CLK_QSPI0_X1_DIV], clk_get_rate(clk[VF610_CLK_QSPI0_X2_DIV]) / 2);
+	clk_provider_set_parent(clk[VF610_CLK_QSPI0_SEL],
+				clk[VF610_CLK_PLL1_PFD4]);
+	clk_provider_set_rate(clk[VF610_CLK_QSPI0_X4_DIV],
+			      clk_provider_get_rate(clk[VF610_CLK_QSPI0_SEL]) / 2);
+	clk_provider_set_rate(clk[VF610_CLK_QSPI0_X2_DIV],
+			      clk_provider_get_rate(clk[VF610_CLK_QSPI0_X4_DIV]) / 2);
+	clk_provider_set_rate(clk[VF610_CLK_QSPI0_X1_DIV],
+			      clk_provider_get_rate(clk[VF610_CLK_QSPI0_X2_DIV]) / 2);
 
-	clk_set_parent(clk[VF610_CLK_QSPI1_SEL], clk[VF610_CLK_PLL1_PFD4]);
-	clk_set_rate(clk[VF610_CLK_QSPI1_X4_DIV], clk_get_rate(clk[VF610_CLK_QSPI1_SEL]) / 2);
-	clk_set_rate(clk[VF610_CLK_QSPI1_X2_DIV], clk_get_rate(clk[VF610_CLK_QSPI1_X4_DIV]) / 2);
-	clk_set_rate(clk[VF610_CLK_QSPI1_X1_DIV], clk_get_rate(clk[VF610_CLK_QSPI1_X2_DIV]) / 2);
+	clk_provider_set_parent(clk[VF610_CLK_QSPI1_SEL],
+				clk[VF610_CLK_PLL1_PFD4]);
+	clk_provider_set_rate(clk[VF610_CLK_QSPI1_X4_DIV],
+			      clk_provider_get_rate(clk[VF610_CLK_QSPI1_SEL]) / 2);
+	clk_provider_set_rate(clk[VF610_CLK_QSPI1_X2_DIV],
+			      clk_provider_get_rate(clk[VF610_CLK_QSPI1_X4_DIV]) / 2);
+	clk_provider_set_rate(clk[VF610_CLK_QSPI1_X1_DIV],
+			      clk_provider_get_rate(clk[VF610_CLK_QSPI1_X2_DIV]) / 2);
 
-	clk_set_parent(clk[VF610_CLK_SAI0_SEL], clk[VF610_CLK_AUDIO_EXT]);
-	clk_set_parent(clk[VF610_CLK_SAI1_SEL], clk[VF610_CLK_AUDIO_EXT]);
-	clk_set_parent(clk[VF610_CLK_SAI2_SEL], clk[VF610_CLK_AUDIO_EXT]);
-	clk_set_parent(clk[VF610_CLK_SAI3_SEL], clk[VF610_CLK_AUDIO_EXT]);
+	clk_provider_set_parent(clk[VF610_CLK_SAI0_SEL],
+				clk[VF610_CLK_AUDIO_EXT]);
+	clk_provider_set_parent(clk[VF610_CLK_SAI1_SEL],
+				clk[VF610_CLK_AUDIO_EXT]);
+	clk_provider_set_parent(clk[VF610_CLK_SAI2_SEL],
+				clk[VF610_CLK_AUDIO_EXT]);
+	clk_provider_set_parent(clk[VF610_CLK_SAI3_SEL],
+				clk[VF610_CLK_AUDIO_EXT]);
 
 	/* Add the clocks to provider list */
 	clk_data.clks = clk;

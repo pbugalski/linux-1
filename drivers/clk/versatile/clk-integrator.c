@@ -39,7 +39,7 @@ static const struct clk_icst_desc __initdata cm_auxosc_desc = {
 
 static void __init of_integrator_cm_osc_setup(struct device_node *np)
 {
-	struct clk *clk = ERR_PTR(-EINVAL);
+	struct clk_core *clk = ERR_PTR(-EINVAL);
 	const char *clk_name = np->name;
 	const struct clk_icst_desc *desc = &cm_auxosc_desc;
 	const char *parent_name;

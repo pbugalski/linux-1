@@ -57,9 +57,9 @@ static unsigned long clk_programmable_recalc_rate(struct clk_hw *hw,
 static long clk_programmable_determine_rate(struct clk_hw *hw,
 					    unsigned long rate,
 					    unsigned long *best_parent_rate,
-					    struct clk **best_parent_clk)
+					    struct clk_core **best_parent_clk)
 {
-	struct clk *parent = NULL;
+	struct clk_core *parent = NULL;
 	long best_rate = -EINVAL;
 	unsigned long parent_rate;
 	unsigned long tmp_rate;
@@ -169,14 +169,14 @@ static const struct clk_ops programmable_ops = {
 	.set_rate = clk_programmable_set_rate,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_programmable(struct at91_pmc *pmc,
 			       const char *name, const char **parent_names,
 			       u8 num_parents, u8 id,
 			       const struct clk_programmable_layout *layout)
 {
 	struct clk_programmable *prog;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	if (id > PROG_ID_MAX)
@@ -229,7 +229,7 @@ of_at91_clk_prog_setup(struct device_node *np, struct at91_pmc *pmc,
 	int num;
 	u32 id;
 	int i;
-	struct clk *clk;
+	struct clk_core *clk;
 	int num_parents;
 	const char *parent_names[PROG_SOURCE_MAX];
 	const char *name;

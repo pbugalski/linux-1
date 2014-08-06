@@ -113,7 +113,7 @@ static __initdata struct clk_hw *atlas6_clk_hw_array[maxclk] = {
 	&clk_cphif.hw,
 };
 
-static struct clk *atlas6_clks[maxclk];
+static struct clk_core *atlas6_clks[maxclk];
 
 static void __init atlas6_clk_init(struct device_node *np)
 {

@@ -238,7 +238,7 @@ mvebu_corediv_clk_init(struct device_node *node,
 {
 	struct clk_init_data init;
 	struct clk_corediv *corediv;
-	struct clk **clks;
+	struct clk_core **clks;
 	void __iomem *base;
 	const char *parent_name;
 	const char *clk_name;
@@ -253,7 +253,7 @@ mvebu_corediv_clk_init(struct device_node *node,
 	clk_data.clk_num = soc_desc->ndescs;
 
 	/* clks holds the clock array */
-	clks = kcalloc(clk_data.clk_num, sizeof(struct clk *),
+	clks = kcalloc(clk_data.clk_num, sizeof(struct clk_core *),
 				GFP_KERNEL);
 	if (WARN_ON(!clks))
 		goto err_unmap;

@@ -116,14 +116,14 @@ static struct clk_ops clk_factor_ops = {
 	.set_rate = clk_factor_set_rate,
 };
 
-struct clk *mmp_clk_register_factor(const char *name, const char *parent_name,
+struct clk_core *mmp_clk_register_factor(const char *name, const char *parent_name,
 		unsigned long flags, void __iomem *base,
 		struct clk_factor_masks *masks, struct clk_factor_tbl *ftbl,
 		unsigned int ftbl_cnt)
 {
 	struct clk_factor *factor;
 	struct clk_init_data init;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	if (!masks) {
 		pr_err("%s: must pass a clk_factor_mask\n", __func__);

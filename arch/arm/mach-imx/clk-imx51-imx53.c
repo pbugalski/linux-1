@@ -83,7 +83,7 @@ static const char *spdif_sel[] = { "pll1_sw", "pll2_sw", "pll3_sw", "spdif_xtal_
 static const char *spdif0_com_sel[] = { "spdif0_podf", "ssi1_root_gate", };
 static const char *mx51_spdif1_com_sel[] = { "spdif1_podf", "ssi2_root_gate", };
 
-static struct clk *clk[IMX5_CLK_END];
+static struct clk_core *clk[IMX5_CLK_END];
 static struct clk_onecell_data clk_data;
 
 static void __init mx5_clocks_common_init(unsigned long rate_ckil,
@@ -298,26 +298,28 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
 	clk_register_clkdev(clk[IMX5_CLK_EPIT2_HF_GATE], "per", "imx-epit.1");
 
 	/* Set SDHC parents to be PLL2 */
-	clk_set_parent(clk[IMX5_CLK_ESDHC_A_SEL], clk[IMX5_CLK_PLL2_SW]);
-	clk_set_parent(clk[IMX5_CLK_ESDHC_B_SEL], clk[IMX5_CLK_PLL2_SW]);
+	clk_provider_set_parent(clk[IMX5_CLK_ESDHC_A_SEL],
+				clk[IMX5_CLK_PLL2_SW]);
+	clk_provider_set_parent(clk[IMX5_CLK_ESDHC_B_SEL],
+				clk[IMX5_CLK_PLL2_SW]);
 
 	/* move usb phy clk to 24MHz */
-	clk_set_parent(clk[IMX5_CLK_USB_PHY_SEL], clk[IMX5_CLK_OSC]);
+	clk_provider_set_parent(clk[IMX5_CLK_USB_PHY_SEL], clk[IMX5_CLK_OSC]);
 
-	clk_prepare_enable(clk[IMX5_CLK_GPC_DVFS]);
-	clk_prepare_enable(clk[IMX5_CLK_AHB_MAX]); /* esdhc3 */
-	clk_prepare_enable(clk[IMX5_CLK_AIPS_TZ1]);
-	clk_prepare_enable(clk[IMX5_CLK_AIPS_TZ2]); /* fec */
-	clk_prepare_enable(clk[IMX5_CLK_SPBA]);
-	clk_prepare_enable(clk[IMX5_CLK_EMI_FAST_GATE]); /* fec */
-	clk_prepare_enable(clk[IMX5_CLK_EMI_SLOW_GATE]); /* eim */
-	clk_prepare_enable(clk[IMX5_CLK_MIPI_HSC1_GATE]);
-	clk_prepare_enable(clk[IMX5_CLK_MIPI_HSC2_GATE]);
-	clk_prepare_enable(clk[IMX5_CLK_MIPI_ESC_GATE]);
-	clk_prepare_enable(clk[IMX5_CLK_MIPI_HSP_GATE]);
-	clk_prepare_enable(clk[IMX5_CLK_TMAX1]);
-	clk_prepare_enable(clk[IMX5_CLK_TMAX2]); /* esdhc2, fec */
-	clk_prepare_enable(clk[IMX5_CLK_TMAX3]); /* esdhc1, esdhc4 */
+	clk_provider_prepare_enable(clk[IMX5_CLK_GPC_DVFS]);
+	clk_provider_prepare_enable(clk[IMX5_CLK_AHB_MAX]); /* esdhc3 */
+	clk_provider_prepare_enable(clk[IMX5_CLK_AIPS_TZ1]);
+	clk_provider_prepare_enable(clk[IMX5_CLK_AIPS_TZ2]); /* fec */
+	clk_provider_prepare_enable(clk[IMX5_CLK_SPBA]);
+	clk_provider_prepare_enable(clk[IMX5_CLK_EMI_FAST_GATE]); /* fec */
+	clk_provider_prepare_enable(clk[IMX5_CLK_EMI_SLOW_GATE]); /* eim */
+	clk_provider_prepare_enable(clk[IMX5_CLK_MIPI_HSC1_GATE]);
+	clk_provider_prepare_enable(clk[IMX5_CLK_MIPI_HSC2_GATE]);
+	clk_provider_prepare_enable(clk[IMX5_CLK_MIPI_ESC_GATE]);
+	clk_provider_prepare_enable(clk[IMX5_CLK_MIPI_HSP_GATE]);
+	clk_provider_prepare_enable(clk[IMX5_CLK_TMAX1]);
+	clk_provider_prepare_enable(clk[IMX5_CLK_TMAX2]); /* esdhc2, fec */
+	clk_provider_prepare_enable(clk[IMX5_CLK_TMAX3]); /* esdhc1, esdhc4 */
 }
 
 static void __init mx50_clocks_init(struct device_node *np)
@@ -361,15 +363,15 @@ static void __init mx50_clocks_init(struct device_node *np)
 	mx5_clocks_common_init(0, 0, 0, 0);
 
 	/* set SDHC root clock to 200MHZ*/
-	clk_set_rate(clk[IMX5_CLK_ESDHC_A_PODF], 200000000);
-	clk_set_rate(clk[IMX5_CLK_ESDHC_B_PODF], 200000000);
+	clk_provider_set_rate(clk[IMX5_CLK_ESDHC_A_PODF], 200000000);
+	clk_provider_set_rate(clk[IMX5_CLK_ESDHC_B_PODF], 200000000);
 
-	clk_prepare_enable(clk[IMX5_CLK_IIM_GATE]);
+	clk_provider_prepare_enable(clk[IMX5_CLK_IIM_GATE]);
 	imx_print_silicon_rev("i.MX50", IMX_CHIP_REVISION_1_1);
-	clk_disable_unprepare(clk[IMX5_CLK_IIM_GATE]);
+	clk_provider_disable_unprepare(clk[IMX5_CLK_IIM_GATE]);
 
-	r = clk_round_rate(clk[IMX5_CLK_USBOH3_PER_GATE], 54000000);
-	clk_set_rate(clk[IMX5_CLK_USBOH3_PER_GATE], r);
+	r = clk_provider_round_rate(clk[IMX5_CLK_USBOH3_PER_GATE], 54000000);
+	clk_provider_set_rate(clk[IMX5_CLK_USBOH3_PER_GATE], r);
 
 	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx50-gpt"));
 }
@@ -447,18 +449,19 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
 	clk_register_clkdev(clk[IMX5_CLK_ESDHC4_PER_GATE], "per", "sdhci-esdhc-imx51.3");
 
 	/* set the usboh3 parent to pll2_sw */
-	clk_set_parent(clk[IMX5_CLK_USBOH3_SEL], clk[IMX5_CLK_PLL2_SW]);
+	clk_provider_set_parent(clk[IMX5_CLK_USBOH3_SEL],
+				clk[IMX5_CLK_PLL2_SW]);
 
 	/* set SDHC root clock to 166.25MHZ*/
-	clk_set_rate(clk[IMX5_CLK_ESDHC_A_PODF], 166250000);
-	clk_set_rate(clk[IMX5_CLK_ESDHC_B_PODF], 166250000);
+	clk_provider_set_rate(clk[IMX5_CLK_ESDHC_A_PODF], 166250000);
+	clk_provider_set_rate(clk[IMX5_CLK_ESDHC_B_PODF], 166250000);
 
 	/* System timer */
 	mxc_timer_init(MX51_IO_ADDRESS(MX51_GPT1_BASE_ADDR), MX51_INT_GPT);
 
-	clk_prepare_enable(clk[IMX5_CLK_IIM_GATE]);
+	clk_provider_prepare_enable(clk[IMX5_CLK_IIM_GATE]);
 	imx_print_silicon_rev("i.MX51", mx51_revision());
-	clk_disable_unprepare(clk[IMX5_CLK_IIM_GATE]);
+	clk_provider_disable_unprepare(clk[IMX5_CLK_IIM_GATE]);
 
 	/*
 	 * Reference Manual says: Functionality of CCDR[18] and CLPCR[23] is no
@@ -571,18 +574,18 @@ static void __init mx53_clocks_init(struct device_node *np)
 	clk_register_clkdev(clk[IMX5_CLK_ESDHC4_PER_GATE], "per", "sdhci-esdhc-imx53.3");
 
 	/* set SDHC root clock to 200MHZ*/
-	clk_set_rate(clk[IMX5_CLK_ESDHC_A_PODF], 200000000);
-	clk_set_rate(clk[IMX5_CLK_ESDHC_B_PODF], 200000000);
+	clk_provider_set_rate(clk[IMX5_CLK_ESDHC_A_PODF], 200000000);
+	clk_provider_set_rate(clk[IMX5_CLK_ESDHC_B_PODF], 200000000);
 
 	/* move can bus clk to 24MHz */
-	clk_set_parent(clk[IMX5_CLK_CAN_SEL], clk[IMX5_CLK_LP_APM]);
+	clk_provider_set_parent(clk[IMX5_CLK_CAN_SEL], clk[IMX5_CLK_LP_APM]);
 
-	clk_prepare_enable(clk[IMX5_CLK_IIM_GATE]);
+	clk_provider_prepare_enable(clk[IMX5_CLK_IIM_GATE]);
 	imx_print_silicon_rev("i.MX53", mx53_revision());
-	clk_disable_unprepare(clk[IMX5_CLK_IIM_GATE]);
+	clk_provider_disable_unprepare(clk[IMX5_CLK_IIM_GATE]);
 
-	r = clk_round_rate(clk[IMX5_CLK_USBOH3_PER_GATE], 54000000);
-	clk_set_rate(clk[IMX5_CLK_USBOH3_PER_GATE], r);
+	r = clk_provider_round_rate(clk[IMX5_CLK_USBOH3_PER_GATE], 54000000);
+	clk_provider_set_rate(clk[IMX5_CLK_USBOH3_PER_GATE], r);
 
 	mxc_timer_init_dt(of_find_compatible_node(NULL, NULL, "fsl,imx53-gpt"));
 }

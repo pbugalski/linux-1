@@ -99,12 +99,12 @@ static const struct clk_ops system_ops = {
 	.is_prepared = clk_system_is_prepared,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_system(struct at91_pmc *pmc, const char *name,
 			 const char *parent_name, u8 id, int irq)
 {
 	struct clk_system *sys;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 	int ret;
 
@@ -153,7 +153,7 @@ of_at91_clk_sys_setup(struct device_node *np, struct at91_pmc *pmc)
 	int num;
 	int irq = 0;
 	u32 id;
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *name;
 	struct device_node *sysclknp;
 	const char *parent_name;

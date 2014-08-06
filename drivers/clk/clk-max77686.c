@@ -112,10 +112,10 @@ static struct clk_init_data max77686_clks_init[MAX77686_CLKS_NUM] = {
 	},
 };
 
-static struct clk *max77686_clk_register(struct device *dev,
+static struct clk_core *max77686_clk_register(struct device *dev,
 				struct max77686_clk *max77686)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_hw *hw = &max77686->hw;
 
 	clk = clk_register(dev, hw);
@@ -138,10 +138,10 @@ static int max77686_clk_probe(struct platform_device *pdev)
 {
 	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
 	struct max77686_clk *max77686_clks[MAX77686_CLKS_NUM];
-	struct clk **clocks;
+	struct clk_core **clocks;
 	int i, ret;
 
-	clocks = devm_kzalloc(&pdev->dev, sizeof(struct clk *)
+	clocks = devm_kzalloc(&pdev->dev, sizeof(struct clk_core *)
 					* MAX77686_CLKS_NUM, GFP_KERNEL);
 	if (!clocks)
 		return -ENOMEM;
@@ -203,7 +203,7 @@ err_clocks:
 static int max77686_clk_remove(struct platform_device *pdev)
 {
 	struct max77686_dev *iodev = dev_get_drvdata(pdev->dev.parent);
-	struct clk **clocks = platform_get_drvdata(pdev);
+	struct clk_core **clocks = platform_get_drvdata(pdev);
 	int i;
 
 	if (iodev->dev->of_node)

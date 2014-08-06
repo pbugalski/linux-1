@@ -403,7 +403,7 @@ static void sun7i_a20_get_out_factors(u32 *freq, u32 parent_rate,
  * clk_sunxi_mmc_phase_control() - configures MMC clock phase control
  */
 
-void clk_sunxi_mmc_phase_control(struct clk *clk, u8 sample, u8 output)
+void clk_sunxi_mmc_phase_control(struct clk_core *clk, u8 sample, u8 output)
 {
 	#define to_clk_composite(_hw) container_of(_hw, struct clk_composite, hw)
 	#define to_clk_factors(_hw) container_of(_hw, struct clk_factors, hw)
@@ -582,10 +582,10 @@ static const struct factors_data sun7i_a20_out_data __initconst = {
 	.getter = sun7i_a20_get_out_factors,
 };
 
-static struct clk * __init sunxi_factors_clk_setup(struct device_node *node,
+static struct clk_core * __init sunxi_factors_clk_setup(struct device_node *node,
 						const struct factors_data *data)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_factors *factors;
 	struct clk_gate *gate = NULL;
 	struct clk_mux *mux = NULL;
@@ -695,7 +695,7 @@ static const struct mux_data sun4i_apb1_mux_data __initconst = {
 static void __init sunxi_mux_clk_setup(struct device_node *node,
 				       struct mux_data *data)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *clk_name = node->name;
 	const char *parents[SUNXI_MAX_PARENTS];
 	void __iomem *reg;
@@ -777,7 +777,7 @@ static const struct div_data sun6i_a31_apb2_div_data __initconst = {
 static void __init sunxi_divider_clk_setup(struct device_node *node,
 					   struct div_data *data)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *clk_name = node->name;
 	const char *clk_parent;
 	void __iomem *reg;
@@ -976,7 +976,7 @@ static void __init sunxi_gates_clk_setup(struct device_node *node,
 	clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
 	if (!clk_data)
 		return;
-	clk_data->clks = kzalloc((qty+1) * sizeof(struct clk *), GFP_KERNEL);
+	clk_data->clks = kzalloc((qty+1) * sizeof(struct clk_core *), GFP_KERNEL);
 	if (!clk_data->clks) {
 		kfree(clk_data);
 		return;
@@ -1078,7 +1078,7 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
 	struct clk_onecell_data *clk_data;
 	const char *parent;
 	const char *clk_name;
-	struct clk **clks, *pclk;
+	struct clk_core **clks, *pclk;
 	struct clk_hw *gate_hw, *rate_hw;
 	const struct clk_ops *rate_ops;
 	struct clk_gate *gate = NULL;
@@ -1291,10 +1291,10 @@ static void __init sunxi_init_clocks(const char *clocks[], int nclocks)
 
 	/* Protect the clocks that needs to stay on */
 	for (i = 0; i < nclocks; i++) {
-		struct clk *clk = clk_get(NULL, clocks[i]);
+		struct clk_core *clk = clk_provider_get(NULL, clocks[i]);
 
 		if (!IS_ERR(clk))
-			clk_prepare_enable(clk);
+			clk_provider_prepare_enable(clk);
 	}
 }
 

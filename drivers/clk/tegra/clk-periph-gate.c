@@ -127,12 +127,12 @@ const struct clk_ops tegra_clk_periph_gate_ops = {
 	.disable = clk_periph_disable,
 };
 
-struct clk *tegra_clk_register_periph_gate(const char *name,
+struct clk_core *tegra_clk_register_periph_gate(const char *name,
 		const char *parent_name, u8 gate_flags, void __iomem *clk_base,
 		unsigned long flags, int clk_num, int *enable_refcnt)
 {
 	struct tegra_clk_periph_gate *gate;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 	struct tegra_clk_periph_regs *pregs;
 

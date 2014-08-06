@@ -66,8 +66,8 @@ static const char *ccic_phy_parent[] = {"pll1_6", "pll1_12"};
 
 void __init pxa910_clk_init(void)
 {
-	struct clk *clk;
-	struct clk *uart_pll;
+	struct clk_core *clk;
+	struct clk_core *uart_pll;
 	void __iomem *mpmu_base;
 	void __iomem *apmu_base;
 	void __iomem *apbcp_base;
@@ -164,7 +164,7 @@ void __init pxa910_clk_init(void)
 				mpmu_base + MPMU_UART_PLL,
 				&uart_factor_masks, uart_factor_tbl,
 				ARRAY_SIZE(uart_factor_tbl));
-	clk_set_rate(uart_pll, 14745600);
+	clk_provider_set_rate(uart_pll, 14745600);
 	clk_register_clkdev(uart_pll, "uart_pll", NULL);
 
 	clk = mmp_clk_register_apbc("twsi0", "pll1_13_1_5",
@@ -207,7 +207,7 @@ void __init pxa910_clk_init(void)
 				ARRAY_SIZE(uart_parent),
 				CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT,
 				apbc_base + APBC_UART0, 4, 3, 0, &clk_lock);
-	clk_set_parent(clk, uart_pll);
+	clk_provider_set_parent(clk, uart_pll);
 	clk_register_clkdev(clk, "uart_mux.0", NULL);
 
 	clk = mmp_clk_register_apbc("uart0", "uart0_mux",
@@ -218,7 +218,7 @@ void __init pxa910_clk_init(void)
 				ARRAY_SIZE(uart_parent),
 				CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT,
 				apbc_base + APBC_UART1, 4, 3, 0, &clk_lock);
-	clk_set_parent(clk, uart_pll);
+	clk_provider_set_parent(clk, uart_pll);
 	clk_register_clkdev(clk, "uart_mux.1", NULL);
 
 	clk = mmp_clk_register_apbc("uart1", "uart1_mux",
@@ -229,7 +229,7 @@ void __init pxa910_clk_init(void)
 				ARRAY_SIZE(uart_parent),
 				CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT,
 				apbcp_base + APBCP_UART2, 4, 3, 0, &clk_lock);
-	clk_set_parent(clk, uart_pll);
+	clk_provider_set_parent(clk, uart_pll);
 	clk_register_clkdev(clk, "uart_mux.2", NULL);
 
 	clk = mmp_clk_register_apbc("uart2", "uart2_mux",

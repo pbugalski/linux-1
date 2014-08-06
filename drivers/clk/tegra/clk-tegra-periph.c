@@ -585,8 +585,8 @@ static void __init periph_clk_init(void __iomem *clk_base,
 				struct tegra_clk *tegra_clks)
 {
 	int i;
-	struct clk *clk;
-	struct clk **dt_clk;
+	struct clk_core *clk;
+	struct clk_core **dt_clk;
 
 	for (i = 0; i < ARRAY_SIZE(periph_clks); i++) {
 		struct tegra_clk_periph_regs *bank;
@@ -615,8 +615,8 @@ static void __init gate_clk_init(void __iomem *clk_base,
 				struct tegra_clk *tegra_clks)
 {
 	int i;
-	struct clk *clk;
-	struct clk **dt_clk;
+	struct clk_core *clk;
+	struct clk_core **dt_clk;
 
 	for (i = 0; i < ARRAY_SIZE(gate_clks); i++) {
 		struct tegra_periph_init_data *data;
@@ -640,8 +640,8 @@ static void __init init_pllp(void __iomem *clk_base, void __iomem *pmc_base,
 				struct tegra_clk *tegra_clks,
 				struct tegra_clk_pll_params *pll_params)
 {
-	struct clk *clk;
-	struct clk **dt_clk;
+	struct clk_core *clk;
+	struct clk_core **dt_clk;
 	int i;
 
 	dt_clk = tegra_lookup_dt_id(tegra_clk_pll_p, tegra_clks);

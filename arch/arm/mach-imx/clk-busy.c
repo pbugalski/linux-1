@@ -78,12 +78,12 @@ static struct clk_ops clk_busy_divider_ops = {
 	.set_rate = clk_busy_divider_set_rate,
 };
 
-struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
+struct clk_core *imx_clk_busy_divider(const char *name, const char *parent_name,
 				 void __iomem *reg, u8 shift, u8 width,
 				 void __iomem *busy_reg, u8 busy_shift)
 {
 	struct clk_busy_divider *busy;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	busy = kzalloc(sizeof(*busy), GFP_KERNEL);
@@ -152,12 +152,12 @@ static struct clk_ops clk_busy_mux_ops = {
 	.set_parent = clk_busy_mux_set_parent,
 };
 
-struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
+struct clk_core *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
 			     u8 width, void __iomem *busy_reg, u8 busy_shift,
 			     const char **parent_names, int num_parents)
 {
 	struct clk_busy_mux *busy;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	busy = kzalloc(sizeof(*busy), GFP_KERNEL);

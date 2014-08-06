@@ -14,52 +14,52 @@
 #include <linux/device.h>
 #include <linux/types.h>
 
-struct clk *clk_reg_prcc_pclk(const char *name,
+struct clk_core *clk_reg_prcc_pclk(const char *name,
 			      const char *parent_name,
 			      resource_size_t phy_base,
 			      u32 cg_sel,
 			      unsigned long flags);
 
-struct clk *clk_reg_prcc_kclk(const char *name,
+struct clk_core *clk_reg_prcc_kclk(const char *name,
 			      const char *parent_name,
 			      resource_size_t phy_base,
 			      u32 cg_sel,
 			      unsigned long flags);
 
-struct clk *clk_reg_prcmu_scalable(const char *name,
+struct clk_core *clk_reg_prcmu_scalable(const char *name,
 				   const char *parent_name,
 				   u8 cg_sel,
 				   unsigned long rate,
 				   unsigned long flags);
 
-struct clk *clk_reg_prcmu_gate(const char *name,
+struct clk_core *clk_reg_prcmu_gate(const char *name,
 			       const char *parent_name,
 			       u8 cg_sel,
 			       unsigned long flags);
 
-struct clk *clk_reg_prcmu_scalable_rate(const char *name,
+struct clk_core *clk_reg_prcmu_scalable_rate(const char *name,
 					const char *parent_name,
 					u8 cg_sel,
 					unsigned long rate,
 					unsigned long flags);
 
-struct clk *clk_reg_prcmu_rate(const char *name,
+struct clk_core *clk_reg_prcmu_rate(const char *name,
 			       const char *parent_name,
 			       u8 cg_sel,
 			       unsigned long flags);
 
-struct clk *clk_reg_prcmu_opp_gate(const char *name,
+struct clk_core *clk_reg_prcmu_opp_gate(const char *name,
 				   const char *parent_name,
 				   u8 cg_sel,
 				   unsigned long flags);
 
-struct clk *clk_reg_prcmu_opp_volt_scalable(const char *name,
+struct clk_core *clk_reg_prcmu_opp_volt_scalable(const char *name,
 					    const char *parent_name,
 					    u8 cg_sel,
 					    unsigned long rate,
 					    unsigned long flags);
 
-struct clk *clk_reg_sysctrl_gate(struct device *dev,
+struct clk_core *clk_reg_sysctrl_gate(struct device *dev,
 				 const char *name,
 				 const char *parent_name,
 				 u16 reg_sel,
@@ -68,7 +68,7 @@ struct clk *clk_reg_sysctrl_gate(struct device *dev,
 				 unsigned long enable_delay_us,
 				 unsigned long flags);
 
-struct clk *clk_reg_sysctrl_gate_fixed_rate(struct device *dev,
+struct clk_core *clk_reg_sysctrl_gate_fixed_rate(struct device *dev,
 					    const char *name,
 					    const char *parent_name,
 					    u16 reg_sel,
@@ -78,7 +78,7 @@ struct clk *clk_reg_sysctrl_gate_fixed_rate(struct device *dev,
 					    unsigned long enable_delay_us,
 					    unsigned long flags);
 
-struct clk *clk_reg_sysctrl_set_parent(struct device *dev,
+struct clk_core *clk_reg_sysctrl_set_parent(struct device *dev,
 				       const char *name,
 				       const char **parent_names,
 				       u8 num_parents,

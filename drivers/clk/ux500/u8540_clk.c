@@ -17,7 +17,7 @@
 void u8540_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
 		    u32 clkrst5_base, u32 clkrst6_base)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	/* Clock sources. */
 	/* Fixed ClockGen */

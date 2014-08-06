@@ -29,7 +29,7 @@ struct berlin2_pll_map {
 	u8 divsel_shift;
 };
 
-struct clk * __init
+struct clk_core * __init
 berlin2_pll_register(const struct berlin2_pll_map *map,
 		     void __iomem *base, const char *name,
 		     const char *parent_name, unsigned long flags);

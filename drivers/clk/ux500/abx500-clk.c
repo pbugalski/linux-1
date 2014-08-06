@@ -23,7 +23,7 @@
 static int ab8500_reg_clks(struct device *dev)
 {
 	int ret;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	const char *intclk_parents[] = {"ab8500_sysclk", "ulpclk"};
 	u16 intclk_reg_sel[] = {0 , AB8500_SYSULPCLKCTRL1};

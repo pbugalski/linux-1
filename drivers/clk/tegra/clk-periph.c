@@ -138,13 +138,13 @@ static const struct clk_ops tegra_clk_periph_no_gate_ops = {
 	.set_rate = clk_periph_set_rate,
 };
 
-static struct clk *_tegra_clk_register_periph(const char *name,
+static struct clk_core *_tegra_clk_register_periph(const char *name,
 			const char **parent_names, int num_parents,
 			struct tegra_clk_periph *periph,
 			void __iomem *clk_base, u32 offset,
 			unsigned long flags)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 	struct tegra_clk_periph_regs *bank;
 	bool div = !(periph->gate.flags & TEGRA_PERIPH_NO_DIV);
@@ -186,7 +186,7 @@ static struct clk *_tegra_clk_register_periph(const char *name,
 	return clk;
 }
 
-struct clk *tegra_clk_register_periph(const char *name,
+struct clk_core *tegra_clk_register_periph(const char *name,
 		const char **parent_names, int num_parents,
 		struct tegra_clk_periph *periph, void __iomem *clk_base,
 		u32 offset, unsigned long flags)
@@ -195,7 +195,7 @@ struct clk *tegra_clk_register_periph(const char *name,
 			periph, clk_base, offset, flags);
 }
 
-struct clk *tegra_clk_register_periph_nodiv(const char *name,
+struct clk_core *tegra_clk_register_periph_nodiv(const char *name,
 		const char **parent_names, int num_parents,
 		struct tegra_clk_periph *periph, void __iomem *clk_base,
 		u32 offset)

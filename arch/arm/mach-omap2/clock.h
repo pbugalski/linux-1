@@ -40,7 +40,7 @@ struct omap_clk {
 struct clockdomain;
 
 #define DEFINE_STRUCT_CLK(_name, _parent_array_name, _clkops_name)	\
-	static struct clk _name = {				\
+	static struct clk_core _name = {				\
 		.name = #_name,					\
 		.hw = &_name##_hw.hw,				\
 		.parent_names = _parent_array_name,		\
@@ -50,7 +50,7 @@ struct clockdomain;
 
 #define DEFINE_STRUCT_CLK_FLAGS(_name, _parent_array_name,	\
 				_clkops_name, _flags)		\
-	static struct clk _name = {				\
+	static struct clk_core _name = {				\
 		.name = #_name,					\
 		.hw = &_name##_hw.hw,				\
 		.parent_names = _parent_array_name,		\
@@ -70,7 +70,7 @@ struct clockdomain;
 #define DEFINE_CLK_OMAP_MUX(_name, _clkdm_name, _clksel,	\
 			    _clksel_reg, _clksel_mask,		\
 			    _parent_names, _ops)		\
-	static struct clk _name;				\
+	static struct clk_core _name;				\
 	static struct clk_hw_omap _name##_hw = {		\
 		.hw = {						\
 			.clk = &_name,				\
@@ -86,7 +86,7 @@ struct clockdomain;
 				 _clksel_reg, _clksel_mask,	\
 				 _enable_reg, _enable_bit,	\
 				 _hwops, _parent_names, _ops)	\
-	static struct clk _name;				\
+	static struct clk_core _name;				\
 	static struct clk_hw_omap _name##_hw = {		\
 		.hw = {						\
 			.clk = &_name,				\
@@ -111,7 +111,7 @@ struct clockdomain;
 		},						\
 		{ .parent = NULL },				\
 	};							\
-	static struct clk _name;				\
+	static struct clk_core _name;				\
 	static const char *_name##_parent_names[] = {		\
 		_parent_name,					\
 	};							\
@@ -167,14 +167,14 @@ struct clksel_rate {
 
 /**
  * struct clksel - available parent clocks, and a pointer to their divisors
- * @parent: struct clk * to a possible parent clock
+ * @parent: struct clk_core * to a possible parent clock
  * @rates: available divisors for this parent clock
  *
  * A struct clksel is always associated with one or more struct clks
  * and one or more struct clksel_rates.
  */
 struct clksel {
-	struct clk		 *parent;
+	struct clk_core		 *parent;
 	const struct clksel_rate *rates;
 };
 
@@ -236,8 +236,8 @@ void omap2_clk_dflt_find_idlest(struct clk_hw_omap *clk,
 				void __iomem **idlest_reg,
 				u8 *idlest_bit, u8 *idlest_val);
 int omap2_clk_enable_autoidle_all(void);
-int omap2_clk_allow_idle(struct clk *clk);
-int omap2_clk_deny_idle(struct clk *clk);
+int omap2_clk_allow_idle(struct clk_core *clk);
+int omap2_clk_deny_idle(struct clk_core *clk);
 int omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name);
 void omap2_clk_print_new_rates(const char *hfclkin_ck_name,
 			       const char *core_ck_name,
@@ -258,7 +258,7 @@ extern const struct clksel_rate gpt_32k_rates[];
 extern const struct clksel_rate gpt_sys_rates[];
 extern const struct clksel_rate gfx_l3_rates[];
 extern const struct clksel_rate dsp_ick_rates[];
-extern struct clk dummy_ck;
+extern struct clk_core dummy_ck;
 
 extern const struct clk_hw_omap_ops clkhwops_iclk_wait;
 extern const struct clk_hw_omap_ops clkhwops_wait;

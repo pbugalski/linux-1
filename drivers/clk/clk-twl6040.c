@@ -31,7 +31,7 @@ struct twl6040_clk {
 	struct twl6040 *twl6040;
 	struct device *dev;
 	struct clk_hw mcpdm_fclk;
-	struct clk *clk;
+	struct clk_core *clk;
 	int enabled;
 };
 

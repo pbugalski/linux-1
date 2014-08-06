@@ -71,7 +71,7 @@ static void __init emev2_smu_init(void)
 static void __init emev2_smu_clkdiv_init(struct device_node *np)
 {
 	u32 reg[2];
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name = of_clk_get_parent_name(np, 0);
 	if (WARN_ON(of_property_read_u32_array(np, "reg", reg, 2)))
 		return;
@@ -89,7 +89,7 @@ CLK_OF_DECLARE(emev2_smu_clkdiv, "renesas,emev2-smu-clkdiv",
 static void __init emev2_smu_gclk_init(struct device_node *np)
 {
 	u32 reg[2];
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name = of_clk_get_parent_name(np, 0);
 	if (WARN_ON(of_property_read_u32_array(np, "reg", reg, 2)))
 		return;

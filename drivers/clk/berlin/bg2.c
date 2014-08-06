@@ -93,7 +93,7 @@
  */
 
 #define	MAX_CLKS 41
-static struct clk *clks[MAX_CLKS];
+static struct clk_core *clks[MAX_CLKS];
 static struct clk_onecell_data clk_data;
 static DEFINE_SPINLOCK(lock);
 static void __iomem *gbase;
@@ -504,7 +504,7 @@ static const struct berlin2_gate_data bg2_gates[] __initconst = {
 static void __init berlin2_clock_setup(struct device_node *np)
 {
 	const char *parent_names[9];
-	struct clk *clk;
+	struct clk_core *clk;
 	u8 avpll_flags = 0;
 	int n;
 
@@ -513,16 +513,16 @@ static void __init berlin2_clock_setup(struct device_node *np)
 		return;
 
 	/* overwrite default clock names with DT provided ones */
-	clk = of_clk_get_by_name(np, clk_names[REFCLK]);
+	clk = of_clk_provider_get_by_name(np, clk_names[REFCLK]);
 	if (!IS_ERR(clk)) {
 		clk_names[REFCLK] = __clk_get_name(clk);
-		clk_put(clk);
+		__clk_put(clk);
 	}
 
-	clk = of_clk_get_by_name(np, clk_names[VIDEO_EXT0]);
+	clk = of_clk_provider_get_by_name(np, clk_names[VIDEO_EXT0]);
 	if (!IS_ERR(clk)) {
 		clk_names[VIDEO_EXT0] = __clk_get_name(clk);
-		clk_put(clk);
+		__clk_put(clk);
 	}
 
 	/* simple register PLLs */

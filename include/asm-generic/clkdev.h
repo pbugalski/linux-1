@@ -17,8 +17,8 @@
 
 struct clk;
 
-static inline int __clk_get(struct clk *clk) { return 1; }
-static inline void __clk_put(struct clk *clk) { }
+static inline int __clk_get(struct clk_core *clk) { return 1; }
+static inline void __clk_put(struct clk_core *clk) { }
 
 static inline struct clk_lookup_alloc *__clkdev_alloc(size_t size)
 {

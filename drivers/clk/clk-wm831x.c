@@ -25,9 +25,9 @@ struct wm831x_clk {
 	struct clk_hw xtal_hw;
 	struct clk_hw fll_hw;
 	struct clk_hw clkout_hw;
-	struct clk *xtal;
-	struct clk *fll;
-	struct clk *clkout;
+	struct clk_core *xtal;
+	struct clk_core *fll;
+	struct clk_core *clkout;
 	bool xtal_ena;
 };
 

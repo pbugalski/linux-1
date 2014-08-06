@@ -1032,11 +1032,11 @@ static long kona_peri_clk_round_rate(struct clk_hw *hw, unsigned long rate,
 }
 
 static long kona_peri_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
-		unsigned long *best_parent_rate, struct clk **best_parent)
+		unsigned long *best_parent_rate, struct clk_core **best_parent)
 {
 	struct kona_clk *bcm_clk = to_kona_clk(hw);
-	struct clk *clk = hw->clk;
-	struct clk *current_parent;
+	struct clk_core *clk = hw->clk;
+	struct clk_core *current_parent;
 	unsigned long parent_rate;
 	unsigned long best_delta;
 	unsigned long best_rate;
@@ -1053,14 +1053,14 @@ static long kona_peri_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
 		return kona_peri_clk_round_rate(hw, rate, best_parent_rate);
 
 	/* Unless we can do better, stick with current parent */
-	current_parent = clk_get_parent(clk);
+	current_parent = clk_provider_get_parent(clk);
 	parent_rate = __clk_get_rate(current_parent);
 	best_rate = kona_peri_clk_round_rate(hw, rate, &parent_rate);
 	best_delta = abs(best_rate - rate);
 
 	/* Check whether any other parent clock can produce a better result */
 	for (which = 0; which < parent_count; which++) {
-		struct clk *parent = clk_get_parent_by_index(clk, which);
+		struct clk_core *parent = clk_get_parent_by_index(clk, which);
 		unsigned long delta;
 		unsigned long other_rate;
 
@@ -1260,7 +1260,7 @@ bool __init kona_ccu_init(struct ccu_data *ccu)
 {
 	unsigned long flags;
 	unsigned int which;
-	struct clk **clks = ccu->clk_data.clks;
+	struct clk_core **clks = ccu->clk_data.clks;
 	bool success = true;
 
 	flags = ccu_lock(ccu);

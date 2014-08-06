@@ -7,10 +7,10 @@
 
 DEFINE_SPINLOCK(imx_ccm_lock);
 
-static struct clk * __init imx_obtain_fixed_clock_from_dt(const char *name)
+static struct clk_core * __init imx_obtain_fixed_clock_from_dt(const char *name)
 {
 	struct of_phandle_args phandle;
-	struct clk *clk = ERR_PTR(-ENODEV);
+	struct clk_core *clk = ERR_PTR(-ENODEV);
 	char *path;
 
 	path = kasprintf(GFP_KERNEL, "/clocks/%s", name);
@@ -27,10 +27,10 @@ static struct clk * __init imx_obtain_fixed_clock_from_dt(const char *name)
 	return clk;
 }
 
-struct clk * __init imx_obtain_fixed_clock(
+struct clk_core * __init imx_obtain_fixed_clock(
 			const char *name, unsigned long rate)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	clk = imx_obtain_fixed_clock_from_dt(name);
 	if (IS_ERR(clk))

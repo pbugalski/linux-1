@@ -60,7 +60,7 @@ static void (*omap2_sram_suspend)(u32 dllctrl, void __iomem *sdrc_dlla_ctrl,
 static struct powerdomain *mpu_pwrdm, *core_pwrdm;
 static struct clockdomain *dsp_clkdm, *mpu_clkdm, *wkup_clkdm, *gfx_clkdm;
 
-static struct clk *osc_ck, *emul_ck;
+static struct clk_core *osc_ck, *emul_ck;
 
 static int omap2_enter_full_retention(void)
 {
@@ -71,7 +71,7 @@ static int omap2_enter_full_retention(void)
 	 * oscillator itself it will be disabled if/when we enter retention
 	 * mode.
 	 */
-	clk_disable(osc_ck);
+	clk_provider_disable(osc_ck);
 
 	/* Clear old wake-up events */
 	/* REVISIT: These write to reserved bits? */
@@ -101,7 +101,7 @@ static int omap2_enter_full_retention(void)
 no_sleep:
 	omap2_gpio_resume_after_idle();
 
-	clk_enable(osc_ck);
+	clk_provider_enable(osc_ck);
 
 	/* clear CORE wake-up events */
 	omap2_prm_write_mod_reg(0xffffffff, CORE_MOD, PM_WKST1);
@@ -288,17 +288,17 @@ int __init omap2_pm_init(void)
 		pr_err("PM: gfx_clkdm not found\n");
 
 
-	osc_ck = clk_get(NULL, "osc_ck");
+	osc_ck = clk_provider_get(NULL, "osc_ck");
 	if (IS_ERR(osc_ck)) {
 		printk(KERN_ERR "could not get osc_ck\n");
 		return -ENODEV;
 	}
 
 	if (cpu_is_omap242x()) {
-		emul_ck = clk_get(NULL, "emul_ck");
+		emul_ck = clk_provider_get(NULL, "emul_ck");
 		if (IS_ERR(emul_ck)) {
 			printk(KERN_ERR "could not get emul_ck\n");
-			clk_put(osc_ck);
+			__clk_put(osc_ck);
 			return -ENODEV;
 		}
 	}

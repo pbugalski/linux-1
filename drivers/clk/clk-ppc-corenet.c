@@ -64,7 +64,7 @@ const struct clk_ops cmux_ops = {
 
 static void __init core_mux_init(struct device_node *np)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 	struct cmux_clk *cmux_clk;
 	struct device_node *node;
@@ -150,7 +150,7 @@ static void __init core_pll_init(struct device_node *np)
 	int i, rc, count;
 	const char *clk_name, *parent_name;
 	struct clk_onecell_data *onecell_data;
-	struct clk      **subclks;
+	struct clk_core      **subclks;
 	void __iomem *base;
 
 	base = of_iomap(np, 0);
@@ -184,7 +184,7 @@ static void __init core_pll_init(struct device_node *np)
 	/* output clock number per PLL */
 	clocks_per_pll = count;
 
-	subclks = kzalloc(sizeof(struct clk *) * count, GFP_KERNEL);
+	subclks = kzalloc(sizeof(struct clk_core *) * count, GFP_KERNEL);
 	if (!subclks) {
 		pr_err("%s: could not allocate subclks\n", __func__);
 		goto err_map;
@@ -246,7 +246,7 @@ err_map:
 
 static void __init sysclk_init(struct device_node *node)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *clk_name = node->name;
 	struct device_node *np = of_get_parent(node);
 	u32 rate;

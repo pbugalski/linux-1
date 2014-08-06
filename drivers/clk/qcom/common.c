@@ -24,7 +24,7 @@
 struct qcom_cc {
 	struct qcom_reset_controller reset;
 	struct clk_onecell_data data;
-	struct clk *clks[];
+	struct clk_core *clks[];
 };
 
 struct regmap *
@@ -48,9 +48,9 @@ int qcom_cc_really_probe(struct platform_device *pdev,
 {
 	int i, ret;
 	struct device *dev = &pdev->dev;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_onecell_data *data;
-	struct clk **clks;
+	struct clk_core **clks;
 	struct qcom_reset_controller *reset;
 	struct qcom_cc *cc;
 	size_t num_clks = desc->num_clks;

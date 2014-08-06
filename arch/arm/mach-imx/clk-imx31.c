@@ -45,7 +45,7 @@ enum mx31_clks {
 	gacc_gate, emi_gate, rtic_gate, firi_gate, clk_max
 };
 
-static struct clk *clk[clk_max];
+static struct clk_core *clk[clk_max];
 static struct clk_onecell_data clk_data;
 
 int __init mx31_clocks_init(unsigned long fref)
@@ -180,11 +180,11 @@ int __init mx31_clocks_init(unsigned long fref)
 	clk_register_clkdev(clk[sdma_gate], NULL, "imx31-sdma");
 	clk_register_clkdev(clk[iim_gate], "iim", NULL);
 
-	clk_set_parent(clk[csi], clk[upll]);
-	clk_prepare_enable(clk[emi_gate]);
-	clk_prepare_enable(clk[iim_gate]);
+	clk_provider_set_parent(clk[csi], clk[upll]);
+	clk_provider_prepare_enable(clk[emi_gate]);
+	clk_provider_prepare_enable(clk[iim_gate]);
 	mx31_revision();
-	clk_disable_unprepare(clk[iim_gate]);
+	clk_provider_disable_unprepare(clk[iim_gate]);
 
 	mxc_timer_init(MX31_IO_ADDRESS(MX31_GPT1_BASE_ADDR), MX31_INT_GPT);
 

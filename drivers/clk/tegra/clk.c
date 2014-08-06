@@ -68,7 +68,7 @@ struct tegra_cpu_car_ops *tegra_cpu_car_ops = &dummy_car_ops;
 
 int *periph_clk_enb_refcnt;
 static int periph_banks;
-static struct clk **clks;
+static struct clk_core **clks;
 static int clk_num;
 static struct clk_onecell_data clk_data;
 
@@ -164,7 +164,7 @@ struct tegra_clk_periph_regs *get_reg_bank(int clkid)
 	}
 }
 
-struct clk ** __init tegra_clk_init(void __iomem *regs, int num, int banks)
+struct clk_core ** __init tegra_clk_init(void __iomem *regs, int num, int banks)
 {
 	clk_base = regs;
 
@@ -178,7 +178,7 @@ struct clk ** __init tegra_clk_init(void __iomem *regs, int num, int banks)
 
 	periph_banks = banks;
 
-	clks = kzalloc(num * sizeof(struct clk *), GFP_KERNEL);
+	clks = kzalloc(num * sizeof(struct clk_core *), GFP_KERNEL);
 	if (!clks)
 		kfree(periph_clk_enb_refcnt);
 
@@ -188,9 +188,9 @@ struct clk ** __init tegra_clk_init(void __iomem *regs, int num, int banks)
 }
 
 void __init tegra_init_dup_clks(struct tegra_clk_duplicate *dup_list,
-				struct clk *clks[], int clk_max)
+				struct clk_core *clks[], int clk_max)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	for (; dup_list->clk_id < clk_max; dup_list++) {
 		clk = clks[dup_list->clk_id];
@@ -200,9 +200,9 @@ void __init tegra_init_dup_clks(struct tegra_clk_duplicate *dup_list,
 }
 
 void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
-				  struct clk *clks[], int clk_max)
+				  struct clk_core *clks[], int clk_max)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	for (; tbl->clk_id < clk_max; tbl++) {
 		clk = clks[tbl->clk_id];
@@ -210,8 +210,8 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
 			return;
 
 		if (tbl->parent_id < clk_max) {
-			struct clk *parent = clks[tbl->parent_id];
-			if (clk_set_parent(clk, parent)) {
+			struct clk_core *parent = clks[tbl->parent_id];
+			if (clk_provider_set_parent(clk, parent)) {
 				pr_err("%s: Failed to set parent %s of %s\n",
 				       __func__, __clk_get_name(parent),
 				       __clk_get_name(clk));
@@ -220,7 +220,7 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
 		}
 
 		if (tbl->rate)
-			if (clk_set_rate(clk, tbl->rate)) {
+			if (clk_provider_set_rate(clk, tbl->rate)) {
 				pr_err("%s: Failed to set rate %lu of %s\n",
 				       __func__, tbl->rate,
 				       __clk_get_name(clk));
@@ -228,7 +228,7 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
 			}
 
 		if (tbl->state)
-			if (clk_prepare_enable(clk)) {
+			if (clk_provider_prepare_enable(clk)) {
 				pr_err("%s: Failed to enable %s\n", __func__,
 				       __clk_get_name(clk));
 				WARN_ON(1);
@@ -285,7 +285,7 @@ void __init tegra_register_devclks(struct tegra_devclk *dev_clks, int num)
 	}
 }
 
-struct clk ** __init tegra_lookup_dt_id(int clk_id,
+struct clk_core ** __init tegra_lookup_dt_id(int clk_id,
 					struct tegra_clk *tegra_clk)
 {
 	if (tegra_clk[clk_id].present)

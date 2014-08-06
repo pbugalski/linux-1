@@ -140,7 +140,7 @@ static const char *ddr_parents[] = { "ahb_clk", "ahbmult2_clk", "none",
 #ifdef CONFIG_MACH_SPEAR300
 static void __init spear300_clk_init(void)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	clk = clk_register_fixed_factor(NULL, "clcd_clk", "ras_pll3_clk", 0,
 			1, 1);
@@ -170,7 +170,7 @@ static inline void spear300_clk_init(void) { }
 #ifdef CONFIG_MACH_SPEAR310
 static void __init spear310_clk_init(void)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	clk = clk_register_fixed_factor(NULL, "emi_clk", "ras_ahb_clk", 0, 1,
 			1);
@@ -246,9 +246,9 @@ static const char *smii0_parents[] = { "smii_125m_pad", "ras_pll2_clk",
 static const char *uartx_parents[] = { "ras_syn1_gclk", "ras_apb_clk", };
 
 static void __init spear320_clk_init(void __iomem *soc_config_base,
-				     struct clk *ras_apb_clk)
+				     struct clk_core *ras_apb_clk)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	clk = clk_register_fixed_rate(NULL, "smii_125m_pad_clk", NULL,
 			CLK_IS_ROOT, 125000000);
@@ -344,7 +344,7 @@ static void __init spear320_clk_init(void __iomem *soc_config_base,
 			0, &_lock);
 	clk_register_clkdev(clk, NULL, "a3000000.serial");
 	/* Enforce ras_apb_clk */
-	clk_set_parent(clk, ras_apb_clk);
+	clk_provider_set_parent(clk, ras_apb_clk);
 
 	clk = clk_register_mux(NULL, "uart2_clk", uartx_parents,
 			ARRAY_SIZE(uartx_parents),
@@ -353,7 +353,7 @@ static void __init spear320_clk_init(void __iomem *soc_config_base,
 			SPEAR320_UARTX_PCLK_MASK, 0, &_lock);
 	clk_register_clkdev(clk, NULL, "a4000000.serial");
 	/* Enforce ras_apb_clk */
-	clk_set_parent(clk, ras_apb_clk);
+	clk_provider_set_parent(clk, ras_apb_clk);
 
 	clk = clk_register_mux(NULL, "uart3_clk", uartx_parents,
 			ARRAY_SIZE(uartx_parents),
@@ -384,12 +384,12 @@ static void __init spear320_clk_init(void __iomem *soc_config_base,
 	clk_register_clkdev(clk, NULL, "60100000.serial");
 }
 #else
-static inline void spear320_clk_init(void __iomem *sb, struct clk *rc) { }
+static inline void spear320_clk_init(void __iomem *sb, struct clk_core *rc) { }
 #endif
 
 void __init spear3xx_clk_init(void __iomem *misc_base, void __iomem *soc_config_base)
 {
-	struct clk *clk, *clk1, *ras_apb_clk;
+	struct clk_core *clk, *clk1, *ras_apb_clk;
 
 	clk = clk_register_fixed_rate(NULL, "osc_32k_clk", NULL, CLK_IS_ROOT,
 			32000);

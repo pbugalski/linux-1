@@ -133,12 +133,12 @@ static const struct clk_ops cpg_z_clk_ops = {
 	.set_rate = cpg_z_clk_set_rate,
 };
 
-static struct clk * __init cpg_z_clk_register(struct rcar_gen2_cpg *cpg)
+static struct clk_core * __init cpg_z_clk_register(struct rcar_gen2_cpg *cpg)
 {
 	static const char *parent_name = "pll0";
 	struct clk_init_data init;
 	struct cpg_z_clk *zclk;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	zclk = kzalloc(sizeof(*zclk), GFP_KERNEL);
 	if (!zclk)
@@ -212,7 +212,7 @@ static const struct clk_div_table cpg_sd01_div_table[] = {
 
 static u32 cpg_mode __initdata;
 
-static struct clk * __init
+static struct clk_core * __init
 rcar_gen2_cpg_register_clock(struct device_node *np, struct rcar_gen2_cpg *cpg,
 			     const struct cpg_pll_config *config,
 			     const char *name)
@@ -279,7 +279,7 @@ static void __init rcar_gen2_cpg_clocks_init(struct device_node *np)
 {
 	const struct cpg_pll_config *config;
 	struct rcar_gen2_cpg *cpg;
-	struct clk **clks;
+	struct clk_core **clks;
 	unsigned int i;
 	int num_clks;
 
@@ -312,7 +312,7 @@ static void __init rcar_gen2_cpg_clocks_init(struct device_node *np)
 
 	for (i = 0; i < num_clks; ++i) {
 		const char *name;
-		struct clk *clk;
+		struct clk_core *clk;
 
 		of_property_read_string_index(np, "clock-output-names", i,
 					      &name);

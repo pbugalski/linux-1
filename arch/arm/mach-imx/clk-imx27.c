@@ -86,7 +86,7 @@ enum mx27_clks {
 	rtic_ahb_gate, mshc_baud_gate, clk_max
 };
 
-static struct clk *clk[clk_max];
+static struct clk_core *clk[clk_max];
 static struct clk_onecell_data clk_data;
 
 int __init mx27_clocks_init(unsigned long fref)
@@ -278,7 +278,7 @@ int __init mx27_clocks_init(unsigned long fref)
 
 	mxc_timer_init(MX27_IO_ADDRESS(MX27_GPT1_BASE_ADDR), MX27_INT_GPT1);
 
-	clk_prepare_enable(clk[emi_ahb_gate]);
+	clk_provider_prepare_enable(clk[emi_ahb_gate]);
 
 	imx_print_silicon_rev("i.MX27", mx27_revision());
 

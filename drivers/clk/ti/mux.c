@@ -104,14 +104,14 @@ const struct clk_ops ti_clk_mux_ops = {
 	.determine_rate = __clk_mux_determine_rate,
 };
 
-static struct clk *_register_mux(struct device *dev, const char *name,
+static struct clk_core *_register_mux(struct device *dev, const char *name,
 				 const char **parent_names, u8 num_parents,
 				 unsigned long flags, void __iomem *reg,
 				 u8 shift, u32 mask, u8 clk_mux_flags,
 				 u32 *table, spinlock_t *lock)
 {
 	struct clk_mux *mux;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	/* allocate the mux */
@@ -152,7 +152,7 @@ static struct clk *_register_mux(struct device *dev, const char *name,
  */
 static void of_mux_clk_setup(struct device_node *node)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	void __iomem *reg;
 	int num_parents;
 	const char **parent_names;

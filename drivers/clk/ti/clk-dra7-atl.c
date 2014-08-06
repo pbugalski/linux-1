@@ -40,7 +40,7 @@
 struct dra7_atl_clock_info;
 
 struct dra7_atl_desc {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_hw hw;
 	struct dra7_atl_clock_info *cinfo;
 	int id;
@@ -165,7 +165,7 @@ static void __init of_dra7_atl_clock_setup(struct device_node *node)
 	struct dra7_atl_desc *clk_hw = NULL;
 	struct clk_init_data init = { 0 };
 	const char **parent_names = NULL;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	clk_hw = kzalloc(sizeof(*clk_hw), GFP_KERNEL);
 	if (!clk_hw) {
@@ -233,7 +233,7 @@ static int of_dra7_atl_clk_probe(struct platform_device *pdev)
 		char prop[5];
 		struct dra7_atl_desc *cdesc;
 		struct of_phandle_args clkspec;
-		struct clk *clk;
+		struct clk_core *clk;
 		int rc;
 
 		rc = of_parse_phandle_with_args(node, "ti,provided-clocks",

@@ -1017,7 +1017,7 @@ static struct tegra_devclk devclks[] __initdata = {
 	{ .dev_id = "timer", .dt_id = TEGRA124_CLK_TIMER },
 };
 
-static struct clk **clks;
+static struct clk_core **clks;
 
 static void tegra124_utmi_param_configure(void __iomem *clk_base)
 {
@@ -1104,7 +1104,7 @@ static void tegra124_utmi_param_configure(void __iomem *clk_base)
 static __init void tegra124_periph_clk_init(void __iomem *clk_base,
 					    void __iomem *pmc_base)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	/* xusb_ss_div2 */
 	clk = clk_register_fixed_factor(NULL, "xusb_ss_div2", "xusb_ss_src", 0,
@@ -1148,7 +1148,7 @@ static void __init tegra124_pll_init(void __iomem *clk_base,
 				     void __iomem *pmc)
 {
 	u32 val;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	/* PLLC */
 	clk = tegra_clk_register_pllxc("pll_c", "pll_ref", clk_base,

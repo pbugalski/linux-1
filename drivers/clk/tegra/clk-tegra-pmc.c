@@ -82,8 +82,8 @@ static struct pmc_clk_init_data pmc_clks[] = {
 void __init tegra_pmc_clk_init(void __iomem *pmc_base,
 				struct tegra_clk *tegra_clks)
 {
-	struct clk *clk;
-	struct clk **dt_clk;
+	struct clk_core *clk;
+	struct clk_core **dt_clk;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(pmc_clks); i++) {

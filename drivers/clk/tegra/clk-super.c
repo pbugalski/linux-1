@@ -127,13 +127,13 @@ const struct clk_ops tegra_clk_super_ops = {
 	.set_parent = clk_super_set_parent,
 };
 
-struct clk *tegra_clk_register_super_mux(const char *name,
+struct clk_core *tegra_clk_register_super_mux(const char *name,
 		const char **parent_names, u8 num_parents,
 		unsigned long flags, void __iomem *reg, u8 clk_super_flags,
 		u8 width, u8 pllx_index, u8 div2_index, spinlock_t *lock)
 {
 	struct tegra_clk_super_mux *super;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	super = kzalloc(sizeof(*super), GFP_KERNEL);

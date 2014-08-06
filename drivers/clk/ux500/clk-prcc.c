@@ -92,7 +92,7 @@ static struct clk_ops clk_prcc_kclk_ops = {
 	.is_enabled = clk_prcc_is_enabled,
 };
 
-static struct clk *clk_reg_prcc(const char *name,
+static struct clk_core *clk_reg_prcc(const char *name,
 				const char *parent_name,
 				resource_size_t phy_base,
 				u32 cg_sel,
@@ -101,7 +101,7 @@ static struct clk *clk_reg_prcc(const char *name,
 {
 	struct clk_prcc *clk;
 	struct clk_init_data clk_prcc_init;
-	struct clk *clk_reg;
+	struct clk_core *clk_reg;
 
 	if (!name) {
 		pr_err("clk_prcc: %s invalid arguments passed\n", __func__);
@@ -142,7 +142,7 @@ free_clk:
 	return ERR_PTR(-ENOMEM);
 }
 
-struct clk *clk_reg_prcc_pclk(const char *name,
+struct clk_core *clk_reg_prcc_pclk(const char *name,
 			      const char *parent_name,
 			      resource_size_t phy_base,
 			      u32 cg_sel,
@@ -152,7 +152,7 @@ struct clk *clk_reg_prcc_pclk(const char *name,
 			&clk_prcc_pclk_ops);
 }
 
-struct clk *clk_reg_prcc_kclk(const char *name,
+struct clk_core *clk_reg_prcc_kclk(const char *name,
 			      const char *parent_name,
 			      resource_size_t phy_base,
 			      u32 cg_sel,

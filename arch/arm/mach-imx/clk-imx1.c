@@ -50,7 +50,7 @@ enum imx1_clks {
 	usbd_gate, clk_max
 };
 
-static struct clk *clk[clk_max];
+static struct clk_core *clk[clk_max];
 
 int __init mx1_clocks_init(unsigned long fref)
 {

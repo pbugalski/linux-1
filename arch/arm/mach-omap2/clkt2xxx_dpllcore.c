@@ -48,7 +48,7 @@ static struct clk_hw_omap *dpll_core_ck;
  * Returns the CORE_CLK rate.  CORE_CLK can have one of three rate
  * sources on OMAP2xxx: the DPLL CLKOUT rate, DPLL CLKOUTX2, or 32KHz
  * (the latter is unusual).  This currently should be called with
- * struct clk *dpll_ck, which is a composite clock of dpll_ck and
+ * struct clk_core *dpll_ck, which is a composite clock of dpll_ck and
  * core_ck.
  */
 unsigned long omap2xxx_clk_get_core_rate(void)
@@ -179,7 +179,7 @@ int omap2_reprogram_dpllcore(struct clk_hw *hw, unsigned long rate,
 
 /**
  * omap2xxx_clkt_dpllcore_init - clk init function for dpll_ck
- * @clk: struct clk *dpll_ck
+ * @clk: struct clk_core *dpll_ck
  *
  * Store a local copy of @clk in dpll_core_ck so other code can query
  * the core rate without having to clk_get(), which can sleep.  Must

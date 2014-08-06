@@ -198,14 +198,14 @@ void omap2xxx_clkt_vps_check_bootloader_rates(void)
  */
 void omap2xxx_clkt_vps_late_init(void)
 {
-	struct clk *c;
+	struct clk_core *c;
 
-	c = clk_get(NULL, "sys_ck");
+	c = clk_provider_get(NULL, "sys_ck");
 	if (IS_ERR(c)) {
 		WARN(1, "could not locate sys_ck\n");
 	} else {
-		sys_ck_rate = clk_get_rate(c);
-		clk_put(c);
+		sys_ck_rate = clk_provider_get_rate(c);
+		__clk_put(c);
 	}
 }
 
@@ -230,7 +230,7 @@ void omap2xxx_clkt_vps_init(void)
 {
 	struct clk_init_data init = { NULL };
 	struct clk_hw_omap *hw = NULL;
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name = "mpu_ck";
 	struct clk_lookup *lookup = NULL;
 

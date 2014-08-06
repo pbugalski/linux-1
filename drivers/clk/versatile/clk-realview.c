@@ -50,7 +50,7 @@ static const struct clk_icst_desc __initdata realview_osc4_desc = {
  */
 void __init realview_clk_init(void __iomem *sysbase, bool is_pb1176)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	/* APB clock dummy */
 	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);

@@ -145,7 +145,7 @@ static int _wait_idlest_generic(struct clk_hw_omap *clk, void __iomem *reg,
 
 /**
  * _omap2_module_wait_ready - wait for an OMAP module to leave IDLE
- * @clk: struct clk * belonging to the module
+ * @clk: struct clk_core * belonging to the module
  *
  * If the necessary clocks for the OMAP hardware IP block that
  * corresponds to clock @clk are enabled, then wait for the module to
@@ -184,7 +184,7 @@ static void _omap2_module_wait_ready(struct clk_hw_omap *clk)
  * omap2_init_clk_clkdm - look up a clockdomain name, store pointer in clk
  * @clk: OMAP clock struct ptr to use
  *
- * Convert a clockdomain name stored in a struct clk 'clk' into a
+ * Convert a clockdomain name stored in a struct clk_core 'clk' into a
  * clockdomain pointer, and save it into the struct clk.  Intended to be
  * called during clk_register().  No return value.
  */
@@ -225,7 +225,7 @@ void __init omap2_clk_disable_clkdm_control(void)
 
 /**
  * omap2_clk_dflt_find_companion - find companion clock to @clk
- * @clk: struct clk * to find the companion clock of
+ * @clk: struct clk_core * to find the companion clock of
  * @other_reg: void __iomem ** to return the companion clock CM_*CLKEN va in
  * @other_bit: u8 ** to return the companion clock bit shift in
  *
@@ -261,7 +261,7 @@ void omap2_clk_dflt_find_companion(struct clk_hw_omap *clk,
 
 /**
  * omap2_clk_dflt_find_idlest - find CM_IDLEST reg va, bit shift for @clk
- * @clk: struct clk * to find IDLEST info for
+ * @clk: struct clk_core * to find IDLEST info for
  * @idlest_reg: void __iomem ** to return the CM_IDLEST va in
  * @idlest_bit: u8 * to return the CM_IDLEST bit shift in
  * @idlest_val: u8 * to return the idle status indicator
@@ -511,14 +511,14 @@ __setup("mpurate=", omap_clk_setup);
 
 /**
  * omap2_init_clk_hw_omap_clocks - initialize an OMAP clock
- * @clk: struct clk * to initialize
+ * @clk: struct clk_core * to initialize
  *
  * Add an OMAP clock @clk to the internal list of OMAP clocks.  Used
  * temporarily for autoidle handling, until this support can be
  * integrated into the common clock framework code in some way.  No
  * return value.
  */
-void omap2_init_clk_hw_omap_clocks(struct clk *clk)
+void omap2_init_clk_hw_omap_clocks(struct clk_core *clk)
 {
 	struct clk_hw_omap *c;
 
@@ -575,11 +575,11 @@ int omap2_clk_disable_autoidle_all(void)
 
 /**
  * omap2_clk_deny_idle - disable autoidle on an OMAP clock
- * @clk: struct clk * to disable autoidle for
+ * @clk: struct clk_core * to disable autoidle for
  *
  * Disable autoidle on an OMAP clock.
  */
-int omap2_clk_deny_idle(struct clk *clk)
+int omap2_clk_deny_idle(struct clk_core *clk)
 {
 	struct clk_hw_omap *c;
 
@@ -594,11 +594,11 @@ int omap2_clk_deny_idle(struct clk *clk)
 
 /**
  * omap2_clk_allow_idle - enable autoidle on an OMAP clock
- * @clk: struct clk * to enable autoidle for
+ * @clk: struct clk_core * to enable autoidle for
  *
  * Enable autoidle on an OMAP clock.
  */
-int omap2_clk_allow_idle(struct clk *clk)
+int omap2_clk_allow_idle(struct clk_core *clk)
 {
 	struct clk_hw_omap *c;
 
@@ -623,12 +623,12 @@ int omap2_clk_allow_idle(struct clk *clk)
  */
 void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks)
 {
-	struct clk *init_clk;
+	struct clk_core *init_clk;
 	int i;
 
 	for (i = 0; i < num_clocks; i++) {
-		init_clk = clk_get(NULL, clk_names[i]);
-		clk_prepare_enable(init_clk);
+		init_clk = clk_provider_get(NULL, clk_names[i]);
+		clk_provider_prepare_enable(init_clk);
 	}
 }
 
@@ -664,31 +664,31 @@ void __init omap_clocks_register(struct omap_clk oclks[], int cnt)
  * the OPP layer.  XXX This is intended to be handled by the OPP layer
  * code in the near future and should be removed from the clock code.
  * Returns -EINVAL if 'mpurate' is zero or if clk_set_rate() rejects
- * the rate, -ENOENT if the struct clk referred to by @mpurate_ck_name
+ * the rate, -ENOENT if the struct clk_core referred to by @mpurate_ck_name
  * cannot be found, or 0 upon success.
  */
 int __init omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name)
 {
-	struct clk *mpurate_ck;
+	struct clk_core *mpurate_ck;
 	int r;
 
 	if (!mpurate)
 		return -EINVAL;
 
-	mpurate_ck = clk_get(NULL, mpurate_ck_name);
+	mpurate_ck = clk_provider_get(NULL, mpurate_ck_name);
 	if (WARN(IS_ERR(mpurate_ck), "Failed to get %s.\n", mpurate_ck_name))
 		return -ENOENT;
 
-	r = clk_set_rate(mpurate_ck, mpurate);
+	r = clk_provider_set_rate(mpurate_ck, mpurate);
 	if (r < 0) {
 		WARN(1, "clock: %s: unable to set MPU rate to %d: %d\n",
 		     mpurate_ck_name, mpurate, r);
-		clk_put(mpurate_ck);
+		__clk_put(mpurate_ck);
 		return -EINVAL;
 	}
 
 	calibrate_delay();
-	clk_put(mpurate_ck);
+	__clk_put(mpurate_ck);
 
 	return 0;
 }
@@ -709,25 +709,25 @@ void __init omap2_clk_print_new_rates(const char *hfclkin_ck_name,
 				      const char *core_ck_name,
 				      const char *mpu_ck_name)
 {
-	struct clk *hfclkin_ck, *core_ck, *mpu_ck;
+	struct clk_core *hfclkin_ck, *core_ck, *mpu_ck;
 	unsigned long hfclkin_rate;
 
-	mpu_ck = clk_get(NULL, mpu_ck_name);
+	mpu_ck = clk_provider_get(NULL, mpu_ck_name);
 	if (WARN(IS_ERR(mpu_ck), "clock: failed to get %s.\n", mpu_ck_name))
 		return;
 
-	core_ck = clk_get(NULL, core_ck_name);
+	core_ck = clk_provider_get(NULL, core_ck_name);
 	if (WARN(IS_ERR(core_ck), "clock: failed to get %s.\n", core_ck_name))
 		return;
 
-	hfclkin_ck = clk_get(NULL, hfclkin_ck_name);
+	hfclkin_ck = clk_provider_get(NULL, hfclkin_ck_name);
 	if (WARN(IS_ERR(hfclkin_ck), "Failed to get %s.\n", hfclkin_ck_name))
 		return;
 
-	hfclkin_rate = clk_get_rate(hfclkin_ck);
+	hfclkin_rate = clk_provider_get_rate(hfclkin_ck);
 
 	pr_info("Switched to new clocking rate (Crystal/Core/MPU): %ld.%01ld/%ld/%ld MHz\n",
 		(hfclkin_rate / 1000000), ((hfclkin_rate / 100000) % 10),
-		(clk_get_rate(core_ck) / 1000000),
-		(clk_get_rate(mpu_ck) / 1000000));
+		(clk_provider_get_rate(core_ck) / 1000000),
+		(clk_provider_get_rate(mpu_ck) / 1000000));
 }

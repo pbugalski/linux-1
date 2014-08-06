@@ -121,13 +121,13 @@ static const struct clk_ops icst_ops = {
 	.set_rate = icst_set_rate,
 };
 
-struct clk *icst_clk_register(struct device *dev,
+struct clk_core *icst_clk_register(struct device *dev,
 			const struct clk_icst_desc *desc,
 			const char *name,
 			const char *parent_name,
 			void __iomem *base)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_icst *icst;
 	struct clk_init_data init;
 	struct icst_params *pclone;

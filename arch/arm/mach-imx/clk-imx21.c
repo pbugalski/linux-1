@@ -62,7 +62,7 @@ enum imx21_clks {
 	gpio_gate, i2c_gate, kpp_gate, owire_gate, rtc_gate, clk_max
 };
 
-static struct clk *clk[clk_max];
+static struct clk_core *clk[clk_max];
 
 /*
  * must be called very early to get information about the

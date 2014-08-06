@@ -87,13 +87,13 @@ const struct clk_ops tegra_clk_pll_out_ops = {
 	.disable = clk_pll_out_disable,
 };
 
-struct clk *tegra_clk_register_pll_out(const char *name,
+struct clk_core *tegra_clk_register_pll_out(const char *name,
 		const char *parent_name, void __iomem *reg, u8 enb_bit_idx,
 		u8 rst_bit_idx, unsigned long flags, u8 pll_out_flags,
 		spinlock_t *lock)
 {
 	struct tegra_clk_pll_out *pll_out;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	pll_out = kzalloc(sizeof(*pll_out), GFP_KERNEL);

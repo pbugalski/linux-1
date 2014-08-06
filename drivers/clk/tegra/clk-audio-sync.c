@@ -54,12 +54,12 @@ const struct clk_ops tegra_clk_sync_source_ops = {
 	.recalc_rate = clk_sync_source_recalc_rate,
 };
 
-struct clk *tegra_clk_register_sync_source(const char *name,
+struct clk_core *tegra_clk_register_sync_source(const char *name,
 		unsigned long rate, unsigned long max_rate)
 {
 	struct tegra_clk_sync_source *sync;
 	struct clk_init_data init;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	sync = kzalloc(sizeof(*sync), GFP_KERNEL);
 	if (!sync) {

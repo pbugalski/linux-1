@@ -120,12 +120,12 @@ struct clk_ops clk_apbc_ops = {
 	.unprepare = clk_apbc_unprepare,
 };
 
-struct clk *mmp_clk_register_apbc(const char *name, const char *parent_name,
+struct clk_core *mmp_clk_register_apbc(const char *name, const char *parent_name,
 		void __iomem *base, unsigned int delay,
 		unsigned int apbc_flags, spinlock_t *lock)
 {
 	struct clk_apbc *apbc;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	apbc = kzalloc(sizeof(*apbc), GFP_KERNEL);

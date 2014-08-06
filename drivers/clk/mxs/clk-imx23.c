@@ -94,7 +94,7 @@ enum imx23_clk {
 	clk_max
 };
 
-static struct clk *clks[clk_max];
+static struct clk_core *clks[clk_max];
 static struct clk_onecell_data clk_data;
 
 static enum imx23_clk clks_init_on[] __initdata = {
@@ -171,7 +171,7 @@ static void __init mx23_clocks_init(struct device_node *np)
 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
 
 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
-		clk_prepare_enable(clks[clks_init_on[i]]);
+		clk_provider_prepare_enable(clks[clks_init_on[i]]);
 
 }
 CLK_OF_DECLARE(imx23_clkctrl, "fsl,imx23-clkctrl", mx23_clocks_init);

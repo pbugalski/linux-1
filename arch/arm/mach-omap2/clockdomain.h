@@ -207,8 +207,8 @@ int clkdm_wakeup(struct clockdomain *clkdm);
 int clkdm_sleep_nolock(struct clockdomain *clkdm);
 int clkdm_sleep(struct clockdomain *clkdm);
 
-int clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk);
-int clkdm_clk_disable(struct clockdomain *clkdm, struct clk *clk);
+int clkdm_clk_enable(struct clockdomain *clkdm, struct clk_core *clk);
+int clkdm_clk_disable(struct clockdomain *clkdm, struct clk_core *clk);
 int clkdm_hwmod_enable(struct clockdomain *clkdm, struct omap_hwmod *oh);
 int clkdm_hwmod_disable(struct clockdomain *clkdm, struct omap_hwmod *oh);
 

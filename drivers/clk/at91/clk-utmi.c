@@ -92,13 +92,13 @@ static const struct clk_ops utmi_ops = {
 	.recalc_rate = clk_utmi_recalc_rate,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_utmi(struct at91_pmc *pmc, unsigned int irq,
 		       const char *name, const char *parent_name)
 {
 	int ret;
 	struct clk_utmi *utmi;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	utmi = kzalloc(sizeof(*utmi), GFP_KERNEL);
@@ -132,7 +132,7 @@ static void __init
 of_at91_clk_utmi_setup(struct device_node *np, struct at91_pmc *pmc)
 {
 	unsigned int irq;
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name;
 	const char *name = np->name;
 

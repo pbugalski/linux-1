@@ -41,7 +41,7 @@ void __init ti_dt_clocks_register(struct ti_dt_clk oclks[])
 {
 	struct ti_dt_clk *c;
 	struct device_node *node;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct of_phandle_args clkspec;
 
 	for (c = oclks; c->node_name != NULL; c++) {

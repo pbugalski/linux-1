@@ -122,13 +122,13 @@ static struct clk_ops clk_frac_ops = {
 	.set_rate = clk_frac_set_rate,
 };
 
-struct clk *clk_register_frac(const char *name, const char *parent_name,
+struct clk_core *clk_register_frac(const char *name, const char *parent_name,
 		unsigned long flags, void __iomem *reg,
 		struct frac_rate_tbl *rtbl, u8 rtbl_cnt, spinlock_t *lock)
 {
 	struct clk_init_data init;
 	struct clk_frac *frac;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	if (!name || !parent_name || !reg || !rtbl || !rtbl_cnt) {
 		pr_err("Invalid arguments passed");

@@ -215,7 +215,7 @@ static const struct clk_ops clkgena_divmux_ops = {
 /**
  * clk_register_genamux - register a genamux clock with the clock framework
  */
-struct clk *clk_register_genamux(const char *name,
+struct clk_core *clk_register_genamux(const char *name,
 				const char **parent_names, u8 num_parents,
 				void __iomem *reg,
 				const struct clkgena_divmux_data *muxdata,
@@ -227,7 +227,7 @@ struct clk *clk_register_genamux(const char *name,
 	const int mux_width = 2;
 	const int divider_width = 5;
 	struct clkgena_divmux *genamux;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 	int i;
 
@@ -280,8 +280,8 @@ struct clk *clk_register_genamux(const char *name,
 
 	pr_debug("%s: parent %s rate %lu\n",
 			__clk_get_name(clk),
-			__clk_get_name(clk_get_parent(clk)),
-			clk_get_rate(clk));
+			__clk_get_name(clk_provider_get_parent(clk)),
+			clk_provider_get_rate(clk));
 err:
 	return clk;
 }
@@ -413,14 +413,14 @@ void __init st_of_clkgena_divmux_setup(struct device_node *np)
 		goto err;
 
 	clk_data->clk_num = data->num_outputs;
-	clk_data->clks = kzalloc(clk_data->clk_num * sizeof(struct clk *),
+	clk_data->clks = kzalloc(clk_data->clk_num * sizeof(struct clk_core *),
 				 GFP_KERNEL);
 
 	if (!clk_data->clks)
 		goto err;
 
 	for (i = 0; i < clk_data->clk_num; i++) {
-		struct clk *clk;
+		struct clk_core *clk;
 		const char *clk_name;
 
 		if (of_property_read_string_index(np, "clock-output-names",
@@ -490,7 +490,7 @@ void __init st_of_clkgena_prediv_setup(struct device_node *np)
 	const struct of_device_id *match;
 	void __iomem *reg;
 	const char *parent_name, *clk_name;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clkgena_prediv_data *data;
 
 	match = of_match_node(clkgena_prediv_of_match, np);
@@ -522,8 +522,8 @@ void __init st_of_clkgena_prediv_setup(struct device_node *np)
 	of_clk_add_provider(np, of_clk_src_simple_get, clk);
 	pr_debug("%s: parent %s rate %u\n",
 		__clk_get_name(clk),
-		__clk_get_name(clk_get_parent(clk)),
-		(unsigned int)clk_get_rate(clk));
+		__clk_get_name(clk_provider_get_parent(clk)),
+		(unsigned int)clk_provider_get_rate(clk));
 
 	return;
 }
@@ -625,7 +625,7 @@ static struct of_device_id mux_of_match[] = {
 void __init st_of_clkgen_mux_setup(struct device_node *np)
 {
 	const struct of_device_id *match;
-	struct clk *clk;
+	struct clk_core *clk;
 	void __iomem *reg;
 	const char **parents;
 	int num_parents;
@@ -662,8 +662,8 @@ void __init st_of_clkgen_mux_setup(struct device_node *np)
 
 	pr_debug("%s: parent %s rate %u\n",
 			__clk_get_name(clk),
-			__clk_get_name(clk_get_parent(clk)),
-			(unsigned int)clk_get_rate(clk));
+			__clk_get_name(clk_provider_get_parent(clk)),
+			(unsigned int)clk_provider_get_rate(clk));
 
 	of_clk_add_provider(np, of_clk_src_simple_get, clk);
 
@@ -726,14 +726,14 @@ void __init st_of_clkgen_vcc_setup(struct device_node *np)
 		goto err;
 
 	clk_data->clk_num = VCC_MAX_CHANNELS;
-	clk_data->clks = kzalloc(clk_data->clk_num * sizeof(struct clk *),
+	clk_data->clks = kzalloc(clk_data->clk_num * sizeof(struct clk_core *),
 				 GFP_KERNEL);
 
 	if (!clk_data->clks)
 		goto err;
 
 	for (i = 0; i < clk_data->clk_num; i++) {
-		struct clk *clk;
+		struct clk_core *clk;
 		const char *clk_name;
 		struct clk_gate *gate;
 		struct clk_divider *div;
@@ -796,8 +796,8 @@ void __init st_of_clkgen_vcc_setup(struct device_node *np)
 
 		pr_debug("%s: parent %s rate %u\n",
 			__clk_get_name(clk),
-			__clk_get_name(clk_get_parent(clk)),
-			(unsigned int)clk_get_rate(clk));
+			__clk_get_name(clk_provider_get_parent(clk)),
+			(unsigned int)clk_provider_get_rate(clk));
 
 		clk_data->clks[i] = clk;
 	}

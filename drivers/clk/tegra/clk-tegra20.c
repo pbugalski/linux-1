@@ -162,7 +162,7 @@ static void __iomem *pmc_base;
 			_clk_num, _gate_flags,	\
 			_clk_id)
 
-static struct clk **clks;
+static struct clk_core **clks;
 
 static struct tegra_clk_pll_freq_table pll_c_freq_table[] = {
 	{ 12000000, 600000000, 600, 12, 0, 8 },
@@ -633,7 +633,7 @@ static unsigned int tegra20_get_pll_ref_div(void)
 
 static void tegra20_pll_init(void)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	/* PLLC */
 	clk = tegra_clk_register_pll("pll_c", "pll_ref", clk_base, NULL, 0,
@@ -713,7 +713,7 @@ static const char *sclk_parents[] = { "clk_m", "pll_c_out1", "pll_p_out4",
 
 static void tegra20_super_clk_init(void)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	/* CCLK */
 	clk = tegra_clk_register_super_mux("cclk", cclk_parents,
@@ -738,7 +738,7 @@ static const char *audio_parents[] = {"spdif_in", "i2s1", "i2s2", "unused",
 
 static void __init tegra20_audio_clk_init(void)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	/* audio */
 	clk = clk_register_mux(NULL, "audio_mux", audio_parents,
@@ -800,7 +800,7 @@ static struct tegra_periph_init_data tegra_periph_nodiv_clk_list[] = {
 static void __init tegra20_periph_clk_init(void)
 {
 	struct tegra_periph_init_data *data;
-	struct clk *clk;
+	struct clk_core *clk;
 	int i;
 
 	/* ac97 */
@@ -871,7 +871,7 @@ static void __init tegra20_periph_clk_init(void)
 
 static void __init tegra20_osc_clk_init(void)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	unsigned long input_freq;
 	unsigned int pll_ref_div;
 

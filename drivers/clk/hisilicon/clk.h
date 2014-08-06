@@ -90,7 +90,7 @@ struct hisi_gate_clock {
 	const char		*alias;
 };
 
-struct clk *hisi_register_clkgate_sep(struct device *, const char *,
+struct clk_core *hisi_register_clkgate_sep(struct device *, const char *,
 				const char *, unsigned long,
 				void __iomem *, u8,
 				u8, spinlock_t *);

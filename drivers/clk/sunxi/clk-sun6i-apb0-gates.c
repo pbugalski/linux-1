@@ -74,7 +74,7 @@ static int sun6i_a31_apb0_gates_clk_probe(struct platform_device *pdev)
 	/* Worst-case size approximation and memory allocation */
 	ngates = find_last_bit(data->mask, SUN6I_APB0_GATES_MAX_SIZE);
 	clk_data->clks = devm_kcalloc(&pdev->dev, (ngates + 1),
-				      sizeof(struct clk *), GFP_KERNEL);
+				      sizeof(struct clk_core *), GFP_KERNEL);
 	if (!clk_data->clks)
 		return -ENOMEM;
 

@@ -54,7 +54,7 @@ static void __init rk2928_gate_clk_init(struct device_node *node)
 	if (!clk_data)
 		return;
 
-	clk_data->clks = kzalloc(qty * sizeof(struct clk *), GFP_KERNEL);
+	clk_data->clks = kzalloc(qty * sizeof(struct clk_core *), GFP_KERNEL);
 	if (!clk_data->clks) {
 		kfree(clk_data);
 		return;

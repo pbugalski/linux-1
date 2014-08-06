@@ -38,7 +38,7 @@
 
 /**
  * omap3_core_dpll_m2_set_rate - set CORE DPLL M2 divider
- * @clk: struct clk * of DPLL to set
+ * @clk: struct clk_core * of DPLL to set
  * @rate: rounded target rate
  *
  * Program the DPLL M2 divider with the rounded target rate.  Returns

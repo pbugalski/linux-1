@@ -96,14 +96,14 @@ static struct clk_ops clkgate_separated_ops = {
 	.is_enabled	= clkgate_separated_is_enabled,
 };
 
-struct clk *hisi_register_clkgate_sep(struct device *dev, const char *name,
+struct clk_core *hisi_register_clkgate_sep(struct device *dev, const char *name,
 				      const char *parent_name,
 				      unsigned long flags,
 				      void __iomem *reg, u8 bit_idx,
 				      u8 clk_gate_flags, spinlock_t *lock)
 {
 	struct clkgate_separated *sclk;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	sclk = kzalloc(sizeof(*sclk), GFP_KERNEL);

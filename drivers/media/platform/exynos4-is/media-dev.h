@@ -72,7 +72,7 @@ struct fimc_csis_info {
 };
 
 struct fimc_camclk_info {
-	struct clk *clock;
+	struct clk_core *clock;
 	int use_count;
 	unsigned long frequency;
 };
@@ -124,7 +124,7 @@ struct fimc_md {
 	struct fimc_sensor_info sensor[FIMC_MAX_SENSORS];
 	int num_sensors;
 	struct fimc_camclk_info camclk[FIMC_MAX_CAMCLKS];
-	struct clk *wbclk[FIMC_MAX_WBCLKS];
+	struct clk_core *wbclk[FIMC_MAX_WBCLKS];
 	struct fimc_lite *fimc_lite[FIMC_LITE_MAX_DEVS];
 	struct fimc_dev *fimc[FIMC_MAX_DEVS];
 	struct fimc_is *fimc_is;
@@ -141,7 +141,7 @@ struct fimc_md {
 	} pinctl;
 
 	struct cam_clk_provider {
-		struct clk *clks[FIMC_MAX_CAMCLKS];
+		struct clk_core *clks[FIMC_MAX_CAMCLKS];
 		struct clk_onecell_data clk_data;
 		struct device_node *of_node;
 		struct cam_clk camclk[FIMC_MAX_CAMCLKS];

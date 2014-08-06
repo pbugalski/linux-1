@@ -13,7 +13,7 @@ struct clk_icst_desc {
 	u32 lock_offset;
 };
 
-struct clk *icst_clk_register(struct device *dev,
+struct clk_core *icst_clk_register(struct device *dev,
 			      const struct clk_icst_desc *desc,
 			      const char *name,
 			      const char *parent_name,

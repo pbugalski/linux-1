@@ -116,7 +116,7 @@ static struct gpt_rate_tbl gpt_rtbl[] = {
 
 void __init spear6xx_clk_init(void __iomem *misc_base)
 {
-	struct clk *clk, *clk1;
+	struct clk_core *clk, *clk1;
 
 	clk = clk_register_fixed_rate(NULL, "osc_32k_clk", NULL, CLK_IS_ROOT,
 			32000);

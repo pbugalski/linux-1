@@ -159,7 +159,7 @@ static void clk_gate_fn_disable(struct clk_hw *hw)
 
 static struct clk_ops clk_gate_fn_ops;
 
-static struct clk __init *clk_register_gate_fn(struct device *dev,
+static struct clk_core __init *clk_register_gate_fn(struct device *dev,
 		const char *name,
 		const char *parent_name, unsigned long flags,
 		void __iomem *reg, u8 bit_idx,
@@ -167,7 +167,7 @@ static struct clk __init *clk_register_gate_fn(struct device *dev,
 		void (*fn_en)(void), void (*fn_dis)(void))
 {
 	struct clk_gate_fn *gate_fn;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	gate_fn = kzalloc(sizeof(struct clk_gate_fn), GFP_KERNEL);
@@ -208,15 +208,15 @@ static struct clk __init *clk_register_gate_fn(struct device *dev,
 }
 
 static DEFINE_SPINLOCK(gating_lock);
-static struct clk *tclk;
+static struct clk_core *tclk;
 
-static struct clk __init *kirkwood_register_gate(const char *name, u8 bit_idx)
+static struct clk_core __init *kirkwood_register_gate(const char *name, u8 bit_idx)
 {
 	return clk_register_gate(NULL, name, "tclk", 0, CLOCK_GATING_CTRL,
 				 bit_idx, 0, &gating_lock);
 }
 
-static struct clk __init *kirkwood_register_gate_fn(const char *name,
+static struct clk_core __init *kirkwood_register_gate_fn(const char *name,
 						    u8 bit_idx,
 						    void (*fn_en)(void),
 						    void (*fn_dis)(void))
@@ -225,12 +225,12 @@ static struct clk __init *kirkwood_register_gate_fn(const char *name,
 				    bit_idx, 0, &gating_lock, fn_en, fn_dis);
 }
 
-static struct clk *ge0, *ge1;
+static struct clk_core *ge0, *ge1;
 
 void __init kirkwood_clk_init(void)
 {
-	struct clk *runit, *sata0, *sata1, *usb0, *sdio;
-	struct clk *crypto, *xor0, *xor1, *pex0, *pex1, *audio;
+	struct clk_core *runit, *sata0, *sata1, *usb0, *sdio;
+	struct clk_core *crypto, *xor0, *xor1, *pex0, *pex1, *audio;
 
 	tclk = clk_register_fixed_rate(NULL, "tclk", NULL,
 				       CLK_IS_ROOT, kirkwood_tclk);
@@ -278,7 +278,7 @@ void __init kirkwood_clk_init(void)
 	/* Marvell says runit is used by SPI, UART, NAND, TWSI, ...,
 	 * so should never be gated.
 	 */
-	clk_prepare_enable(runit);
+	clk_provider_prepare_enable(runit);
 }
 
 /*****************************************************************************
@@ -300,7 +300,7 @@ void __init kirkwood_ge00_init(struct mv643xx_eth_platform_data *eth_data)
 			IRQ_KIRKWOOD_GE00_ERR, 1600);
 	/* The interface forgets the MAC address assigned by u-boot if
 	the clock is turned off, so claim the clk now. */
-	clk_prepare_enable(ge0);
+	clk_provider_prepare_enable(ge0);
 }
 
 
@@ -312,7 +312,7 @@ void __init kirkwood_ge01_init(struct mv643xx_eth_platform_data *eth_data)
 	orion_ge01_init(eth_data,
 			GE01_PHYS_BASE, IRQ_KIRKWOOD_GE01_SUM,
 			IRQ_KIRKWOOD_GE01_ERR, 1600);
-	clk_prepare_enable(ge1);
+	clk_provider_prepare_enable(ge1);
 }
 
 

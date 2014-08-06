@@ -82,7 +82,7 @@ static const char *lvds_sels[]	= {
 	"dummy", "dummy", "pcie_ref_125m", "dummy", "usbphy1", "usbphy2",
 };
 
-static struct clk *clks[IMX6SX_CLK_CLK_END];
+static struct clk_core *clks[IMX6SX_CLK_CLK_END];
 static struct clk_onecell_data clk_data;
 
 static int const clks_init_on[] __initconst = {
@@ -133,12 +133,14 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
 
 	clks[IMX6SX_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
 
-	clks[IMX6SX_CLK_CKIL] = of_clk_get_by_name(ccm_node, "ckil");
-	clks[IMX6SX_CLK_OSC] = of_clk_get_by_name(ccm_node, "osc");
+	clks[IMX6SX_CLK_CKIL] = of_clk_provider_get_by_name(ccm_node, "ckil");
+	clks[IMX6SX_CLK_OSC] = of_clk_provider_get_by_name(ccm_node, "osc");
 
 	/* ipp_di clock is external input */
-	clks[IMX6SX_CLK_IPP_DI0] = of_clk_get_by_name(ccm_node, "ipp_di0");
-	clks[IMX6SX_CLK_IPP_DI1] = of_clk_get_by_name(ccm_node, "ipp_di1");
+	clks[IMX6SX_CLK_IPP_DI0] = of_clk_provider_get_by_name(ccm_node,
+							       "ipp_di0");
+	clks[IMX6SX_CLK_IPP_DI1] = of_clk_provider_get_by_name(ccm_node,
+							       "ipp_di1");
 
 	np = of_find_compatible_node(NULL, NULL, "fsl,imx6sx-anatop");
 	base = of_iomap(np, 0);
@@ -455,65 +457,80 @@ static void __init imx6sx_clocks_init(struct device_node *ccm_node)
 	clk_register_clkdev(clks[IMX6SX_CLK_GPT_SERIAL], "per", "imx-gpt.0");
 
 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
-		clk_prepare_enable(clks[clks_init_on[i]]);
+		clk_provider_prepare_enable(clks[clks_init_on[i]]);
 
 	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
-		clk_prepare_enable(clks[IMX6SX_CLK_USBPHY1_GATE]);
-		clk_prepare_enable(clks[IMX6SX_CLK_USBPHY2_GATE]);
+		clk_provider_prepare_enable(clks[IMX6SX_CLK_USBPHY1_GATE]);
+		clk_provider_prepare_enable(clks[IMX6SX_CLK_USBPHY2_GATE]);
 	}
 
 	/* Set the default 132MHz for EIM module */
-	clk_set_parent(clks[IMX6SX_CLK_EIM_SLOW_SEL], clks[IMX6SX_CLK_PLL2_PFD2]);
-	clk_set_rate(clks[IMX6SX_CLK_EIM_SLOW], 132000000);
+	clk_provider_set_parent(clks[IMX6SX_CLK_EIM_SLOW_SEL],
+				clks[IMX6SX_CLK_PLL2_PFD2]);
+	clk_provider_set_rate(clks[IMX6SX_CLK_EIM_SLOW], 132000000);
 
 	/* set parent clock for LCDIF1 pixel clock */
-	clk_set_parent(clks[IMX6SX_CLK_LCDIF1_PRE_SEL], clks[IMX6SX_CLK_PLL5_VIDEO_DIV]);
-	clk_set_parent(clks[IMX6SX_CLK_LCDIF1_SEL], clks[IMX6SX_CLK_LCDIF1_PODF]);
+	clk_provider_set_parent(clks[IMX6SX_CLK_LCDIF1_PRE_SEL],
+				clks[IMX6SX_CLK_PLL5_VIDEO_DIV]);
+	clk_provider_set_parent(clks[IMX6SX_CLK_LCDIF1_SEL],
+				clks[IMX6SX_CLK_LCDIF1_PODF]);
 
 	/* Set the parent clks of PCIe lvds1 and pcie_axi to be pcie ref, axi */
-	if (clk_set_parent(clks[IMX6SX_CLK_LVDS1_SEL], clks[IMX6SX_CLK_PCIE_REF_125M]))
+	if (clk_provider_set_parent(clks[IMX6SX_CLK_LVDS1_SEL], clks[IMX6SX_CLK_PCIE_REF_125M]))
 		pr_err("Failed to set pcie bus parent clk.\n");
-	if (clk_set_parent(clks[IMX6SX_CLK_PCIE_AXI_SEL], clks[IMX6SX_CLK_AXI]))
+	if (clk_provider_set_parent(clks[IMX6SX_CLK_PCIE_AXI_SEL], clks[IMX6SX_CLK_AXI]))
 		pr_err("Failed to set pcie parent clk.\n");
 
 	/*
 	 * Init enet system AHB clock, set to 200Mhz
 	 * pll2_pfd2_396m-> ENET_PODF-> ENET_AHB
 	 */
-	clk_set_parent(clks[IMX6SX_CLK_ENET_PRE_SEL], clks[IMX6SX_CLK_PLL2_PFD2]);
-	clk_set_parent(clks[IMX6SX_CLK_ENET_SEL], clks[IMX6SX_CLK_ENET_PODF]);
-	clk_set_rate(clks[IMX6SX_CLK_ENET_PODF], 200000000);
-	clk_set_rate(clks[IMX6SX_CLK_ENET_REF], 125000000);
-	clk_set_rate(clks[IMX6SX_CLK_ENET2_REF], 125000000);
+	clk_provider_set_parent(clks[IMX6SX_CLK_ENET_PRE_SEL],
+				clks[IMX6SX_CLK_PLL2_PFD2]);
+	clk_provider_set_parent(clks[IMX6SX_CLK_ENET_SEL],
+				clks[IMX6SX_CLK_ENET_PODF]);
+	clk_provider_set_rate(clks[IMX6SX_CLK_ENET_PODF], 200000000);
+	clk_provider_set_rate(clks[IMX6SX_CLK_ENET_REF], 125000000);
+	clk_provider_set_rate(clks[IMX6SX_CLK_ENET2_REF], 125000000);
 
 	/* Audio clocks */
-	clk_set_rate(clks[IMX6SX_CLK_PLL4_AUDIO_DIV], 393216000);
+	clk_provider_set_rate(clks[IMX6SX_CLK_PLL4_AUDIO_DIV], 393216000);
 
-	clk_set_parent(clks[IMX6SX_CLK_SPDIF_SEL], clks[IMX6SX_CLK_PLL4_AUDIO_DIV]);
-	clk_set_rate(clks[IMX6SX_CLK_SPDIF_PODF], 98304000);
+	clk_provider_set_parent(clks[IMX6SX_CLK_SPDIF_SEL],
+				clks[IMX6SX_CLK_PLL4_AUDIO_DIV]);
+	clk_provider_set_rate(clks[IMX6SX_CLK_SPDIF_PODF], 98304000);
 
-	clk_set_parent(clks[IMX6SX_CLK_AUDIO_SEL], clks[IMX6SX_CLK_PLL3_USB_OTG]);
-	clk_set_rate(clks[IMX6SX_CLK_AUDIO_PODF], 24000000);
+	clk_provider_set_parent(clks[IMX6SX_CLK_AUDIO_SEL],
+				clks[IMX6SX_CLK_PLL3_USB_OTG]);
+	clk_provider_set_rate(clks[IMX6SX_CLK_AUDIO_PODF], 24000000);
 
-	clk_set_parent(clks[IMX6SX_CLK_SSI1_SEL], clks[IMX6SX_CLK_PLL4_AUDIO_DIV]);
-	clk_set_parent(clks[IMX6SX_CLK_SSI2_SEL], clks[IMX6SX_CLK_PLL4_AUDIO_DIV]);
-	clk_set_parent(clks[IMX6SX_CLK_SSI3_SEL], clks[IMX6SX_CLK_PLL4_AUDIO_DIV]);
-	clk_set_rate(clks[IMX6SX_CLK_SSI1_PODF], 24576000);
-	clk_set_rate(clks[IMX6SX_CLK_SSI2_PODF], 24576000);
-	clk_set_rate(clks[IMX6SX_CLK_SSI3_PODF], 24576000);
+	clk_provider_set_parent(clks[IMX6SX_CLK_SSI1_SEL],
+				clks[IMX6SX_CLK_PLL4_AUDIO_DIV]);
+	clk_provider_set_parent(clks[IMX6SX_CLK_SSI2_SEL],
+				clks[IMX6SX_CLK_PLL4_AUDIO_DIV]);
+	clk_provider_set_parent(clks[IMX6SX_CLK_SSI3_SEL],
+				clks[IMX6SX_CLK_PLL4_AUDIO_DIV]);
+	clk_provider_set_rate(clks[IMX6SX_CLK_SSI1_PODF], 24576000);
+	clk_provider_set_rate(clks[IMX6SX_CLK_SSI2_PODF], 24576000);
+	clk_provider_set_rate(clks[IMX6SX_CLK_SSI3_PODF], 24576000);
 
-	clk_set_parent(clks[IMX6SX_CLK_ESAI_SEL], clks[IMX6SX_CLK_PLL4_AUDIO_DIV]);
-	clk_set_rate(clks[IMX6SX_CLK_ESAI_PODF], 24576000);
+	clk_provider_set_parent(clks[IMX6SX_CLK_ESAI_SEL],
+				clks[IMX6SX_CLK_PLL4_AUDIO_DIV]);
+	clk_provider_set_rate(clks[IMX6SX_CLK_ESAI_PODF], 24576000);
 
 	/* Set parent clock for vadc */
-	clk_set_parent(clks[IMX6SX_CLK_VID_SEL], clks[IMX6SX_CLK_PLL3_USB_OTG]);
+	clk_provider_set_parent(clks[IMX6SX_CLK_VID_SEL],
+				clks[IMX6SX_CLK_PLL3_USB_OTG]);
 
 	/* default parent of can_sel clock is invalid, manually set it here */
-	clk_set_parent(clks[IMX6SX_CLK_CAN_SEL], clks[IMX6SX_CLK_PLL3_60M]);
+	clk_provider_set_parent(clks[IMX6SX_CLK_CAN_SEL],
+				clks[IMX6SX_CLK_PLL3_60M]);
 
 	/* Update gpu clock from default 528M to 720M */
-	clk_set_parent(clks[IMX6SX_CLK_GPU_CORE_SEL], clks[IMX6SX_CLK_PLL3_PFD0]);
-	clk_set_parent(clks[IMX6SX_CLK_GPU_AXI_SEL], clks[IMX6SX_CLK_PLL3_PFD0]);
+	clk_provider_set_parent(clks[IMX6SX_CLK_GPU_CORE_SEL],
+				clks[IMX6SX_CLK_PLL3_PFD0]);
+	clk_provider_set_parent(clks[IMX6SX_CLK_GPU_AXI_SEL],
+				clks[IMX6SX_CLK_PLL3_PFD0]);
 
 	/* Set initial power mode */
 	imx6q_set_lpm(WAIT_CLOCKED);

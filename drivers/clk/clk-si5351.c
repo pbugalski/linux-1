@@ -56,10 +56,10 @@ struct si5351_driver_data {
 	struct regmap		*regmap;
 	struct clk_onecell_data onecell;
 
-	struct clk		*pxtal;
+	struct clk_core		*pxtal;
 	const char		*pxtal_name;
 	struct clk_hw		xtal;
-	struct clk		*pclkin;
+	struct clk_core		*pclkin;
 	const char		*pclkin_name;
 	struct clk_hw		clkin;
 
@@ -1128,12 +1128,12 @@ static int si5351_dt_parse(struct i2c_client *client,
 	if (!pdata)
 		return -ENOMEM;
 
-	pdata->clk_xtal = of_clk_get(np, 0);
+	pdata->clk_xtal = of_clk_provider_get(np, 0);
 	if (!IS_ERR(pdata->clk_xtal))
-		clk_put(pdata->clk_xtal);
-	pdata->clk_clkin = of_clk_get(np, 1);
+		__clk_put(pdata->clk_xtal);
+	pdata->clk_clkin = of_clk_provider_get(np, 1);
 	if (!IS_ERR(pdata->clk_clkin))
-		clk_put(pdata->clk_clkin);
+		__clk_put(pdata->clk_clkin);
 
 	/*
 	 * property silabs,pll-source : <num src>, [<..>]
@@ -1306,7 +1306,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
 	struct si5351_platform_data *pdata;
 	struct si5351_driver_data *drvdata;
 	struct clk_init_data init;
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_names[4];
 	u8 num_parents, num_clocks;
 	int ret, n;
@@ -1545,7 +1545,8 @@ static int si5351_i2c_probe(struct i2c_client *client,
 		/* set initial clkout rate */
 		if (pdata->clkout[n].rate != 0) {
 			int ret;
-			ret = clk_set_rate(clk, pdata->clkout[n].rate);
+			ret = clk_provider_set_rate(clk,
+						    pdata->clkout[n].rate);
 			if (ret != 0) {
 				dev_err(&client->dev, "Cannot set rate : %d\n",
 					ret);

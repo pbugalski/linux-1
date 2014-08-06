@@ -2718,7 +2718,7 @@ MODULE_DEVICE_TABLE(of, gcc_msm8660_match_table);
 
 static int gcc_msm8660_probe(struct platform_device *pdev)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct device *dev = &pdev->dev;
 
 	/* Temporary until RPM clocks supported */

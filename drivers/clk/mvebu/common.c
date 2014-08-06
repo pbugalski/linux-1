@@ -43,7 +43,7 @@ void __init mvebu_coreclk_setup(struct device_node *np,
 
 	/* Allocate struct for TCLK, cpu clk, and core ratio clocks */
 	clk_data.clk_num = 2 + desc->num_ratios;
-	clk_data.clks = kzalloc(clk_data.clk_num * sizeof(struct clk *),
+	clk_data.clks = kzalloc(clk_data.clk_num * sizeof(struct clk_core *),
 				GFP_KERNEL);
 	if (WARN_ON(!clk_data.clks)) {
 		iounmap(base);
@@ -91,13 +91,13 @@ void __init mvebu_coreclk_setup(struct device_node *np,
 
 struct clk_gating_ctrl {
 	spinlock_t lock;
-	struct clk **gates;
+	struct clk_core **gates;
 	int num_gates;
 };
 
 #define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
 
-static struct clk *clk_gating_get_src(
+static struct clk_core *clk_gating_get_src(
 	struct of_phandle_args *clkspec, void *data)
 {
 	struct clk_gating_ctrl *ctrl = (struct clk_gating_ctrl *)data;
@@ -119,7 +119,7 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
 				   const struct clk_gating_soc_desc *desc)
 {
 	struct clk_gating_ctrl *ctrl;
-	struct clk *clk;
+	struct clk_core *clk;
 	void __iomem *base;
 	const char *default_parent = NULL;
 	int n;
@@ -128,10 +128,10 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
 	if (WARN_ON(!base))
 		return;
 
-	clk = of_clk_get(np, 0);
+	clk = of_clk_provider_get(np, 0);
 	if (!IS_ERR(clk)) {
 		default_parent = __clk_get_name(clk);
-		clk_put(clk);
+		__clk_put(clk);
 	}
 
 	ctrl = kzalloc(sizeof(*ctrl), GFP_KERNEL);
@@ -145,7 +145,7 @@ void __init mvebu_clk_gating_setup(struct device_node *np,
 		n++;
 
 	ctrl->num_gates = n;
-	ctrl->gates = kzalloc(ctrl->num_gates * sizeof(struct clk *),
+	ctrl->gates = kzalloc(ctrl->num_gates * sizeof(struct clk_core *),
 			      GFP_KERNEL);
 	if (WARN_ON(!ctrl->gates))
 		goto gates_out;

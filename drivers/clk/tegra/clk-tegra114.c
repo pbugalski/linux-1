@@ -936,14 +936,14 @@ static u32 mux_pllm_pllc2_c_c3_pllp_plla_idx[] = {
 	[0] = 0, [1] = 1, [2] = 2, [3] = 3, [4] = 4, [5] = 6,
 };
 
-static struct clk **clks;
+static struct clk_core **clks;
 
 static unsigned long osc_freq;
 static unsigned long pll_ref_freq;
 
 static int __init tegra114_osc_clk_init(void __iomem *clk_base)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	u32 val, pll_ref_div;
 
 	val = readl_relaxed(clk_base + OSC_CTRL);
@@ -973,7 +973,7 @@ static int __init tegra114_osc_clk_init(void __iomem *clk_base)
 
 static void __init tegra114_fixed_clk_init(void __iomem *clk_base)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	/* clk_32k */
 	clk = clk_register_fixed_rate(NULL, "clk_32k", NULL, CLK_IS_ROOT,
@@ -1078,7 +1078,7 @@ static void __init tegra114_pll_init(void __iomem *clk_base,
 				     void __iomem *pmc)
 {
 	u32 val;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	/* PLLC */
 	clk = tegra_clk_register_pllxc("pll_c", "pll_ref", clk_base,
@@ -1200,7 +1200,7 @@ static struct tegra_periph_init_data tegra_periph_clk_list[] = {
 static __init void tegra114_periph_clk_init(void __iomem *clk_base,
 					    void __iomem *pmc_base)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct tegra_periph_init_data *data;
 	int i;
 

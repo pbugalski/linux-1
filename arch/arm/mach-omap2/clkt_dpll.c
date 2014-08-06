@@ -67,7 +67,7 @@
 
 /*
  * _dpll_test_fint - test whether an Fint value is valid for the DPLL
- * @clk: DPLL struct clk to test
+ * @clk: DPLL struct clk_core to test
  * @n: divider value (N) to test
  *
  * Tests whether a particular divider @n will result in a valid DPLL
@@ -200,7 +200,7 @@ u8 omap2_init_dpll_parent(struct clk_hw *hw)
 	v &= dd->enable_mask;
 	v >>= __ffs(dd->enable_mask);
 
-	/* Reparent the struct clk in case the dpll is in bypass */
+	/* Reparent the struct clk_core in case the dpll is in bypass */
 	if (cpu_is_omap24xx()) {
 		if (v == OMAP2XXX_EN_DPLL_LPBYPASS ||
 		    v == OMAP2XXX_EN_DPLL_FRBYPASS)
@@ -220,7 +220,7 @@ u8 omap2_init_dpll_parent(struct clk_hw *hw)
 
 /**
  * omap2_get_dpll_rate - returns the current DPLL CLKOUT rate
- * @clk: struct clk * of a DPLL
+ * @clk: struct clk_core * of a DPLL
  *
  * DPLLs can be locked or bypassed - basically, enabled or disabled.
  * When locked, the DPLL output depends on the M and N values.  When
@@ -278,7 +278,7 @@ unsigned long omap2_get_dpll_rate(struct clk_hw_omap *clk)
 
 /**
  * omap2_dpll_round_rate - round a target rate for an OMAP DPLL
- * @clk: struct clk * for a DPLL
+ * @clk: struct clk_core * for a DPLL
  * @target_rate: desired DPLL clock rate
  *
  * Given a DPLL and a desired target rate, round the target rate to a

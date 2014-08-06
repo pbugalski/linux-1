@@ -62,7 +62,7 @@ void __init orion5x_map_io(void)
 /*****************************************************************************
  * CLK tree
  ****************************************************************************/
-static struct clk *tclk;
+static struct clk_core *tclk;
 
 void __init clk_init(void)
 {

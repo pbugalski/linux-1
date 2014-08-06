@@ -19,7 +19,7 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
 {
 	struct prcmu_fw_version *fw_version;
 	const char *sgaclk_parent = NULL;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	/* Clock sources */
 	clk = clk_reg_prcmu_gate("soc0_pll", NULL, PRCMU_PLLSOC0,

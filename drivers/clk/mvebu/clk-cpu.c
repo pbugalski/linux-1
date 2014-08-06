@@ -30,7 +30,7 @@ struct cpu_clk {
 	void __iomem *reg_base;
 };
 
-static struct clk **clks;
+static struct clk_core **clks;
 
 static struct clk_onecell_data clk_data;
 
@@ -127,8 +127,8 @@ static void __init of_cpu_clk_setup(struct device_node *node)
 
 	for_each_node_by_type(dn, "cpu") {
 		struct clk_init_data init;
-		struct clk *clk;
-		struct clk *parent_clk;
+		struct clk_core *clk;
+		struct clk_core *parent_clk;
 		char *clk_name = kzalloc(5, GFP_KERNEL);
 		int cpu, err;
 
@@ -140,7 +140,7 @@ static void __init of_cpu_clk_setup(struct device_node *node)
 			goto bail_out;
 
 		sprintf(clk_name, "cpu%d", cpu);
-		parent_clk = of_clk_get(node, 0);
+		parent_clk = of_clk_provider_get(node, 0);
 
 		cpuclk[cpu].parent_name = __clk_get_name(parent_clk);
 		cpuclk[cpu].clk_name = clk_name;

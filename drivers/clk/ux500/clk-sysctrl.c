@@ -114,7 +114,7 @@ static struct clk_ops clk_sysctrl_set_parent_ops = {
 	.get_parent = clk_sysctrl_get_parent,
 };
 
-static struct clk *clk_reg_sysctrl(struct device *dev,
+static struct clk_core *clk_reg_sysctrl(struct device *dev,
 				const char *name,
 				const char **parent_names,
 				u8 num_parents,
@@ -128,7 +128,7 @@ static struct clk *clk_reg_sysctrl(struct device *dev,
 {
 	struct clk_sysctrl *clk;
 	struct clk_init_data clk_sysctrl_init;
-	struct clk *clk_reg;
+	struct clk_core *clk_reg;
 	int i;
 
 	if (!dev)
@@ -176,7 +176,7 @@ static struct clk *clk_reg_sysctrl(struct device *dev,
 	return clk_reg;
 }
 
-struct clk *clk_reg_sysctrl_gate(struct device *dev,
+struct clk_core *clk_reg_sysctrl_gate(struct device *dev,
 				const char *name,
 				const char *parent_name,
 				u16 reg_sel,
@@ -193,7 +193,7 @@ struct clk *clk_reg_sysctrl_gate(struct device *dev,
 			flags, &clk_sysctrl_gate_ops);
 }
 
-struct clk *clk_reg_sysctrl_gate_fixed_rate(struct device *dev,
+struct clk_core *clk_reg_sysctrl_gate_fixed_rate(struct device *dev,
 					const char *name,
 					const char *parent_name,
 					u16 reg_sel,
@@ -212,7 +212,7 @@ struct clk *clk_reg_sysctrl_gate_fixed_rate(struct device *dev,
 			&clk_sysctrl_gate_fixed_rate_ops);
 }
 
-struct clk *clk_reg_sysctrl_set_parent(struct device *dev,
+struct clk_core *clk_reg_sysctrl_set_parent(struct device *dev,
 				const char *name,
 				const char **parent_names,
 				u8 num_parents,

@@ -117,7 +117,7 @@ static const struct clk_ops slow_osc_ops = {
 	.is_prepared = clk_slow_osc_is_prepared,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_slow_osc(void __iomem *sckcr,
 			   const char *name,
 			   const char *parent_name,
@@ -125,7 +125,7 @@ at91_clk_register_slow_osc(void __iomem *sckcr,
 			   bool bypass)
 {
 	struct clk_slow_osc *osc;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	if (!sckcr || !name || !parent_name)
@@ -159,7 +159,7 @@ at91_clk_register_slow_osc(void __iomem *sckcr,
 void __init of_at91sam9x5_clk_slow_osc_setup(struct device_node *np,
 					     void __iomem *sckcr)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name;
 	const char *name = np->name;
 	u32 startup;
@@ -229,7 +229,7 @@ static const struct clk_ops slow_rc_osc_ops = {
 	.recalc_accuracy = clk_slow_rc_osc_recalc_accuracy,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_slow_rc_osc(void __iomem *sckcr,
 			      const char *name,
 			      unsigned long frequency,
@@ -237,7 +237,7 @@ at91_clk_register_slow_rc_osc(void __iomem *sckcr,
 			      unsigned long startup)
 {
 	struct clk_slow_rc_osc *osc;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	if (!sckcr || !name)
@@ -269,7 +269,7 @@ at91_clk_register_slow_rc_osc(void __iomem *sckcr,
 void __init of_at91sam9x5_clk_slow_rc_osc_setup(struct device_node *np,
 						void __iomem *sckcr)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	u32 frequency = 0;
 	u32 accuracy = 0;
 	u32 startup = 0;
@@ -327,14 +327,14 @@ static const struct clk_ops sam9x5_slow_ops = {
 	.get_parent = clk_sam9x5_slow_get_parent,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_sam9x5_slow(void __iomem *sckcr,
 			      const char *name,
 			      const char **parent_names,
 			      int num_parents)
 {
 	struct clk_sam9x5_slow *slowck;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	if (!sckcr || !name || !parent_names || !num_parents)
@@ -364,7 +364,7 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
 void __init of_at91sam9x5_clk_slow_setup(struct device_node *np,
 					 void __iomem *sckcr)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_names[2];
 	int num_parents;
 	const char *name = np->name;
@@ -401,14 +401,14 @@ static const struct clk_ops sam9260_slow_ops = {
 	.get_parent = clk_sam9260_slow_get_parent,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_sam9260_slow(struct at91_pmc *pmc,
 			       const char *name,
 			       const char **parent_names,
 			       int num_parents)
 {
 	struct clk_sam9260_slow *slowck;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	if (!pmc || !name)
@@ -440,7 +440,7 @@ at91_clk_register_sam9260_slow(struct at91_pmc *pmc,
 void __init of_at91sam9260_clk_slow_setup(struct device_node *np,
 					  struct at91_pmc *pmc)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_names[2];
 	int num_parents;
 	const char *name = np->name;

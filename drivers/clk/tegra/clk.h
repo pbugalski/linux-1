@@ -39,7 +39,7 @@ struct tegra_clk_sync_source {
 extern const struct clk_ops tegra_clk_sync_source_ops;
 extern int *periph_clk_enb_refcnt;
 
-struct clk *tegra_clk_register_sync_source(const char *name,
+struct clk_core *tegra_clk_register_sync_source(const char *name,
 		unsigned long fixed_rate, unsigned long max_rate);
 
 /**
@@ -82,7 +82,7 @@ struct tegra_clk_frac_div {
 #define TEGRA_DIVIDER_UART BIT(3)
 
 extern const struct clk_ops tegra_clk_frac_div_ops;
-struct clk *tegra_clk_register_divider(const char *name,
+struct clk_core *tegra_clk_register_divider(const char *name,
 		const char *parent_name, void __iomem *reg,
 		unsigned long flags, u8 clk_divider_flags, u8 shift, u8 width,
 		u8 frac_width, spinlock_t *lock);
@@ -258,47 +258,47 @@ struct tegra_clk_pll {
 
 extern const struct clk_ops tegra_clk_pll_ops;
 extern const struct clk_ops tegra_clk_plle_ops;
-struct clk *tegra_clk_register_pll(const char *name, const char *parent_name,
+struct clk_core *tegra_clk_register_pll(const char *name, const char *parent_name,
 		void __iomem *clk_base, void __iomem *pmc,
 		unsigned long flags, struct tegra_clk_pll_params *pll_params,
 		spinlock_t *lock);
 
-struct clk *tegra_clk_register_plle(const char *name, const char *parent_name,
+struct clk_core *tegra_clk_register_plle(const char *name, const char *parent_name,
 		void __iomem *clk_base, void __iomem *pmc,
 		unsigned long flags, struct tegra_clk_pll_params *pll_params,
 		spinlock_t *lock);
 
-struct clk *tegra_clk_register_pllxc(const char *name, const char *parent_name,
+struct clk_core *tegra_clk_register_pllxc(const char *name, const char *parent_name,
 			    void __iomem *clk_base, void __iomem *pmc,
 			    unsigned long flags,
 			    struct tegra_clk_pll_params *pll_params,
 			    spinlock_t *lock);
 
-struct clk *tegra_clk_register_pllm(const char *name, const char *parent_name,
+struct clk_core *tegra_clk_register_pllm(const char *name, const char *parent_name,
 			   void __iomem *clk_base, void __iomem *pmc,
 			   unsigned long flags,
 			   struct tegra_clk_pll_params *pll_params,
 			   spinlock_t *lock);
 
-struct clk *tegra_clk_register_pllc(const char *name, const char *parent_name,
+struct clk_core *tegra_clk_register_pllc(const char *name, const char *parent_name,
 			   void __iomem *clk_base, void __iomem *pmc,
 			   unsigned long flags,
 			   struct tegra_clk_pll_params *pll_params,
 			   spinlock_t *lock);
 
-struct clk *tegra_clk_register_pllre(const char *name, const char *parent_name,
+struct clk_core *tegra_clk_register_pllre(const char *name, const char *parent_name,
 			   void __iomem *clk_base, void __iomem *pmc,
 			   unsigned long flags,
 			   struct tegra_clk_pll_params *pll_params,
 			   spinlock_t *lock, unsigned long parent_rate);
 
-struct clk *tegra_clk_register_plle_tegra114(const char *name,
+struct clk_core *tegra_clk_register_plle_tegra114(const char *name,
 				const char *parent_name,
 				void __iomem *clk_base, unsigned long flags,
 				struct tegra_clk_pll_params *pll_params,
 				spinlock_t *lock);
 
-struct clk *tegra_clk_register_pllss(const char *name, const char *parent_name,
+struct clk_core *tegra_clk_register_pllss(const char *name, const char *parent_name,
 			   void __iomem *clk_base, unsigned long flags,
 			   struct tegra_clk_pll_params *pll_params,
 			   spinlock_t *lock);
@@ -325,7 +325,7 @@ struct tegra_clk_pll_out {
 #define to_clk_pll_out(_hw) container_of(_hw, struct tegra_clk_pll_out, hw)
 
 extern const struct clk_ops tegra_clk_pll_out_ops;
-struct clk *tegra_clk_register_pll_out(const char *name,
+struct clk_core *tegra_clk_register_pll_out(const char *name,
 		const char *parent_name, void __iomem *reg, u8 enb_bit_idx,
 		u8 rst_bit_idx, unsigned long flags, u8 pll_div_flags,
 		spinlock_t *lock);
@@ -394,7 +394,7 @@ struct tegra_clk_periph_gate {
 #define TEGRA_PERIPH_NO_GATE BIT(5)
 
 extern const struct clk_ops tegra_clk_periph_gate_ops;
-struct clk *tegra_clk_register_periph_gate(const char *name,
+struct clk_core *tegra_clk_register_periph_gate(const char *name,
 		const char *parent_name, u8 gate_flags, void __iomem *clk_base,
 		unsigned long flags, int clk_num, int *enable_refcnt);
 
@@ -427,11 +427,11 @@ struct tegra_clk_periph {
 #define TEGRA_CLK_PERIPH_MAGIC 0x18221223
 
 extern const struct clk_ops tegra_clk_periph_ops;
-struct clk *tegra_clk_register_periph(const char *name,
+struct clk_core *tegra_clk_register_periph(const char *name,
 		const char **parent_names, int num_parents,
 		struct tegra_clk_periph *periph, void __iomem *clk_base,
 		u32 offset, unsigned long flags);
-struct clk *tegra_clk_register_periph_nodiv(const char *name,
+struct clk_core *tegra_clk_register_periph_nodiv(const char *name,
 		const char **parent_names, int num_parents,
 		struct tegra_clk_periph *periph, void __iomem *clk_base,
 		u32 offset);
@@ -540,7 +540,7 @@ struct tegra_clk_super_mux {
 #define TEGRA_DIVIDER_2 BIT(0)
 
 extern const struct clk_ops tegra_clk_super_ops;
-struct clk *tegra_clk_register_super_mux(const char *name,
+struct clk_core *tegra_clk_register_super_mux(const char *name,
 		const char **parent_names, u8 num_parents,
 		unsigned long flags, void __iomem *reg, u8 clk_super_flags,
 		u8 width, u8 pllx_index, u8 div2_index, spinlock_t *lock);
@@ -590,15 +590,15 @@ struct tegra_devclk {
 };
 
 void tegra_init_from_table(struct tegra_clk_init_table *tbl,
-		struct clk *clks[], int clk_max);
+		struct clk_core *clks[], int clk_max);
 
 void tegra_init_dup_clks(struct tegra_clk_duplicate *dup_list,
-		struct clk *clks[], int clk_max);
+		struct clk_core *clks[], int clk_max);
 
 struct tegra_clk_periph_regs *get_reg_bank(int clkid);
-struct clk **tegra_clk_init(void __iomem *clk_base, int num, int periph_banks);
+struct clk_core **tegra_clk_init(void __iomem *clk_base, int num, int periph_banks);
 
-struct clk **tegra_lookup_dt_id(int clk_id, struct tegra_clk *tegra_clk);
+struct clk_core **tegra_lookup_dt_id(int clk_id, struct tegra_clk *tegra_clk);
 
 void tegra_add_of_provider(struct device_node *np);
 void tegra_register_devclks(struct tegra_devclk *dev_clks, int num);

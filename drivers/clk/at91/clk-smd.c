@@ -113,12 +113,12 @@ static const struct clk_ops at91sam9x5_smd_ops = {
 	.set_rate = at91sam9x5_clk_smd_set_rate,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91sam9x5_clk_register_smd(struct at91_pmc *pmc, const char *name,
 			    const char **parent_names, u8 num_parents)
 {
 	struct at91sam9x5_clk_smd *smd;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	smd = kzalloc(sizeof(*smd), GFP_KERNEL);
@@ -144,7 +144,7 @@ at91sam9x5_clk_register_smd(struct at91_pmc *pmc, const char *name,
 void __init of_at91sam9x5_clk_smd_setup(struct device_node *np,
 					struct at91_pmc *pmc)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	int i;
 	int num_parents;
 	const char *parent_names[SMD_SOURCE_MAX];

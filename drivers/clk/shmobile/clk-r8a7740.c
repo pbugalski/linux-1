@@ -61,7 +61,7 @@ static const struct clk_div_table div4_div_table[] = {
 
 static u32 cpg_mode __initdata;
 
-static struct clk * __init
+static struct clk_core * __init
 r8a7740_cpg_register_clock(struct device_node *np, struct r8a7740_cpg *cpg,
 			     const char *name)
 {
@@ -147,7 +147,7 @@ r8a7740_cpg_register_clock(struct device_node *np, struct r8a7740_cpg *cpg,
 static void __init r8a7740_cpg_clocks_init(struct device_node *np)
 {
 	struct r8a7740_cpg *cpg;
-	struct clk **clks;
+	struct clk_core **clks;
 	unsigned int i;
 	int num_clks;
 
@@ -180,7 +180,7 @@ static void __init r8a7740_cpg_clocks_init(struct device_node *np)
 
 	for (i = 0; i < num_clks; ++i) {
 		const char *name;
-		struct clk *clk;
+		struct clk_core *clk;
 
 		of_property_read_string_index(np, "clock-output-names", i,
 					      &name);

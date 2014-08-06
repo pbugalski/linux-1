@@ -53,8 +53,8 @@ static const char *cclk_lp_parents[] = { "clk_m", "pll_c", "clk_32k", "pll_m",
 static void __init tegra_sclk_init(void __iomem *clk_base,
 				struct tegra_clk *tegra_clks)
 {
-	struct clk *clk;
-	struct clk **dt_clk;
+	struct clk_core *clk;
+	struct clk_core **dt_clk;
 
 	/* SCLK */
 	dt_clk = tegra_lookup_dt_id(tegra_clk_sclk, tegra_clks);
@@ -99,8 +99,8 @@ void __init tegra_super_clk_gen4_init(void __iomem *clk_base,
 				struct tegra_clk *tegra_clks,
 				struct tegra_clk_pll_params *params)
 {
-	struct clk *clk;
-	struct clk **dt_clk;
+	struct clk_core *clk;
+	struct clk_core **dt_clk;
 
 	/* CCLKG */
 	dt_clk = tegra_lookup_dt_id(tegra_clk_cclk_g, tegra_clks);

@@ -18,22 +18,22 @@ struct mv_sata_platform_data;
 void __init orion_uart0_init(void __iomem *membase,
 			     resource_size_t mapbase,
 			     unsigned int irq,
-			     struct clk *clk);
+			     struct clk_core *clk);
 
 void __init orion_uart1_init(void __iomem *membase,
 			     resource_size_t mapbase,
 			     unsigned int irq,
-			     struct clk *clk);
+			     struct clk_core *clk);
 
 void __init orion_uart2_init(void __iomem *membase,
 			     resource_size_t mapbase,
 			     unsigned int irq,
-			     struct clk *clk);
+			     struct clk_core *clk);
 
 void __init orion_uart3_init(void __iomem *membase,
 			     resource_size_t mapbase,
 			     unsigned int irq,
-			     struct clk *clk);
+			     struct clk_core *clk);
 
 void __init orion_rtc_init(unsigned long mapbase,
 			   unsigned long irq);
@@ -107,7 +107,7 @@ void __init orion_crypto_init(unsigned long mapbase,
 			      unsigned long irq);
 
 void __init orion_clkdev_add(const char *con_id, const char *dev_id,
-			     struct clk *clk);
+			     struct clk_core *clk);
 
-void __init orion_clkdev_init(struct clk *tclk);
+void __init orion_clkdev_init(struct clk_core *tclk);
 #endif

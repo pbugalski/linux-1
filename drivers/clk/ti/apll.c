@@ -135,10 +135,10 @@ static void __init omap_clk_register_apll(struct clk_hw *hw,
 {
 	struct clk_hw_omap *clk_hw = to_clk_hw_omap(hw);
 	struct dpll_data *ad = clk_hw->dpll_data;
-	struct clk *clk;
+	struct clk_core *clk;
 
-	ad->clk_ref = of_clk_get(node, 0);
-	ad->clk_bypass = of_clk_get(node, 1);
+	ad->clk_ref = of_clk_provider_get(node, 0);
+	ad->clk_bypass = of_clk_provider_get(node, 1);
 
 	if (IS_ERR(ad->clk_ref) || IS_ERR(ad->clk_bypass)) {
 		pr_debug("clk-ref or clk-bypass for %s not ready, retry\n",
@@ -332,7 +332,7 @@ static void __init of_omap2_apll_setup(struct device_node *node)
 	struct dpll_data *ad = NULL;
 	struct clk_hw_omap *clk_hw = NULL;
 	struct clk_init_data *init = NULL;
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name;
 	u32 val;
 

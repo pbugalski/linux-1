@@ -215,7 +215,7 @@ static int __fimc_pipeline_open(struct exynos_media_pipeline *ep,
 
 	/* Disable PXLASYNC clock if this pipeline includes FIMC-IS */
 	if (!IS_ERR(fmd->wbclk[CLK_IDX_WB_B]) && p->subdevs[IDX_IS_ISP]) {
-		ret = clk_prepare_enable(fmd->wbclk[CLK_IDX_WB_B]);
+		ret = clk_provider_prepare_enable(fmd->wbclk[CLK_IDX_WB_B]);
 		if (ret < 0)
 			return ret;
 	}
@@ -225,7 +225,7 @@ static int __fimc_pipeline_open(struct exynos_media_pipeline *ep,
 		return 0;
 
 	if (!IS_ERR(fmd->wbclk[CLK_IDX_WB_B]) && p->subdevs[IDX_IS_ISP])
-		clk_disable_unprepare(fmd->wbclk[CLK_IDX_WB_B]);
+		clk_provider_disable_unprepare(fmd->wbclk[CLK_IDX_WB_B]);
 
 	return ret;
 }
@@ -254,7 +254,7 @@ static int __fimc_pipeline_close(struct exynos_media_pipeline *ep)
 
 	/* Disable PXLASYNC clock if this pipeline includes FIMC-IS */
 	if (!IS_ERR(fmd->wbclk[CLK_IDX_WB_B]) && p->subdevs[IDX_IS_ISP])
-		clk_disable_unprepare(fmd->wbclk[CLK_IDX_WB_B]);
+		clk_provider_disable_unprepare(fmd->wbclk[CLK_IDX_WB_B]);
 
 	return ret == -ENXIO ? 0 : ret;
 }
@@ -954,7 +954,7 @@ static void fimc_md_put_clocks(struct fimc_md *fmd)
 	while (--i >= 0) {
 		if (IS_ERR(fmd->camclk[i].clock))
 			continue;
-		clk_put(fmd->camclk[i].clock);
+		__clk_put(fmd->camclk[i].clock);
 		fmd->camclk[i].clock = ERR_PTR(-EINVAL);
 	}
 
@@ -962,7 +962,7 @@ static void fimc_md_put_clocks(struct fimc_md *fmd)
 	for (i = 0; i < FIMC_MAX_WBCLKS; i++) {
 		if (IS_ERR(fmd->wbclk[i]))
 			continue;
-		clk_put(fmd->wbclk[i]);
+		__clk_put(fmd->wbclk[i]);
 		fmd->wbclk[i] = ERR_PTR(-EINVAL);
 	}
 }
@@ -971,7 +971,7 @@ static int fimc_md_get_clocks(struct fimc_md *fmd)
 {
 	struct device *dev = &fmd->pdev->dev;
 	char clk_name[32];
-	struct clk *clock;
+	struct clk_core *clock;
 	int i, ret = 0;
 
 	for (i = 0; i < FIMC_MAX_CAMCLKS; i++)
@@ -979,7 +979,7 @@ static int fimc_md_get_clocks(struct fimc_md *fmd)
 
 	for (i = 0; i < FIMC_MAX_CAMCLKS; i++) {
 		snprintf(clk_name, sizeof(clk_name), "sclk_cam%u", i);
-		clock = clk_get(dev, clk_name);
+		clock = clk_provider_get(dev, clk_name);
 
 		if (IS_ERR(clock)) {
 			dev_err(dev, "Failed to get clock: %s\n", clk_name);
@@ -1001,7 +1001,7 @@ static int fimc_md_get_clocks(struct fimc_md *fmd)
 
 	for (i = CLK_IDX_WB_B; i < FIMC_MAX_WBCLKS; i++) {
 		snprintf(clk_name, sizeof(clk_name), "pxl_async%u", i);
-		clock = clk_get(dev, clk_name);
+		clock = clk_provider_get(dev, clk_name);
 		if (IS_ERR(clock)) {
 			v4l2_err(&fmd->v4l2_dev, "Failed to get clock: %s\n",
 				  clk_name);

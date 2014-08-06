@@ -29,7 +29,7 @@
 
 #define s2mps11_name(a) (a->hw.init->name)
 
-static struct clk **clk_table;
+static struct clk_core **clk_table;
 static struct clk_onecell_data clk_data;
 
 enum {
@@ -43,7 +43,7 @@ struct s2mps11_clk {
 	struct sec_pmic_dev *iodev;
 	struct device_node *clk_np;
 	struct clk_hw hw;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_lookup *lookup;
 	u32 mask;
 	unsigned int reg;
@@ -174,7 +174,7 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
 
 	s2mps11_clk = s2mps11_clks;
 
-	clk_table = devm_kzalloc(&pdev->dev, sizeof(struct clk *) *
+	clk_table = devm_kzalloc(&pdev->dev, sizeof(struct clk_core *) *
 				 S2MPS11_CLKS_NUM, GFP_KERNEL);
 	if (!clk_table)
 		return -ENOMEM;

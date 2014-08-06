@@ -28,7 +28,7 @@ struct rz_cpg {
  * Initialization
  */
 
-static struct clk * __init
+static struct clk_core * __init
 rz_cpg_register_clock(struct device_node *np, struct rz_cpg *cpg, const char *name)
 {
 	u32 val;
@@ -67,7 +67,7 @@ rz_cpg_register_clock(struct device_node *np, struct rz_cpg *cpg, const char *na
 static void __init rz_cpg_clocks_init(struct device_node *np)
 {
 	struct rz_cpg *cpg;
-	struct clk **clks;
+	struct clk_core **clks;
 	unsigned i;
 	int num_clks;
 
@@ -86,7 +86,7 @@ static void __init rz_cpg_clocks_init(struct device_node *np)
 
 	for (i = 0; i < num_clks; ++i) {
 		const char *name;
-		struct clk *clk;
+		struct clk_core *clk;
 
 		of_property_read_string_index(np, "clock-output-names", i, &name);
 

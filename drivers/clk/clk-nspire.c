@@ -69,7 +69,7 @@ static void __init nspire_ahbdiv_setup(struct device_node *node,
 {
 	u32 val;
 	void __iomem *io;
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *clk_name = node->name;
 	const char *parent_name;
 	struct nspire_clk_info info;
@@ -111,7 +111,7 @@ static void __init nspire_clk_setup(struct device_node *node,
 {
 	u32 val;
 	void __iomem *io;
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *clk_name = node->name;
 	struct nspire_clk_info info;
 

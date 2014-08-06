@@ -46,7 +46,7 @@ static unsigned long ar100_recalc_rate(struct clk_hw *hw,
 
 static long ar100_determine_rate(struct clk_hw *hw, unsigned long rate,
 				 unsigned long *best_parent_rate,
-				 struct clk **best_parent_clk)
+				 struct clk_core **best_parent_clk)
 {
 	int nparents = __clk_get_num_parents(hw->clk);
 	long best_rate = -EINVAL;
@@ -57,7 +57,7 @@ static long ar100_determine_rate(struct clk_hw *hw, unsigned long rate,
 	for (i = 0; i < nparents; i++) {
 		unsigned long parent_rate;
 		unsigned long tmp_rate;
-		struct clk *parent;
+		struct clk_core *parent;
 		unsigned long div;
 		int shift;
 
@@ -176,7 +176,7 @@ static int sun6i_a31_ar100_clk_probe(struct platform_device *pdev)
 	struct clk_init_data init;
 	struct ar100_clk *ar100;
 	struct resource *r;
-	struct clk *clk;
+	struct clk_core *clk;
 	int nparents;
 	int i;
 

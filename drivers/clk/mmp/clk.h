@@ -20,15 +20,15 @@ struct clk_factor_tbl {
 	unsigned int den;
 };
 
-extern struct clk *mmp_clk_register_pll2(const char *name,
+extern struct clk_core *mmp_clk_register_pll2(const char *name,
 		const char *parent_name, unsigned long flags);
-extern struct clk *mmp_clk_register_apbc(const char *name,
+extern struct clk_core *mmp_clk_register_apbc(const char *name,
 		const char *parent_name, void __iomem *base,
 		unsigned int delay, unsigned int apbc_flags, spinlock_t *lock);
-extern struct clk *mmp_clk_register_apmu(const char *name,
+extern struct clk_core *mmp_clk_register_apmu(const char *name,
 		const char *parent_name, void __iomem *base, u32 enable_mask,
 		spinlock_t *lock);
-extern struct clk *mmp_clk_register_factor(const char *name,
+extern struct clk_core *mmp_clk_register_factor(const char *name,
 		const char *parent_name, unsigned long flags,
 		void __iomem *base, struct clk_factor_masks *masks,
 		struct clk_factor_tbl *ftbl, unsigned int ftbl_cnt);

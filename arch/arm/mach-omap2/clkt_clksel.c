@@ -51,15 +51,15 @@
 
 /**
  * _get_clksel_by_parent() - return clksel struct for a given clk & parent
- * @clk: OMAP struct clk ptr to inspect
- * @src_clk: OMAP struct clk ptr of the parent clk to search for
+ * @clk: OMAP struct clk_core ptr to inspect
+ * @src_clk: OMAP struct clk_core ptr of the parent clk to search for
  *
  * Scan the struct clksel array associated with the clock to find
  * the element associated with the supplied parent clock address.
  * Returns a pointer to the struct clksel on success or NULL on error.
  */
 static const struct clksel *_get_clksel_by_parent(struct clk_hw_omap *clk,
-						  struct clk *src_clk)
+						  struct clk_core *src_clk)
 {
 	const struct clksel *clks;
 
@@ -82,7 +82,7 @@ static const struct clksel *_get_clksel_by_parent(struct clk_hw_omap *clk,
 
 /**
  * _write_clksel_reg() - program a clock's clksel register in hardware
- * @clk: struct clk * to program
+ * @clk: struct clk_core * to program
  * @v: clksel bitfield value to program (with LSB at bit 0)
  *
  * Shift the clksel register bitfield value @v to its appropriate
@@ -107,10 +107,10 @@ static void _write_clksel_reg(struct clk_hw_omap *clk, u32 field_val)
 
 /**
  * _clksel_to_divisor() - turn clksel field value into integer divider
- * @clk: OMAP struct clk to use
+ * @clk: OMAP struct clk_core to use
  * @field_val: register field value to find
  *
- * Given a struct clk of a rate-selectable clksel clock, and a register field
+ * Given a struct clk_core of a rate-selectable clksel clock, and a register field
  * value to search for, find the corresponding clock divisor.  The register
  * field value should be pre-masked and shifted down so the LSB is at bit 0
  * before calling.  Returns 0 on error or returns the actual integer divisor
@@ -120,7 +120,7 @@ static u32 _clksel_to_divisor(struct clk_hw_omap *clk, u32 field_val)
 {
 	const struct clksel *clks;
 	const struct clksel_rate *clkr;
-	struct clk *parent;
+	struct clk_core *parent;
 
 	parent = __clk_get_parent(clk->hw.clk);
 
@@ -149,10 +149,10 @@ static u32 _clksel_to_divisor(struct clk_hw_omap *clk, u32 field_val)
 
 /**
  * _divisor_to_clksel() - turn clksel integer divisor into a field value
- * @clk: OMAP struct clk to use
+ * @clk: OMAP struct clk_core to use
  * @div: integer divisor to search for
  *
- * Given a struct clk of a rate-selectable clksel clock, and a clock
+ * Given a struct clk_core of a rate-selectable clksel clock, and a clock
  * divisor, find the corresponding register field value.  Returns the
  * register field value _before_ left-shifting (i.e., LSB is at bit
  * 0); or returns 0xFFFFFFFF (~0) upon error.
@@ -161,7 +161,7 @@ static u32 _divisor_to_clksel(struct clk_hw_omap *clk, u32 div)
 {
 	const struct clksel *clks;
 	const struct clksel_rate *clkr;
-	struct clk *parent;
+	struct clk_core *parent;
 
 	/* should never happen */
 	WARN_ON(div == 0);
@@ -191,7 +191,7 @@ static u32 _divisor_to_clksel(struct clk_hw_omap *clk, u32 div)
 
 /**
  * _read_divisor() - get current divisor applied to parent clock (from hdwr)
- * @clk: OMAP struct clk to use.
+ * @clk: OMAP struct clk_core to use.
  *
  * Read the current divisor register value for @clk that is programmed
  * into the hardware, convert it into the actual divisor value, and
@@ -215,7 +215,7 @@ static u32 _read_divisor(struct clk_hw_omap *clk)
 
 /**
  * omap2_clksel_round_rate_div() - find divisor for the given clock and rate
- * @clk: OMAP struct clk to use
+ * @clk: OMAP struct clk_core to use
  * @target_rate: desired clock rate
  * @new_div: ptr to where we should store the divisor
  *
@@ -233,7 +233,7 @@ u32 omap2_clksel_round_rate_div(struct clk_hw_omap *clk,
 	const struct clksel *clks;
 	const struct clksel_rate *clkr;
 	u32 last_div = 0;
-	struct clk *parent;
+	struct clk_core *parent;
 	unsigned long parent_rate;
 	const char *clk_name;
 
@@ -286,7 +286,7 @@ u32 omap2_clksel_round_rate_div(struct clk_hw_omap *clk,
 
 /*
  * Clocktype interface functions to the OMAP clock code
- * (i.e., those used in struct clk field function pointers, etc.)
+ * (i.e., those used in struct clk_core field function pointers, etc.)
  */
 
 /**
@@ -309,7 +309,7 @@ u8 omap2_clksel_find_parent_index(struct clk_hw *hw)
 	const struct clksel *clks;
 	const struct clksel_rate *clkr;
 	u32 r, found = 0;
-	struct clk *parent;
+	struct clk_core *parent;
 	const char *clk_name;
 	int ret = 0, f = 0;
 
@@ -345,11 +345,11 @@ u8 omap2_clksel_find_parent_index(struct clk_hw *hw)
 
 
 /**
- * omap2_clksel_recalc() - function ptr to pass via struct clk .recalc field
- * @clk: struct clk *
+ * omap2_clksel_recalc() - function ptr to pass via struct clk_core .recalc field
+ * @clk: struct clk_core *
  *
  * This function is intended to be called only by the clock framework.
- * Each clksel clock should have its struct clk .recalc field set to this
+ * Each clksel clock should have its struct clk_core .recalc field set to this
  * function.  Returns the clock's current rate, based on its parent's rate
  * and its current divisor setting in the hardware.
  */
@@ -376,7 +376,7 @@ unsigned long omap2_clksel_recalc(struct clk_hw *hw, unsigned long parent_rate)
 
 /**
  * omap2_clksel_round_rate() - find rounded rate for the given clock and rate
- * @clk: OMAP struct clk to use
+ * @clk: OMAP struct clk_core to use
  * @target_rate: desired clock rate
  *
  * This function is intended to be called only by the clock framework.
@@ -396,7 +396,7 @@ long omap2_clksel_round_rate(struct clk_hw *hw, unsigned long target_rate,
 
 /**
  * omap2_clksel_set_rate() - program clock rate in hardware
- * @clk: struct clk * to program rate
+ * @clk: struct clk_core * to program rate
  * @rate: target rate to program
  *
  * This function is intended to be called only by the clock framework.
@@ -435,7 +435,7 @@ int omap2_clksel_set_rate(struct clk_hw *hw, unsigned long rate,
 }
 
 /*
- * Clksel parent setting function - not passed in struct clk function
+ * Clksel parent setting function - not passed in struct clk_core function
  * pointer - instead, the OMAP clock code currently assumes that any
  * parent-setting clock is a clksel clock, and calls
  * omap2_clksel_set_parent() by default
@@ -443,8 +443,8 @@ int omap2_clksel_set_rate(struct clk_hw *hw, unsigned long rate,
 
 /**
  * omap2_clksel_set_parent() - change a clock's parent clock
- * @clk: struct clk * of the child clock
- * @new_parent: struct clk * of the new parent clock
+ * @clk: struct clk_core * of the child clock
+ * @new_parent: struct clk_core * of the new parent clock
  *
  * This function is intended to be called only by the clock framework.
  * Change the parent clock of clock @clk to @new_parent.  This is

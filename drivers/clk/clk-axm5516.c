@@ -532,7 +532,7 @@ MODULE_DEVICE_TABLE(of, axmclk_match_table);
 
 struct axmclk_priv {
 	struct clk_onecell_data onecell;
-	struct clk *clks[];
+	struct clk_core *clks[];
 };
 
 static int axmclk_probe(struct platform_device *pdev)
@@ -541,7 +541,7 @@ static int axmclk_probe(struct platform_device *pdev)
 	struct resource *res;
 	int i, ret;
 	struct device *dev = &pdev->dev;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct regmap *regmap;
 	size_t num_clks;
 	struct axmclk_priv *priv;

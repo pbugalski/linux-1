@@ -21,18 +21,18 @@
 
 struct impd1_clk {
 	char *pclkname;
-	struct clk *pclk;
+	struct clk_core *pclk;
 	char *vco1name;
-	struct clk *vco1clk;
+	struct clk_core *vco1clk;
 	char *vco2name;
-	struct clk *vco2clk;
-	struct clk *mmciclk;
+	struct clk_core *vco2clk;
+	struct clk_core *mmciclk;
 	char *uartname;
-	struct clk *uartclk;
+	struct clk_core *uartclk;
 	char *spiname;
-	struct clk *spiclk;
+	struct clk_core *spiclk;
 	char *scname;
-	struct clk *scclk;
+	struct clk_core *scclk;
 	struct clk_lookup *clks[15];
 };
 
@@ -87,8 +87,8 @@ static const struct clk_icst_desc impd1_icst2_desc = {
 void integrator_impd1_clk_init(void __iomem *base, unsigned int id)
 {
 	struct impd1_clk *imc;
-	struct clk *clk;
-	struct clk *pclk;
+	struct clk_core *clk;
+	struct clk_core *pclk;
 	int i;
 
 	if (id > 3) {

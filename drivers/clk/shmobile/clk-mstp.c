@@ -121,13 +121,13 @@ static const struct clk_ops cpg_mstp_clock_ops = {
 	.is_enabled = cpg_mstp_clock_is_enabled,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 cpg_mstp_clock_register(const char *name, const char *parent_name,
 			unsigned int index, struct mstp_clock_group *group)
 {
 	struct clk_init_data init;
 	struct mstp_clock *clock;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	clock = kzalloc(sizeof(*clock), GFP_KERNEL);
 	if (!clock) {
@@ -157,7 +157,7 @@ static void __init cpg_mstp_clocks_init(struct device_node *np)
 {
 	struct mstp_clock_group *group;
 	const char *idxname;
-	struct clk **clks;
+	struct clk_core **clks;
 	unsigned int i;
 
 	group = kzalloc(sizeof(*group), GFP_KERNEL);

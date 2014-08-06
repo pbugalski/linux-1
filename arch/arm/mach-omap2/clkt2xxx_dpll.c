@@ -22,7 +22,7 @@
 
 /**
  * _allow_idle - enable DPLL autoidle bits
- * @clk: struct clk * of the DPLL to operate on
+ * @clk: struct clk_core * of the DPLL to operate on
  *
  * Enable DPLL automatic idle control.  The DPLL will enter low-power
  * stop when its downstream clocks are gated.  No return value.
@@ -39,7 +39,7 @@ static void _allow_idle(struct clk_hw_omap *clk)
 
 /**
  * _deny_idle - prevent DPLL from automatically idling
- * @clk: struct clk * of the DPLL to operate on
+ * @clk: struct clk_core * of the DPLL to operate on
  *
  * Disable DPLL automatic idle control.  No return value.
  */

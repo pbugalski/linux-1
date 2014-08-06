@@ -193,12 +193,12 @@ static const struct clk_ops zynq_pll_ops = {
  * @lock	Register lock
  * Returns handle to the registered clock.
  */
-struct clk *clk_register_zynq_pll(const char *name, const char *parent,
+struct clk_core *clk_register_zynq_pll(const char *name, const char *parent,
 		void __iomem *pll_ctrl, void __iomem *pll_status, u8 lock_index,
 		spinlock_t *lock)
 {
 	struct zynq_pll *pll;
-	struct clk *clk;
+	struct clk_core *clk;
 	u32 reg;
 	const char *parent_arr[1] = {parent};
 	unsigned long flags = 0;

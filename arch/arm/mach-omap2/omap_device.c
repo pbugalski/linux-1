@@ -47,7 +47,7 @@
 static void _add_clkdev(struct omap_device *od, const char *clk_alias,
 		       const char *clk_name)
 {
-	struct clk *r;
+	struct clk_core *r;
 	struct clk_lookup *l;
 
 	if (!clk_alias || !clk_name)
@@ -55,15 +55,15 @@ static void _add_clkdev(struct omap_device *od, const char *clk_alias,
 
 	dev_dbg(&od->pdev->dev, "Creating %s -> %s\n", clk_alias, clk_name);
 
-	r = clk_get_sys(dev_name(&od->pdev->dev), clk_alias);
+	r = clk_provider_get_sys(dev_name(&od->pdev->dev), clk_alias);
 	if (!IS_ERR(r)) {
 		dev_warn(&od->pdev->dev,
 			 "alias %s already exists\n", clk_alias);
-		clk_put(r);
+		__clk_put(r);
 		return;
 	}
 
-	r = clk_get(NULL, clk_name);
+	r = clk_provider_get(NULL, clk_name);
 	if (IS_ERR(r)) {
 		dev_err(&od->pdev->dev,
 			"clk_get for %s failed\n", clk_name);

@@ -116,14 +116,14 @@ static const struct clk_ops clk_pll_ops = {
 	.recalc_rate = clk_pllclk_recalc,
 };
 
-static struct clk *clk_register_pll(struct device *dev,
+static struct clk_core *clk_register_pll(struct device *dev,
 			const char *name,
 			const char *parent_name,
 			struct clk_pll_data *pll_data)
 {
 	struct clk_init_data init;
 	struct clk_pll *pll;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
 	if (!pll)
@@ -158,7 +158,7 @@ static void __init _of_pll_clk_init(struct device_node *node, bool pllctrl)
 {
 	struct clk_pll_data *pll_data;
 	const char *parent_name;
-	struct clk *clk;
+	struct clk_core *clk;
 	int i;
 
 	pll_data = kzalloc(sizeof(*pll_data), GFP_KERNEL);
@@ -239,7 +239,7 @@ static void __init of_pll_div_clk_init(struct device_node *node)
 	const char *parent_name;
 	void __iomem *reg;
 	u32 shift, mask;
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *clk_name = node->name;
 
 	of_property_read_string(node, "clock-output-names", &clk_name);
@@ -282,7 +282,7 @@ static void __init of_pll_mux_clk_init(struct device_node *node)
 {
 	void __iomem *reg;
 	u32 shift, mask;
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parents[2];
 	const char *clk_name = node->name;
 

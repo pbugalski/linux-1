@@ -697,7 +697,7 @@ static void bcm_clk_teardown(struct kona_clk *bcm_clk)
 	bcm_clk->type = bcm_clk_none;
 }
 
-static void kona_clk_teardown(struct clk *clk)
+static void kona_clk_teardown(struct clk_core *clk)
 {
 	struct clk_hw *hw;
 	struct kona_clk *bcm_clk;
@@ -716,10 +716,10 @@ static void kona_clk_teardown(struct clk *clk)
 	bcm_clk_teardown(bcm_clk);
 }
 
-struct clk *kona_clk_setup(struct kona_clk *bcm_clk)
+struct clk_core *kona_clk_setup(struct kona_clk *bcm_clk)
 {
 	struct clk_init_data *init_data = &bcm_clk->init_data;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 
 	switch (bcm_clk->type) {
 	case bcm_clk_peri:

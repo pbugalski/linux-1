@@ -291,7 +291,7 @@ static void _lookup_sddiv(struct clk_hw_omap *clk, u8 *sd_div, u16 m, u8 n)
 
 /*
  * _omap3_noncore_dpll_program - set non-core DPLL M,N values directly
- * @clk:	struct clk * of DPLL to set
+ * @clk:	struct clk_core * of DPLL to set
  * @freqsel:	FREQSEL value to set
  *
  * Program the DPLL with the last M, N values calculated, and wait for
@@ -413,7 +413,7 @@ int omap3_noncore_dpll_enable(struct clk_hw *hw)
 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
 	int r;
 	struct dpll_data *dd;
-	struct clk *parent;
+	struct clk_core *parent;
 
 	dd = clk->dpll_data;
 	if (!dd)
@@ -464,7 +464,7 @@ void omap3_noncore_dpll_disable(struct clk_hw *hw)
 
 /**
  * omap3_noncore_dpll_set_rate - set non-core DPLL rate
- * @clk: struct clk * of DPLL to set
+ * @clk: struct clk_core * of DPLL to set
  * @rate: rounded target rate
  *
  * Set the DPLL CLKOUT to the target rate.  If the DPLL can enter
@@ -477,7 +477,7 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
 					unsigned long parent_rate)
 {
 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
-	struct clk *new_parent = NULL;
+	struct clk_core *new_parent = NULL;
 	u16 freqsel = 0;
 	struct dpll_data *dd;
 	int ret;
@@ -495,15 +495,15 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
 			 __func__, __clk_get_name(hw->clk));
 
 		__clk_prepare(dd->clk_bypass);
-		clk_enable(dd->clk_bypass);
+		clk_provider_enable(dd->clk_bypass);
 		ret = _omap3_noncore_dpll_bypass(clk);
 		if (!ret)
 			new_parent = dd->clk_bypass;
-		clk_disable(dd->clk_bypass);
+		clk_provider_disable(dd->clk_bypass);
 		__clk_unprepare(dd->clk_bypass);
 	} else {
 		__clk_prepare(dd->clk_ref);
-		clk_enable(dd->clk_ref);
+		clk_provider_enable(dd->clk_ref);
 
 		if (dd->last_rounded_rate != rate)
 			rate = __clk_round_rate(hw->clk, rate);
@@ -524,7 +524,7 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
 		ret = omap3_noncore_dpll_program(clk, freqsel);
 		if (!ret)
 			new_parent = dd->clk_ref;
-		clk_disable(dd->clk_ref);
+		clk_provider_disable(dd->clk_ref);
 		__clk_unprepare(dd->clk_ref);
 	}
 	/*
@@ -534,7 +534,7 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
 	* stuff is inherited for free
 	*/
 
-	if (!ret && clk_get_parent(hw->clk) != new_parent)
+	if (!ret && clk_provider_get_parent(hw->clk) != new_parent)
 		__clk_reparent(hw->clk, new_parent);
 
 	return 0;
@@ -544,10 +544,10 @@ int omap3_noncore_dpll_set_rate(struct clk_hw *hw, unsigned long rate,
 
 /**
  * omap3_dpll_autoidle_read - read a DPLL's autoidle bits
- * @clk: struct clk * of the DPLL to read
+ * @clk: struct clk_core * of the DPLL to read
  *
  * Return the DPLL's autoidle bits, shifted down to bit 0.  Returns
- * -EINVAL if passed a null pointer or if the struct clk does not
+ * -EINVAL if passed a null pointer or if the struct clk_core does not
  * appear to refer to a DPLL.
  */
 u32 omap3_dpll_autoidle_read(struct clk_hw_omap *clk)
@@ -572,7 +572,7 @@ u32 omap3_dpll_autoidle_read(struct clk_hw_omap *clk)
 
 /**
  * omap3_dpll_allow_idle - enable DPLL autoidle bits
- * @clk: struct clk * of the DPLL to operate on
+ * @clk: struct clk_core * of the DPLL to operate on
  *
  * Enable DPLL automatic idle control.  This automatic idle mode
  * switching takes effect only when the DPLL is locked, at least on
@@ -606,7 +606,7 @@ void omap3_dpll_allow_idle(struct clk_hw_omap *clk)
 
 /**
  * omap3_dpll_deny_idle - prevent DPLL from automatically idling
- * @clk: struct clk * of the DPLL to operate on
+ * @clk: struct clk_core * of the DPLL to operate on
  *
  * Disable DPLL automatic idle control.  No return value.
  */
@@ -636,7 +636,7 @@ void omap3_dpll_deny_idle(struct clk_hw_omap *clk)
 static struct clk_hw_omap *omap3_find_clkoutx2_dpll(struct clk_hw *hw)
 {
 	struct clk_hw_omap *pclk = NULL;
-	struct clk *parent;
+	struct clk_core *parent;
 
 	/* Walk up the parents of clk, looking for a DPLL */
 	do {

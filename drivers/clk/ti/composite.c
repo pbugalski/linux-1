@@ -119,7 +119,7 @@ static inline struct clk_hw *_get_hw(struct clk_hw_omap_comp *clk, int idx)
 static void __init ti_clk_register_composite(struct clk_hw *hw,
 					     struct device_node *node)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_hw_omap_comp *cclk = to_clk_hw_comp(hw);
 	struct component_clk *comp;
 	int num_parents = 0;

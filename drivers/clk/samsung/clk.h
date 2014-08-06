@@ -336,7 +336,7 @@ extern void __init samsung_clk_of_register_fixed_ext(
 			const struct of_device_id *clk_matches);
 
 extern void samsung_clk_add_lookup(struct samsung_clk_provider *ctx,
-			struct clk *clk, unsigned int id);
+			struct clk_core *clk, unsigned int id);
 
 extern void samsung_clk_register_alias(struct samsung_clk_provider *ctx,
 			struct samsung_clock_alias *list,

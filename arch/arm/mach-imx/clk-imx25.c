@@ -89,7 +89,7 @@ enum mx25_clks {
 	wdt_ipg, cko_div, cko_sel, cko, clk_max
 };
 
-static struct clk *clk[clk_max];
+static struct clk_core *clk[clk_max];
 
 static int __init __mx25_clocks_init(unsigned long osc_rate)
 {
@@ -229,10 +229,10 @@ static int __init __mx25_clocks_init(unsigned long osc_rate)
 			pr_err("i.MX25 clk %d: register failed with %ld\n",
 				i, PTR_ERR(clk[i]));
 
-	clk_prepare_enable(clk[emi_ahb]);
+	clk_provider_prepare_enable(clk[emi_ahb]);
 
 	/* Clock source for gpt must be derived from AHB */
-	clk_set_parent(clk[per5_sel], clk[ahb]);
+	clk_provider_set_parent(clk[per5_sel], clk[ahb]);
 
 	clk_register_clkdev(clk[ipg], "ipg", "imx-gpt.0");
 	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
@@ -241,7 +241,7 @@ static int __init __mx25_clocks_init(unsigned long osc_rate)
 	 * Let's initially set up CLKO parent as ipg, since this configuration
 	 * is used on some imx25 board designs to clock the audio codec.
 	 */
-	clk_set_parent(clk[cko_sel], clk[ipg]);
+	clk_provider_set_parent(clk[cko_sel], clk[ipg]);
 
 	return 0;
 }

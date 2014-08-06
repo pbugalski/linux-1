@@ -47,7 +47,7 @@
 #define REG_SDIO1XIN_CLKCTL	0x015c
 
 #define	MAX_CLKS 27
-static struct clk *clks[MAX_CLKS];
+static struct clk_core *clks[MAX_CLKS];
 static struct clk_onecell_data clk_data;
 static DEFINE_SPINLOCK(lock);
 static void __iomem *gbase;
@@ -293,7 +293,7 @@ static const struct berlin2_gate_data bg2q_gates[] __initconst = {
 static void __init berlin2q_clock_setup(struct device_node *np)
 {
 	const char *parent_names[9];
-	struct clk *clk;
+	struct clk_core *clk;
 	int n;
 
 	gbase = of_iomap(np, 0);
@@ -311,10 +311,10 @@ static void __init berlin2q_clock_setup(struct device_node *np)
 	}
 
 	/* overwrite default clock names with DT provided ones */
-	clk = of_clk_get_by_name(np, clk_names[REFCLK]);
+	clk = of_clk_provider_get_by_name(np, clk_names[REFCLK]);
 	if (!IS_ERR(clk)) {
 		clk_names[REFCLK] = __clk_get_name(clk);
-		clk_put(clk);
+		__clk_put(clk);
 	}
 
 	/* simple register PLLs */

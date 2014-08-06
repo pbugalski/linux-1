@@ -66,11 +66,11 @@ struct clk_ops clk_apmu_ops = {
 	.disable = clk_apmu_disable,
 };
 
-struct clk *mmp_clk_register_apmu(const char *name, const char *parent_name,
+struct clk_core *mmp_clk_register_apmu(const char *name, const char *parent_name,
 		void __iomem *base, u32 enable_mask, spinlock_t *lock)
 {
 	struct clk_apmu *apmu;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	apmu = kzalloc(sizeof(*apmu), GFP_KERNEL);

@@ -1141,7 +1141,7 @@ static int _clkdm_clk_hwmod_enable(struct clockdomain *clkdm)
 /**
  * clkdm_clk_enable - add an enabled downstream clock to this clkdm
  * @clkdm: struct clockdomain *
- * @clk: struct clk * of the enabled downstream clock
+ * @clk: struct clk_core * of the enabled downstream clock
  *
  * Increment the usecount of the clockdomain @clkdm and ensure that it
  * is awake before @clk is enabled.  Intended to be called by
@@ -1152,7 +1152,7 @@ static int _clkdm_clk_hwmod_enable(struct clockdomain *clkdm)
  * by on-chip processors.  Returns -EINVAL if passed null pointers;
  * returns 0 upon success or if the clockdomain is in hwsup idle mode.
  */
-int clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk)
+int clkdm_clk_enable(struct clockdomain *clkdm, struct clk_core *clk)
 {
 	/*
 	 * XXX Rewrite this code to maintain a list of enabled
@@ -1168,7 +1168,7 @@ int clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk)
 /**
  * clkdm_clk_disable - remove an enabled downstream clock from this clkdm
  * @clkdm: struct clockdomain *
- * @clk: struct clk * of the disabled downstream clock
+ * @clk: struct clk_core * of the disabled downstream clock
  *
  * Decrement the usecount of this clockdomain @clkdm when @clk is
  * disabled.  Intended to be called by clk_disable() code.  If the
@@ -1178,7 +1178,7 @@ int clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk)
  * pointers; -ERANGE if the @clkdm usecount underflows; or returns 0
  * upon success or if the clockdomain is in hwsup idle mode.
  */
-int clkdm_clk_disable(struct clockdomain *clkdm, struct clk *clk)
+int clkdm_clk_disable(struct clockdomain *clkdm, struct clk_core *clk)
 {
 	if (!clkdm || !clk || !arch_clkdm || !arch_clkdm->clkdm_clk_disable)
 		return -EINVAL;

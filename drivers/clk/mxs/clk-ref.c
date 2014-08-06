@@ -125,11 +125,11 @@ static const struct clk_ops clk_ref_ops = {
 	.set_rate	= clk_ref_set_rate,
 };
 
-struct clk *mxs_clk_ref(const char *name, const char *parent_name,
+struct clk_core *mxs_clk_ref(const char *name, const char *parent_name,
 			void __iomem *reg, u8 idx)
 {
 	struct clk_ref *ref;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	ref = kzalloc(sizeof(*ref), GFP_KERNEL);

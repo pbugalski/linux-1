@@ -614,13 +614,13 @@ static const struct clk_ops st_quadfs_pll_c32_ops = {
 	.set_rate	= quadfs_pll_fs660c32_set_rate,
 };
 
-static struct clk * __init st_clk_register_quadfs_pll(
+static struct clk_core * __init st_clk_register_quadfs_pll(
 		const char *name, const char *parent_name,
 		struct clkgen_quadfs_data *quadfs, void __iomem *reg,
 		spinlock_t *lock)
 {
 	struct st_clk_quadfs_pll *pll;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	/*
@@ -1018,13 +1018,13 @@ static const struct clk_ops st_quadfs_ops = {
 	.recalc_rate	= quadfs_recalc_rate,
 };
 
-static struct clk * __init st_clk_register_quadfs_fsynth(
+static struct clk_core * __init st_clk_register_quadfs_fsynth(
 		const char *name, const char *parent_name,
 		struct clkgen_quadfs_data *quadfs, void __iomem *reg, u32 chan,
 		spinlock_t *lock)
 {
 	struct st_clk_quadfs_fsynth *fs;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	/*
@@ -1102,7 +1102,7 @@ static void __init st_of_create_quadfs_fsynths(
 		return;
 
 	clk_data->clk_num = QUADFS_MAX_CHAN;
-	clk_data->clks = kzalloc(QUADFS_MAX_CHAN * sizeof(struct clk *),
+	clk_data->clks = kzalloc(QUADFS_MAX_CHAN * sizeof(struct clk_core *),
 				 GFP_KERNEL);
 
 	if (!clk_data->clks) {
@@ -1111,7 +1111,7 @@ static void __init st_of_create_quadfs_fsynths(
 	}
 
 	for (fschan = 0; fschan < QUADFS_MAX_CHAN; fschan++) {
-		struct clk *clk;
+		struct clk_core *clk;
 		const char *clk_name;
 
 		if (of_property_read_string_index(np, "clock-output-names",
@@ -1136,8 +1136,8 @@ static void __init st_of_create_quadfs_fsynths(
 			clk_data->clks[fschan] = clk;
 			pr_debug("%s: parent %s rate %u\n",
 				__clk_get_name(clk),
-				__clk_get_name(clk_get_parent(clk)),
-				(unsigned int)clk_get_rate(clk));
+				__clk_get_name(clk_provider_get_parent(clk)),
+				(unsigned int)clk_provider_get_rate(clk));
 		}
 	}
 
@@ -1147,7 +1147,7 @@ static void __init st_of_create_quadfs_fsynths(
 static void __init st_of_quadfs_setup(struct device_node *np)
 {
 	const struct of_device_id *match;
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *pll_name, *clk_parent_name;
 	void __iomem *reg;
 	spinlock_t *lock;
@@ -1181,8 +1181,8 @@ static void __init st_of_quadfs_setup(struct device_node *np)
 	else
 		pr_debug("%s: parent %s rate %u\n",
 			__clk_get_name(clk),
-			__clk_get_name(clk_get_parent(clk)),
-			(unsigned int)clk_get_rate(clk));
+			__clk_get_name(clk_provider_get_parent(clk)),
+			(unsigned int)clk_provider_get_rate(clk));
 
 	st_of_create_quadfs_fsynths(np, pll_name,
 				    (struct clkgen_quadfs_data *)match->data,

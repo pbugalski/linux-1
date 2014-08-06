@@ -48,11 +48,11 @@ static const struct clk_ops ls1x_pll_clk_ops = {
 	.recalc_rate = ls1x_pll_recalc_rate,
 };
 
-static struct clk * __init clk_register_pll(struct device *dev,
+static struct clk_core * __init clk_register_pll(struct device *dev,
 	 const char *name, const char *parent_name, unsigned long flags)
 {
 	struct clk_hw *hw;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	/* allocate the divider */
@@ -80,32 +80,32 @@ static struct clk * __init clk_register_pll(struct device *dev,
 
 void __init ls1x_clk_init(void)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 
 	clk = clk_register_pll(NULL, "pll_clk", NULL, CLK_IS_ROOT);
-	clk_prepare_enable(clk);
+	clk_provider_prepare_enable(clk);
 
 	clk = clk_register_divider(NULL, "cpu_clk", "pll_clk",
 			CLK_SET_RATE_PARENT, LS1X_CLK_PLL_DIV, DIV_CPU_SHIFT,
 			DIV_CPU_WIDTH, CLK_DIVIDER_ONE_BASED, &_lock);
-	clk_prepare_enable(clk);
+	clk_provider_prepare_enable(clk);
 	clk_register_clkdev(clk, "cpu", NULL);
 
 	clk = clk_register_divider(NULL, "dc_clk", "pll_clk",
 			CLK_SET_RATE_PARENT, LS1X_CLK_PLL_DIV, DIV_DC_SHIFT,
 			DIV_DC_WIDTH, CLK_DIVIDER_ONE_BASED, &_lock);
-	clk_prepare_enable(clk);
+	clk_provider_prepare_enable(clk);
 	clk_register_clkdev(clk, "dc", NULL);
 
 	clk = clk_register_divider(NULL, "ahb_clk", "pll_clk",
 			CLK_SET_RATE_PARENT, LS1X_CLK_PLL_DIV, DIV_DDR_SHIFT,
 			DIV_DDR_WIDTH, CLK_DIVIDER_ONE_BASED, &_lock);
-	clk_prepare_enable(clk);
+	clk_provider_prepare_enable(clk);
 	clk_register_clkdev(clk, "ahb", NULL);
 	clk_register_clkdev(clk, "stmmaceth", NULL);
 
 	clk = clk_register_fixed_factor(NULL, "apb_clk", "ahb_clk", 0, 1, 2);
-	clk_prepare_enable(clk);
+	clk_provider_prepare_enable(clk);
 	clk_register_clkdev(clk, "apb", NULL);
 	clk_register_clkdev(clk, "serial8250", NULL);
 }

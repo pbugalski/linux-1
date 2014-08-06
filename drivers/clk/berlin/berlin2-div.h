@@ -80,7 +80,7 @@ struct berlin2_div_data {
 	u8 div_flags;
 };
 
-struct clk * __init
+struct clk_core * __init
 berlin2_div_register(const struct berlin2_div_map *map,
 	     void __iomem *base,  const char *name, u8 div_flags,
 	     const char **parent_names, int num_parents,

@@ -73,7 +73,7 @@ static int vexpress_osc_probe(struct platform_device *pdev)
 	struct clk_lookup *cl = pdev->dev.platform_data; /* Non-DT lookup */
 	struct clk_init_data init;
 	struct vexpress_osc *osc;
-	struct clk *clk;
+	struct clk_core *clk;
 	u32 range[2];
 
 	osc = devm_kzalloc(&pdev->dev, sizeof(*osc), GFP_KERNEL);

@@ -131,7 +131,7 @@ static const struct clk_ops master_ops = {
 	.get_parent = clk_master_get_parent,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_master(struct at91_pmc *pmc, unsigned int irq,
 		const char *name, int num_parents,
 		const char **parent_names,
@@ -140,7 +140,7 @@ at91_clk_register_master(struct at91_pmc *pmc, unsigned int irq,
 {
 	int ret;
 	struct clk_master *master;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	if (!pmc || !irq || !name || !num_parents || !parent_names)
@@ -216,7 +216,7 @@ static void __init
 of_at91_clk_master_setup(struct device_node *np, struct at91_pmc *pmc,
 			 const struct clk_master_layout *layout)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	int num_parents;
 	int i;
 	unsigned int irq;

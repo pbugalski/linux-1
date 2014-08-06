@@ -70,7 +70,7 @@ enum {
 };
 
 /* data required for the OF clock provider registration */
-static struct clk *clks[MPC512x_CLK_LAST_PRIVATE];
+static struct clk_core *clks[MPC512x_CLK_LAST_PRIVATE];
 static struct clk_onecell_data clk_data;
 
 /* CCM register access */
@@ -218,12 +218,12 @@ static bool soc_has_mclk_mux0_canin(void)
 /* common clk API wrappers {{{ */
 
 /* convenience wrappers around the common clk API */
-static inline struct clk *mpc512x_clk_fixed(const char *name, int rate)
+static inline struct clk_core *mpc512x_clk_fixed(const char *name, int rate)
 {
 	return clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
 }
 
-static inline struct clk *mpc512x_clk_factor(
+static inline struct clk_core *mpc512x_clk_factor(
 	const char *name, const char *parent_name,
 	int mul, int div)
 {
@@ -234,7 +234,7 @@ static inline struct clk *mpc512x_clk_factor(
 					 mul, div);
 }
 
-static inline struct clk *mpc512x_clk_divider(
+static inline struct clk_core *mpc512x_clk_divider(
 	const char *name, const char *parent_name, u8 clkflags,
 	u32 __iomem *reg, u8 pos, u8 len, int divflags)
 {
@@ -242,7 +242,7 @@ static inline struct clk *mpc512x_clk_divider(
 				    reg, pos, len, divflags, &clklock);
 }
 
-static inline struct clk *mpc512x_clk_divtable(
+static inline struct clk_core *mpc512x_clk_divtable(
 	const char *name, const char *parent_name,
 	u32 __iomem *reg, u8 pos, u8 len,
 	const struct clk_div_table *divtab)
@@ -255,7 +255,7 @@ static inline struct clk *mpc512x_clk_divtable(
 					  divtab, &clklock);
 }
 
-static inline struct clk *mpc512x_clk_gated(
+static inline struct clk_core *mpc512x_clk_gated(
 	const char *name, const char *parent_name,
 	u32 __iomem *reg, u8 pos)
 {
@@ -266,7 +266,7 @@ static inline struct clk *mpc512x_clk_gated(
 				 reg, pos, 0, &clklock);
 }
 
-static inline struct clk *mpc512x_clk_muxed(const char *name,
+static inline struct clk_core *mpc512x_clk_muxed(const char *name,
 	const char **parent_names, int parent_count,
 	u32 __iomem *reg, u8 pos, u8 len)
 {
@@ -422,7 +422,7 @@ static void mpc512x_clk_setup_ref_clock(struct device_node *np, int bus_freq,
 					int *sys_mul, int *sys_div,
 					int *ips_div)
 {
-	struct clk *osc_clk;
+	struct clk_core *osc_clk;
 	int calc_freq;
 
 	/* fetch mul/div factors from the hardware */
@@ -432,7 +432,7 @@ static void mpc512x_clk_setup_ref_clock(struct device_node *np, int bus_freq,
 	*ips_div = get_bit_field(&clkregs->scfr1, 23, 3);
 
 	/* lookup the oscillator clock for its rate */
-	osc_clk = of_clk_get_by_name(np, "osc");
+	osc_clk = of_clk_provider_get_by_name(np, "osc");
 
 	/*
 	 * either descend from OSC to REF (and in bypassing verify the
@@ -444,7 +444,7 @@ static void mpc512x_clk_setup_ref_clock(struct device_node *np, int bus_freq,
 	 */
 	if (!IS_ERR(osc_clk)) {
 		clks[MPC512x_CLK_REF] = mpc512x_clk_factor("ref", "osc", 1, 1);
-		calc_freq = clk_get_rate(clks[MPC512x_CLK_REF]);
+		calc_freq = clk_provider_get_rate(clks[MPC512x_CLK_REF]);
 		calc_freq *= *sys_mul;
 		calc_freq /= *sys_div;
 		calc_freq /= 2;
@@ -647,8 +647,8 @@ static void mpc512x_clk_setup_mclk(struct mclk_setup_data *entry, size_t idx)
 	 * - MCLK 0 enabled
 	 * - MCLK 1 from MCLK DIV
 	 */
-	div = clk_get_rate(clks[MPC512x_CLK_SYS]);
-	div /= clk_get_rate(clks[MPC512x_CLK_IPS]);
+	div = clk_provider_get_rate(clks[MPC512x_CLK_SYS]);
+	div /= clk_provider_get_rate(clks[MPC512x_CLK_IPS]);
 	out_be32(mccr_reg, (0 << 16));
 	out_be32(mccr_reg, (0 << 16) | ((div - 1) << 17));
 	out_be32(mccr_reg, (1 << 16) | ((div - 1) << 17));
@@ -925,12 +925,12 @@ static void mpc512x_clk_setup_clock_tree(struct device_node *np, int busfreq)
 	 * claimed by any peripheral driver, to not have the clock
 	 * subsystem disable them late at startup
 	 */
-	clk_prepare_enable(clks[MPC512x_CLK_DUMMY]);
-	clk_prepare_enable(clks[MPC512x_CLK_E300]);	/* PowerPC CPU */
-	clk_prepare_enable(clks[MPC512x_CLK_DDR]);	/* DRAM */
-	clk_prepare_enable(clks[MPC512x_CLK_MEM]);	/* SRAM */
-	clk_prepare_enable(clks[MPC512x_CLK_IPS]);	/* SoC periph */
-	clk_prepare_enable(clks[MPC512x_CLK_LPC]);	/* boot media */
+	clk_provider_prepare_enable(clks[MPC512x_CLK_DUMMY]);
+	clk_provider_prepare_enable(clks[MPC512x_CLK_E300]);	/* PowerPC CPU */
+	clk_provider_prepare_enable(clks[MPC512x_CLK_DDR]);	/* DRAM */
+	clk_provider_prepare_enable(clks[MPC512x_CLK_MEM]);	/* SRAM */
+	clk_provider_prepare_enable(clks[MPC512x_CLK_IPS]);	/* SoC periph */
+	clk_provider_prepare_enable(clks[MPC512x_CLK_LPC]);	/* boot media */
 }
 
 /*
@@ -969,9 +969,9 @@ static void mpc5121_clk_provide_migration_support(void)
 	 * has attached to bridges, otherwise the PCI clock remains
 	 * unused and so it gets disabled
 	 */
-	clk_prepare_enable(clks[MPC512x_CLK_PSC3_MCLK]);/* serial console */
+	clk_provider_prepare_enable(clks[MPC512x_CLK_PSC3_MCLK]);/* serial console */
 	if (of_find_compatible_node(NULL, "pci", "fsl,mpc5121-pci"))
-		clk_prepare_enable(clks[MPC512x_CLK_PCI]);
+		clk_provider_prepare_enable(clks[MPC512x_CLK_PCI]);
 }
 
 /*
@@ -988,8 +988,8 @@ static void mpc5121_clk_provide_migration_support(void)
 } while (0)
 
 #define NODE_CHK(clkname, clkitem, regnode, regflag) do { \
-	struct clk *clk; \
-	clk = of_clk_get_by_name(np, clkname); \
+	struct clk_core *clk; \
+	clk = of_clk_provider_get_by_name(np, clkname); \
 	if (IS_ERR(clk)) { \
 		clk = clkitem; \
 		clk_register_clkdev(clk, clkname, devname); \
@@ -999,7 +999,7 @@ static void mpc5121_clk_provide_migration_support(void)
 		pr_debug("clock alias name '%s' for dev '%s' pointer %p\n", \
 			 clkname, devname, clk); \
 	} else { \
-		clk_put(clk); \
+		__clk_put(clk); \
 	} \
 } while (0)
 
@@ -1090,7 +1090,7 @@ static void mpc5121_clk_provide_backwards_compat(void)
 	 * workaround obsolete
 	 */
 	if (did_register & DID_REG_I2C)
-		clk_prepare_enable(clks[MPC512x_CLK_I2C]);
+		clk_provider_prepare_enable(clks[MPC512x_CLK_I2C]);
 
 	FOR_NODES("fsl,mpc5121-diu") {
 		NODE_PREP;

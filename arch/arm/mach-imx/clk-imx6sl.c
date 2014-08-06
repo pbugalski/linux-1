@@ -79,7 +79,7 @@ static struct clk_div_table video_div_table[] = {
 	{ }
 };
 
-static struct clk *clks[IMX6SL_CLK_END];
+static struct clk_core *clks[IMX6SL_CLK_END];
 static struct clk_onecell_data clk_data;
 static void __iomem *ccm_base;
 static void __iomem *anatop_base;
@@ -361,7 +361,7 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
 	clk_register_clkdev(clks[IMX6SL_CLK_GPT_SERIAL], "per", "imx-gpt.0");
 
 	/* Ensure the AHB clk is at 132MHz. */
-	ret = clk_set_rate(clks[IMX6SL_CLK_AHB], 132000000);
+	ret = clk_provider_set_rate(clks[IMX6SL_CLK_AHB], 132000000);
 	if (ret)
 		pr_warn("%s: failed to set AHB clock rate %d!\n",
 			__func__, ret);
@@ -371,15 +371,16 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
 	 * usecount and enabling/disabling of parent PLLs.
 	 */
 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
-		clk_prepare_enable(clks[clks_init_on[i]]);
+		clk_provider_prepare_enable(clks[clks_init_on[i]]);
 
 	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
-		clk_prepare_enable(clks[IMX6SL_CLK_USBPHY1_GATE]);
-		clk_prepare_enable(clks[IMX6SL_CLK_USBPHY2_GATE]);
+		clk_provider_prepare_enable(clks[IMX6SL_CLK_USBPHY1_GATE]);
+		clk_provider_prepare_enable(clks[IMX6SL_CLK_USBPHY2_GATE]);
 	}
 
 	/* Audio-related clocks configuration */
-	clk_set_parent(clks[IMX6SL_CLK_SPDIF0_SEL], clks[IMX6SL_CLK_PLL3_PFD3]);
+	clk_provider_set_parent(clks[IMX6SL_CLK_SPDIF0_SEL],
+				clks[IMX6SL_CLK_PLL3_PFD3]);
 
 	/* Set initial power mode */
 	imx6q_set_lpm(WAIT_CLOCKED);

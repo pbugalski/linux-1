@@ -165,9 +165,9 @@ static long cpu_clk_round_rate(struct clk_hw *hw, unsigned long rate,
 	 * SiRF SoC has not cpu clock control,
 	 * So bypass to it's parent pll.
 	 */
-	struct clk *parent_clk = clk_get_parent(hw->clk);
-	struct clk *pll_parent_clk = clk_get_parent(parent_clk);
-	unsigned long pll_parent_rate = clk_get_rate(pll_parent_clk);
+	struct clk_core *parent_clk = clk_provider_get_parent(hw->clk);
+	struct clk_core *pll_parent_clk = clk_provider_get_parent(parent_clk);
+	unsigned long pll_parent_rate = clk_provider_get_rate(pll_parent_clk);
 	return pll_clk_round_rate(__clk_get_hw(parent_clk), rate, &pll_parent_rate);
 }
 
@@ -178,7 +178,7 @@ static unsigned long cpu_clk_recalc_rate(struct clk_hw *hw,
 	 * SiRF SoC has not cpu clock control,
 	 * So return the parent pll rate.
 	 */
-	struct clk *parent_clk = clk_get_parent(hw->clk);
+	struct clk_core *parent_clk = clk_provider_get_parent(hw->clk);
 	return __clk_get_rate(parent_clk);
 }
 
@@ -403,34 +403,34 @@ static int cpu_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 		unsigned long parent_rate)
 {
 	int ret1, ret2;
-	struct clk *cur_parent;
+	struct clk_core *cur_parent;
 
-	if (rate == clk_get_rate(clk_pll1.hw.clk)) {
-		ret1 = clk_set_parent(hw->clk, clk_pll1.hw.clk);
+	if (rate == clk_provider_get_rate(clk_pll1.hw.clk)) {
+		ret1 = clk_provider_set_parent(hw->clk, clk_pll1.hw.clk);
 		return ret1;
 	}
 
-	if (rate == clk_get_rate(clk_pll2.hw.clk)) {
-		ret1 = clk_set_parent(hw->clk, clk_pll2.hw.clk);
+	if (rate == clk_provider_get_rate(clk_pll2.hw.clk)) {
+		ret1 = clk_provider_set_parent(hw->clk, clk_pll2.hw.clk);
 		return ret1;
 	}
 
-	if (rate == clk_get_rate(clk_pll3.hw.clk)) {
-		ret1 = clk_set_parent(hw->clk, clk_pll3.hw.clk);
+	if (rate == clk_provider_get_rate(clk_pll3.hw.clk)) {
+		ret1 = clk_provider_set_parent(hw->clk, clk_pll3.hw.clk);
 		return ret1;
 	}
 
-	cur_parent = clk_get_parent(hw->clk);
+	cur_parent = clk_provider_get_parent(hw->clk);
 
 	/* switch to tmp pll before setting parent clock's rate */
 	if (cur_parent ==  clk_pll1.hw.clk) {
-		ret1 = clk_set_parent(hw->clk, clk_pll2.hw.clk);
+		ret1 = clk_provider_set_parent(hw->clk, clk_pll2.hw.clk);
 		BUG_ON(ret1);
 	}
 
-	ret2 = clk_set_rate(clk_pll1.hw.clk, rate);
+	ret2 = clk_provider_set_rate(clk_pll1.hw.clk, rate);
 
-	ret1 = clk_set_parent(hw->clk, clk_pll1.hw.clk);
+	ret1 = clk_provider_set_parent(hw->clk, clk_pll1.hw.clk);
 
 	return ret2 ? ret2 : ret1;
 }

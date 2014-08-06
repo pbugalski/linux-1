@@ -207,7 +207,7 @@ struct omap_hwmod_rst_info {
  * struct omap_hwmod_opt_clk - optional clocks used by this hwmod
  * @role: "sys", "32k", "tv", etc -- for use in clk_get()
  * @clk: opt clock: OMAP clock name
- * @_clk: pointer to the struct clk (filled in at runtime)
+ * @_clk: pointer to the struct clk_core (filled in at runtime)
  *
  * The module's interface clock and main functional clock should not
  * be added as optional clocks.
@@ -215,7 +215,7 @@ struct omap_hwmod_rst_info {
 struct omap_hwmod_opt_clk {
 	const char	*role;
 	const char	*clk;
-	struct clk	*_clk;
+	struct clk_core	*_clk;
 };
 
 
@@ -289,7 +289,7 @@ struct omap_hwmod_addr_space {
  * @slave: struct omap_hwmod that responds to OCP transactions on this link
  * @addr: address space associated with this link
  * @clk: interface clock: OMAP clock name
- * @_clk: pointer to the interface struct clk (filled in at runtime)
+ * @_clk: pointer to the interface struct clk_core (filled in at runtime)
  * @fw: interface firewall data
  * @width: OCP data width
  * @user: initiators using this interface (see OCP_USER_* macros above)
@@ -306,7 +306,7 @@ struct omap_hwmod_ocp_if {
 	struct omap_hwmod		*slave;
 	struct omap_hwmod_addr_space	*addr;
 	const char			*clk;
-	struct clk			*_clk;
+	struct clk_core			*_clk;
 	union {
 		struct omap_hwmod_omap2_firewall omap2;
 	}				fw;
@@ -611,7 +611,7 @@ struct omap_hwmod_link {
  * @sdma_reqs: ptr to an array of System DMA request IDs
  * @prcm: PRCM data pertaining to this hwmod
  * @main_clk: main clock: OMAP clock name
- * @_clk: pointer to the main struct clk (filled in at runtime)
+ * @_clk: pointer to the main struct clk_core (filled in at runtime)
  * @opt_clks: other device clocks that drivers can request (0..*)
  * @voltdm: pointer to voltage domain (filled in at runtime)
  * @dev_attr: arbitrary device attributes that can be passed to the driver
@@ -653,7 +653,7 @@ struct omap_hwmod {
 		struct omap_hwmod_omap4_prcm omap4;
 	}				prcm;
 	const char			*main_clk;
-	struct clk			*_clk;
+	struct clk_core			*_clk;
 	struct omap_hwmod_opt_clk	*opt_clks;
 	char				*clkdm_name;
 	struct clockdomain		*clkdm;

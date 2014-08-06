@@ -77,8 +77,8 @@ static const char *ccic_parent[] = {"pll1_2", "pll1_16", "vctcxo"};
 
 void __init mmp2_clk_init(void)
 {
-	struct clk *clk;
-	struct clk *vctcxo;
+	struct clk_core *clk;
+	struct clk_core *vctcxo;
 	void __iomem *mpmu_base;
 	void __iomem *apmu_base;
 	void __iomem *apbc_base;
@@ -192,7 +192,7 @@ void __init mmp2_clk_init(void)
 				mpmu_base + MPMU_UART_PLL,
 				&uart_factor_masks, uart_factor_tbl,
 				ARRAY_SIZE(uart_factor_tbl));
-	clk_set_rate(clk, 14745600);
+	clk_provider_set_rate(clk, 14745600);
 	clk_register_clkdev(clk, "uart_pll", NULL);
 
 	clk = mmp_clk_register_apbc("twsi0", "vctcxo",
@@ -251,7 +251,7 @@ void __init mmp2_clk_init(void)
 				ARRAY_SIZE(uart_parent),
 				CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT,
 				apbc_base + APBC_UART0, 4, 3, 0, &clk_lock);
-	clk_set_parent(clk, vctcxo);
+	clk_provider_set_parent(clk, vctcxo);
 	clk_register_clkdev(clk, "uart_mux.0", NULL);
 
 	clk = mmp_clk_register_apbc("uart0", "uart0_mux",
@@ -262,7 +262,7 @@ void __init mmp2_clk_init(void)
 				ARRAY_SIZE(uart_parent),
 				CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT,
 				apbc_base + APBC_UART1, 4, 3, 0, &clk_lock);
-	clk_set_parent(clk, vctcxo);
+	clk_provider_set_parent(clk, vctcxo);
 	clk_register_clkdev(clk, "uart_mux.1", NULL);
 
 	clk = mmp_clk_register_apbc("uart1", "uart1_mux",
@@ -273,7 +273,7 @@ void __init mmp2_clk_init(void)
 				ARRAY_SIZE(uart_parent),
 				CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT,
 				apbc_base + APBC_UART2, 4, 3, 0, &clk_lock);
-	clk_set_parent(clk, vctcxo);
+	clk_provider_set_parent(clk, vctcxo);
 	clk_register_clkdev(clk, "uart_mux.2", NULL);
 
 	clk = mmp_clk_register_apbc("uart2", "uart2_mux",
@@ -284,7 +284,7 @@ void __init mmp2_clk_init(void)
 				ARRAY_SIZE(uart_parent),
 				CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT,
 				apbc_base + APBC_UART3, 4, 3, 0, &clk_lock);
-	clk_set_parent(clk, vctcxo);
+	clk_provider_set_parent(clk, vctcxo);
 	clk_register_clkdev(clk, "uart_mux.3", NULL);
 
 	clk = mmp_clk_register_apbc("uart3", "uart3_mux",

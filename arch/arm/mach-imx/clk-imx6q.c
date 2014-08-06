@@ -110,7 +110,7 @@ enum mx6q_clks {
 	lvds1_sel, lvds2_sel, lvds1_gate, lvds2_gate, esai_ahb, clk_max
 };
 
-static struct clk *clk[clk_max];
+static struct clk_core *clk[clk_max];
 static struct clk_onecell_data clk_data;
 
 static enum mx6q_clks const clks_init_on[] __initconst = {
@@ -448,50 +448,50 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 
 	if ((imx_get_soc_revision() != IMX_CHIP_REVISION_1_0) ||
 	    cpu_is_imx6dl()) {
-		clk_set_parent(clk[ldb_di0_sel], clk[pll5_video_div]);
-		clk_set_parent(clk[ldb_di1_sel], clk[pll5_video_div]);
+		clk_provider_set_parent(clk[ldb_di0_sel], clk[pll5_video_div]);
+		clk_provider_set_parent(clk[ldb_di1_sel], clk[pll5_video_div]);
 	}
 
-	clk_set_parent(clk[ipu1_di0_pre_sel], clk[pll5_video_div]);
-	clk_set_parent(clk[ipu1_di1_pre_sel], clk[pll5_video_div]);
-	clk_set_parent(clk[ipu2_di0_pre_sel], clk[pll5_video_div]);
-	clk_set_parent(clk[ipu2_di1_pre_sel], clk[pll5_video_div]);
-	clk_set_parent(clk[ipu1_di0_sel], clk[ipu1_di0_pre]);
-	clk_set_parent(clk[ipu1_di1_sel], clk[ipu1_di1_pre]);
-	clk_set_parent(clk[ipu2_di0_sel], clk[ipu2_di0_pre]);
-	clk_set_parent(clk[ipu2_di1_sel], clk[ipu2_di1_pre]);
+	clk_provider_set_parent(clk[ipu1_di0_pre_sel], clk[pll5_video_div]);
+	clk_provider_set_parent(clk[ipu1_di1_pre_sel], clk[pll5_video_div]);
+	clk_provider_set_parent(clk[ipu2_di0_pre_sel], clk[pll5_video_div]);
+	clk_provider_set_parent(clk[ipu2_di1_pre_sel], clk[pll5_video_div]);
+	clk_provider_set_parent(clk[ipu1_di0_sel], clk[ipu1_di0_pre]);
+	clk_provider_set_parent(clk[ipu1_di1_sel], clk[ipu1_di1_pre]);
+	clk_provider_set_parent(clk[ipu2_di0_sel], clk[ipu2_di0_pre]);
+	clk_provider_set_parent(clk[ipu2_di1_sel], clk[ipu2_di1_pre]);
 
 	/*
 	 * The gpmi needs 100MHz frequency in the EDO/Sync mode,
 	 * We can not get the 100MHz from the pll2_pfd0_352m.
 	 * So choose pll2_pfd2_396m as enfc_sel's parent.
 	 */
-	clk_set_parent(clk[enfc_sel], clk[pll2_pfd2_396m]);
+	clk_provider_set_parent(clk[enfc_sel], clk[pll2_pfd2_396m]);
 
 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
-		clk_prepare_enable(clk[clks_init_on[i]]);
+		clk_provider_prepare_enable(clk[clks_init_on[i]]);
 
 	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
-		clk_prepare_enable(clk[usbphy1_gate]);
-		clk_prepare_enable(clk[usbphy2_gate]);
+		clk_provider_prepare_enable(clk[usbphy1_gate]);
+		clk_provider_prepare_enable(clk[usbphy2_gate]);
 	}
 
 	/*
 	 * Let's initially set up CLKO with OSC24M, since this configuration
 	 * is widely used by imx6q board designs to clock audio codec.
 	 */
-	ret = clk_set_parent(clk[cko2_sel], clk[osc]);
+	ret = clk_provider_set_parent(clk[cko2_sel], clk[osc]);
 	if (!ret)
-		ret = clk_set_parent(clk[cko], clk[cko2]);
+		ret = clk_provider_set_parent(clk[cko], clk[cko2]);
 	if (ret)
 		pr_warn("failed to set up CLKO: %d\n", ret);
 
 	/* Audio-related clocks configuration */
-	clk_set_parent(clk[spdif_sel], clk[pll3_pfd3_454m]);
+	clk_provider_set_parent(clk[spdif_sel], clk[pll3_pfd3_454m]);
 
 	/* All existing boards with PCIe use LVDS1 */
 	if (IS_ENABLED(CONFIG_PCI_IMX6))
-		clk_set_parent(clk[lvds1_sel], clk[sata_ref]);
+		clk_provider_set_parent(clk[lvds1_sel], clk[sata_ref]);
 
 	/* Set initial power mode */
 	imx6q_set_lpm(WAIT_CLOCKED);

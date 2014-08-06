@@ -128,10 +128,10 @@ static void __init ti_clk_register_dpll(struct clk_hw *hw,
 {
 	struct clk_hw_omap *clk_hw = to_clk_hw_omap(hw);
 	struct dpll_data *dd = clk_hw->dpll_data;
-	struct clk *clk;
+	struct clk_core *clk;
 
-	dd->clk_ref = of_clk_get(node, 0);
-	dd->clk_bypass = of_clk_get(node, 1);
+	dd->clk_ref = of_clk_provider_get(node, 0);
+	dd->clk_bypass = of_clk_provider_get(node, 1);
 
 	if (IS_ERR(dd->clk_ref) || IS_ERR(dd->clk_bypass)) {
 		pr_debug("clk-ref or clk-bypass missing for %s, retry later\n",
@@ -175,7 +175,7 @@ static void ti_clk_register_dpll_x2(struct device_node *node,
 				    const struct clk_ops *ops,
 				    const struct clk_hw_omap_ops *hw_ops)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init = { NULL };
 	struct clk_hw_omap *clk_hw;
 	const char *name = node->name;

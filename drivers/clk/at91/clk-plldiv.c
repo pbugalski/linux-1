@@ -79,12 +79,12 @@ static const struct clk_ops plldiv_ops = {
 	.set_rate = clk_plldiv_set_rate,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_plldiv(struct at91_pmc *pmc, const char *name,
 			 const char *parent_name)
 {
 	struct clk_plldiv *plldiv;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	plldiv = kzalloc(sizeof(*plldiv), GFP_KERNEL);
@@ -111,7 +111,7 @@ at91_clk_register_plldiv(struct at91_pmc *pmc, const char *name,
 static void __init
 of_at91_clk_plldiv_setup(struct device_node *np, struct at91_pmc *pmc)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name;
 	const char *name = np->name;
 

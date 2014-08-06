@@ -134,14 +134,14 @@ static struct clk_ops clk_aux_ops = {
 	.set_rate = clk_aux_set_rate,
 };
 
-struct clk *clk_register_aux(const char *aux_name, const char *gate_name,
+struct clk_core *clk_register_aux(const char *aux_name, const char *gate_name,
 		const char *parent_name, unsigned long flags, void __iomem *reg,
 		struct aux_clk_masks *masks, struct aux_rate_tbl *rtbl,
-		u8 rtbl_cnt, spinlock_t *lock, struct clk **gate_clk)
+		u8 rtbl_cnt, spinlock_t *lock, struct clk_core **gate_clk)
 {
 	struct clk_aux *aux;
 	struct clk_init_data init;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	if (!aux_name || !parent_name || !reg || !rtbl || !rtbl_cnt) {
 		pr_err("Invalid arguments passed");
@@ -177,7 +177,7 @@ struct clk *clk_register_aux(const char *aux_name, const char *gate_name,
 		goto free_aux;
 
 	if (gate_name) {
-		struct clk *tgate_clk;
+		struct clk_core *tgate_clk;
 
 		tgate_clk = clk_register_gate(NULL, gate_name, aux_name,
 				CLK_SET_RATE_PARENT, reg,

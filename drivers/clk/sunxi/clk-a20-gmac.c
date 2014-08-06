@@ -55,7 +55,7 @@ static DEFINE_SPINLOCK(gmac_lock);
 
 static void __init sun7i_a20_gmac_clk_setup(struct device_node *node)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_mux *mux;
 	struct clk_gate *gate;
 	const char *clk_name = node->name;

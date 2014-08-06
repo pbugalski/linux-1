@@ -489,7 +489,7 @@ static int axi_clkgen_probe(struct platform_device *pdev)
 	const char *parent_name;
 	const char *clk_name;
 	struct resource *mem;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	if (!pdev->dev.of_node)
 		return -ENODEV;

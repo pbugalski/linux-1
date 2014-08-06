@@ -90,7 +90,7 @@ static const unsigned int cpg_plla_mult[4] __initconst = { 42, 48, 56, 64 };
 
 static u32 cpg_mode __initdata;
 
-static struct clk * __init
+static struct clk_core * __init
 r8a7779_cpg_register_clock(struct device_node *np, struct r8a7779_cpg *cpg,
 			   const struct cpg_clk_config *config,
 			   unsigned int plla_mult, const char *name)
@@ -124,7 +124,7 @@ static void __init r8a7779_cpg_clocks_init(struct device_node *np)
 {
 	const struct cpg_clk_config *config;
 	struct r8a7779_cpg *cpg;
-	struct clk **clks;
+	struct clk_core **clks;
 	unsigned int i, plla_mult;
 	int num_clks;
 
@@ -153,7 +153,7 @@ static void __init r8a7779_cpg_clocks_init(struct device_node *np)
 
 	for (i = 0; i < num_clks; ++i) {
 		const char *name;
-		struct clk *clk;
+		struct clk_core *clk;
 
 		of_property_read_string_index(np, "clock-output-names", i,
 					      &name);

@@ -27,7 +27,7 @@
 
 /* Create a clkdev entry for a given device/clk */
 void __init orion_clkdev_add(const char *con_id, const char *dev_id,
-			     struct clk *clk)
+			     struct clk_core *clk)
 {
 	struct clk_lookup *cl;
 
@@ -40,7 +40,7 @@ void __init orion_clkdev_add(const char *con_id, const char *dev_id,
    Kirkwood has gated clocks for some of its peripherals, so creates
    its own clkdev entries. For all the other orion devices, create
    clkdev entries to the tclk. */
-void __init orion_clkdev_init(struct clk *tclk)
+void __init orion_clkdev_init(struct clk_core *tclk)
 {
 	orion_clkdev_add(NULL, "orion_spi.0", tclk);
 	orion_clkdev_add(NULL, "orion_spi.1", tclk);
@@ -78,10 +78,10 @@ static void fill_resources(struct platform_device *device,
 /*****************************************************************************
  * UART
  ****************************************************************************/
-static unsigned long __init uart_get_clk_rate(struct clk *clk)
+static unsigned long __init uart_get_clk_rate(struct clk_core *clk)
 {
-	clk_prepare_enable(clk);
-	return clk_get_rate(clk);
+	clk_provider_prepare_enable(clk);
+	return clk_provider_get_rate(clk);
 }
 
 static void __init uart_complete(
@@ -91,7 +91,7 @@ static void __init uart_complete(
 	void __iomem *membase,
 	resource_size_t mapbase,
 	unsigned int irq,
-	struct clk *clk)
+	struct clk_core *clk)
 {
 	data->mapbase = mapbase;
 	data->membase = membase;
@@ -125,7 +125,7 @@ static struct platform_device orion_uart0 = {
 void __init orion_uart0_init(void __iomem *membase,
 			     resource_size_t mapbase,
 			     unsigned int irq,
-			     struct clk *clk)
+			     struct clk_core *clk)
 {
 	uart_complete(&orion_uart0, orion_uart0_data, orion_uart0_resources,
 		      membase, mapbase, irq, clk);
@@ -153,7 +153,7 @@ static struct platform_device orion_uart1 = {
 void __init orion_uart1_init(void __iomem *membase,
 			     resource_size_t mapbase,
 			     unsigned int irq,
-			     struct clk *clk)
+			     struct clk_core *clk)
 {
 	uart_complete(&orion_uart1, orion_uart1_data, orion_uart1_resources,
 		      membase, mapbase, irq, clk);
@@ -181,7 +181,7 @@ static struct platform_device orion_uart2 = {
 void __init orion_uart2_init(void __iomem *membase,
 			     resource_size_t mapbase,
 			     unsigned int irq,
-			     struct clk *clk)
+			     struct clk_core *clk)
 {
 	uart_complete(&orion_uart2, orion_uart2_data, orion_uart2_resources,
 		      membase, mapbase, irq, clk);
@@ -209,7 +209,7 @@ static struct platform_device orion_uart3 = {
 void __init orion_uart3_init(void __iomem *membase,
 			     resource_size_t mapbase,
 			     unsigned int irq,
-			     struct clk *clk)
+			     struct clk_core *clk)
 {
 	uart_complete(&orion_uart3, orion_uart3_data, orion_uart3_resources,
 		      membase, mapbase, irq, clk);

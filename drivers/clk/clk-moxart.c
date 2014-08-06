@@ -18,7 +18,7 @@
 void __init moxart_of_pll_clk_init(struct device_node *node)
 {
 	static void __iomem *base;
-	struct clk *clk, *ref_clk;
+	struct clk_core *clk, *ref_clk;
 	unsigned int mul;
 	const char *name = node->name;
 	const char *parent_name;
@@ -35,7 +35,7 @@ void __init moxart_of_pll_clk_init(struct device_node *node)
 	mul = readl(base + 0x30) >> 3 & 0x3f;
 	iounmap(base);
 
-	ref_clk = of_clk_get(node, 0);
+	ref_clk = of_clk_provider_get(node, 0);
 	if (IS_ERR(ref_clk)) {
 		pr_err("%s: of_clk_get failed\n", node->full_name);
 		return;
@@ -56,7 +56,7 @@ CLK_OF_DECLARE(moxart_pll_clock, "moxa,moxart-pll-clock",
 void __init moxart_of_apb_clk_init(struct device_node *node)
 {
 	static void __iomem *base;
-	struct clk *clk, *pll_clk;
+	struct clk_core *clk, *pll_clk;
 	unsigned int div, val;
 	unsigned int div_idx[] = { 2, 3, 4, 6, 8};
 	const char *name = node->name;
@@ -78,7 +78,7 @@ void __init moxart_of_apb_clk_init(struct device_node *node)
 		val = 0;
 	div = div_idx[val] * 2;
 
-	pll_clk = of_clk_get(node, 0);
+	pll_clk = of_clk_provider_get(node, 0);
 	if (IS_ERR(pll_clk)) {
 		pr_err("%s: of_clk_get failed\n", node->full_name);
 		return;

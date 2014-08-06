@@ -119,7 +119,7 @@ static void __init cpg_div6_clock_init(struct device_node *np)
 	struct div6_clock *clock;
 	const char *parent_name;
 	const char *name;
-	struct clk *clk;
+	struct clk_core *clk;
 	int ret;
 
 	clock = kzalloc(sizeof(*clock), GFP_KERNEL);

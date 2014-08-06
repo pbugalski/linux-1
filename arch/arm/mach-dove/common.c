@@ -71,9 +71,9 @@ void __init dove_map_io(void)
 static int dove_tclk;
 
 static DEFINE_SPINLOCK(gating_lock);
-static struct clk *tclk;
+static struct clk_core *tclk;
 
-static struct clk __init *dove_register_gate(const char *name,
+static struct clk_core __init *dove_register_gate(const char *name,
 					     const char *parent, u8 bit_idx)
 {
 	return clk_register_gate(NULL, name, parent, 0,
@@ -83,9 +83,9 @@ static struct clk __init *dove_register_gate(const char *name,
 
 static void __init dove_clk_init(void)
 {
-	struct clk *usb0, *usb1, *sata, *pex0, *pex1, *sdio0, *sdio1;
-	struct clk *nand, *camera, *i2s0, *i2s1, *crypto, *ac97, *pdma;
-	struct clk *xor0, *xor1, *ge, *gephy;
+	struct clk_core *usb0, *usb1, *sata, *pex0, *pex1, *sdio0, *sdio1;
+	struct clk_core *nand, *camera, *i2s0, *i2s1, *crypto, *ac97, *pdma;
+	struct clk_core *xor0, *xor1, *ge, *gephy;
 
 	tclk = clk_register_fixed_rate(NULL, "tclk", NULL, CLK_IS_ROOT,
 				       dove_tclk);

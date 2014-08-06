@@ -26,7 +26,7 @@
 
 static void __init of_ti_clockdomain_setup(struct device_node *node)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_hw *clk_hw;
 	const char *clkdm_name = node->name;
 	int i;
@@ -35,7 +35,7 @@ static void __init of_ti_clockdomain_setup(struct device_node *node)
 	num_clks = of_count_phandle_with_args(node, "clocks", "#clock-cells");
 
 	for (i = 0; i < num_clks; i++) {
-		clk = of_clk_get(node, i);
+		clk = of_clk_provider_get(node, i);
 		if (__clk_get_flags(clk) & CLK_IS_BASIC) {
 			pr_warn("can't setup clkdm for basic clk %s\n",
 				__clk_get_name(clk));

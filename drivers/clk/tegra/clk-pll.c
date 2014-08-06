@@ -729,7 +729,7 @@ static int clk_plle_training(struct tegra_clk_pll *pll)
 static int clk_plle_enable(struct clk_hw *hw)
 {
 	struct tegra_clk_pll *pll = to_clk_pll(hw);
-	unsigned long input_rate = clk_get_rate(clk_get_parent(hw->clk));
+	unsigned long input_rate = clk_provider_get_rate(clk_provider_get_parent(hw->clk));
 	struct tegra_clk_pll_freq_table sel;
 	u32 val;
 	int err;
@@ -1033,7 +1033,7 @@ static int clk_pllm_set_rate(struct clk_hw *hw, unsigned long rate,
 
 	state = clk_pll_is_enabled(hw);
 	if (state) {
-		if (rate != clk_get_rate(hw->clk)) {
+		if (rate != clk_provider_get_rate(hw->clk)) {
 			pr_err("%s: Cannot change active PLLM\n", __func__);
 			ret = -EINVAL;
 			goto out;
@@ -1285,7 +1285,7 @@ static int clk_plle_tegra114_enable(struct clk_hw *hw)
 	u32 val;
 	int ret;
 	unsigned long flags = 0;
-	unsigned long input_rate = clk_get_rate(clk_get_parent(hw->clk));
+	unsigned long input_rate = clk_provider_get_rate(clk_provider_get_parent(hw->clk));
 
 	if (_get_table_rate(hw, &sel, pll->params->fixed_rate, input_rate))
 		return -EINVAL;
@@ -1430,7 +1430,7 @@ static struct tegra_clk_pll *_tegra_init_pll(void __iomem *clk_base,
 	return pll;
 }
 
-static struct clk *_tegra_clk_register_pll(struct tegra_clk_pll *pll,
+static struct clk_core *_tegra_clk_register_pll(struct tegra_clk_pll *pll,
 		const char *name, const char *parent_name, unsigned long flags,
 		const struct clk_ops *ops)
 {
@@ -1448,13 +1448,13 @@ static struct clk *_tegra_clk_register_pll(struct tegra_clk_pll *pll,
 	return clk_register(NULL, &pll->hw);
 }
 
-struct clk *tegra_clk_register_pll(const char *name, const char *parent_name,
+struct clk_core *tegra_clk_register_pll(const char *name, const char *parent_name,
 		void __iomem *clk_base, void __iomem *pmc,
 		unsigned long flags, struct tegra_clk_pll_params *pll_params,
 		spinlock_t *lock)
 {
 	struct tegra_clk_pll *pll;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	pll_params->flags |= TEGRA_PLL_BYPASS;
 	pll_params->flags |= TEGRA_PLL_HAS_LOCK_ENABLE;
@@ -1479,13 +1479,13 @@ static struct div_nmp pll_e_nmp = {
 	.divp_width = PLLE_BASE_DIVP_WIDTH,
 };
 
-struct clk *tegra_clk_register_plle(const char *name, const char *parent_name,
+struct clk_core *tegra_clk_register_plle(const char *name, const char *parent_name,
 		void __iomem *clk_base, void __iomem *pmc,
 		unsigned long flags, struct tegra_clk_pll_params *pll_params,
 		spinlock_t *lock)
 {
 	struct tegra_clk_pll *pll;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	pll_params->flags |= TEGRA_PLL_LOCK_MISC | TEGRA_PLL_BYPASS;
 	pll_params->flags |= TEGRA_PLL_HAS_LOCK_ENABLE;
@@ -1550,14 +1550,14 @@ static const struct clk_ops tegra_clk_plle_tegra114_ops = {
 };
 
 
-struct clk *tegra_clk_register_pllxc(const char *name, const char *parent_name,
+struct clk_core *tegra_clk_register_pllxc(const char *name, const char *parent_name,
 			  void __iomem *clk_base, void __iomem *pmc,
 			  unsigned long flags,
 			  struct tegra_clk_pll_params *pll_params,
 			  spinlock_t *lock)
 {
 	struct tegra_clk_pll *pll;
-	struct clk *clk, *parent;
+	struct clk_core *clk, *parent;
 	unsigned long parent_rate;
 	int err;
 	u32 val, val_iddq;
@@ -1603,7 +1603,7 @@ struct clk *tegra_clk_register_pllxc(const char *name, const char *parent_name,
 	return clk;
 }
 
-struct clk *tegra_clk_register_pllre(const char *name, const char *parent_name,
+struct clk_core *tegra_clk_register_pllre(const char *name, const char *parent_name,
 			  void __iomem *clk_base, void __iomem *pmc,
 			  unsigned long flags,
 			  struct tegra_clk_pll_params *pll_params,
@@ -1611,7 +1611,7 @@ struct clk *tegra_clk_register_pllre(const char *name, const char *parent_name,
 {
 	u32 val;
 	struct tegra_clk_pll *pll;
-	struct clk *clk;
+	struct clk_core *clk;
 
 	pll_params->flags |= TEGRA_PLL_HAS_LOCK_ENABLE | TEGRA_PLL_LOCK_MISC;
 
@@ -1649,14 +1649,14 @@ struct clk *tegra_clk_register_pllre(const char *name, const char *parent_name,
 	return clk;
 }
 
-struct clk *tegra_clk_register_pllm(const char *name, const char *parent_name,
+struct clk_core *tegra_clk_register_pllm(const char *name, const char *parent_name,
 			  void __iomem *clk_base, void __iomem *pmc,
 			  unsigned long flags,
 			  struct tegra_clk_pll_params *pll_params,
 			  spinlock_t *lock)
 {
 	struct tegra_clk_pll *pll;
-	struct clk *clk, *parent;
+	struct clk_core *clk, *parent;
 	unsigned long parent_rate;
 
 	if (!pll_params->pdiv_tohw)
@@ -1688,13 +1688,13 @@ struct clk *tegra_clk_register_pllm(const char *name, const char *parent_name,
 	return clk;
 }
 
-struct clk *tegra_clk_register_pllc(const char *name, const char *parent_name,
+struct clk_core *tegra_clk_register_pllc(const char *name, const char *parent_name,
 			  void __iomem *clk_base, void __iomem *pmc,
 			  unsigned long flags,
 			  struct tegra_clk_pll_params *pll_params,
 			  spinlock_t *lock)
 {
-	struct clk *parent, *clk;
+	struct clk_core *parent, *clk;
 	struct pdiv_map *p_tohw = pll_params->pdiv_tohw;
 	struct tegra_clk_pll *pll;
 	struct tegra_clk_pll_freq_table cfg;
@@ -1762,14 +1762,14 @@ struct clk *tegra_clk_register_pllc(const char *name, const char *parent_name,
 	return clk;
 }
 
-struct clk *tegra_clk_register_plle_tegra114(const char *name,
+struct clk_core *tegra_clk_register_plle_tegra114(const char *name,
 				const char *parent_name,
 				void __iomem *clk_base, unsigned long flags,
 				struct tegra_clk_pll_params *pll_params,
 				spinlock_t *lock)
 {
 	struct tegra_clk_pll *pll;
-	struct clk *clk;
+	struct clk_core *clk;
 	u32 val, val_aux;
 
 	pll_params->flags |= TEGRA_PLL_HAS_LOCK_ENABLE;
@@ -1812,13 +1812,13 @@ static const struct clk_ops tegra_clk_pllss_ops = {
 	.set_rate = clk_pllxc_set_rate,
 };
 
-struct clk *tegra_clk_register_pllss(const char *name, const char *parent_name,
+struct clk_core *tegra_clk_register_pllss(const char *name, const char *parent_name,
 				void __iomem *clk_base, unsigned long flags,
 				struct tegra_clk_pll_params *pll_params,
 				spinlock_t *lock)
 {
 	struct tegra_clk_pll *pll;
-	struct clk *clk, *parent;
+	struct clk_core *clk, *parent;
 	struct tegra_clk_pll_freq_table cfg;
 	unsigned long parent_rate;
 	u32 val;

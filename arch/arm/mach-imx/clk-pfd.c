@@ -128,11 +128,11 @@ static const struct clk_ops clk_pfd_ops = {
 	.is_enabled     = clk_pfd_is_enabled,
 };
 
-struct clk *imx_clk_pfd(const char *name, const char *parent_name,
+struct clk_core *imx_clk_pfd(const char *name, const char *parent_name,
 			void __iomem *reg, u8 idx)
 {
 	struct clk_pfd *pfd;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	pfd = kzalloc(sizeof(*pfd), GFP_KERNEL);

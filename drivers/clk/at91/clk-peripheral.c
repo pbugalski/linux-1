@@ -100,12 +100,12 @@ static const struct clk_ops peripheral_ops = {
 	.is_enabled = clk_peripheral_is_enabled,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_peripheral(struct at91_pmc *pmc, const char *name,
 			     const char *parent_name, u32 id)
 {
 	struct clk_peripheral *periph;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	if (!pmc || !name || !parent_name || id > PERIPHERAL_ID_MAX)
@@ -134,7 +134,7 @@ at91_clk_register_peripheral(struct at91_pmc *pmc, const char *name,
 
 static void clk_sam9x5_peripheral_autodiv(struct clk_sam9x5_peripheral *periph)
 {
-	struct clk *parent;
+	struct clk_core *parent;
 	unsigned long parent_rate;
 	int shift = 0;
 
@@ -309,13 +309,13 @@ static const struct clk_ops sam9x5_peripheral_ops = {
 	.set_rate = clk_sam9x5_peripheral_set_rate,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 at91_clk_register_sam9x5_peripheral(struct at91_pmc *pmc, const char *name,
 				    const char *parent_name, u32 id,
 				    const struct clk_range *range)
 {
 	struct clk_sam9x5_peripheral *periph;
-	struct clk *clk = NULL;
+	struct clk_core *clk = NULL;
 	struct clk_init_data init;
 
 	if (!pmc || !name || !parent_name)
@@ -352,7 +352,7 @@ of_at91_clk_periph_setup(struct device_node *np, struct at91_pmc *pmc, u8 type)
 {
 	int num;
 	u32 id;
-	struct clk *clk;
+	struct clk_core *clk;
 	const char *parent_name;
 	const char *name;
 	struct device_node *periphclknp;

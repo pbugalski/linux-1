@@ -87,12 +87,12 @@ const struct clk_ops s3c24xx_clkout_ops = {
 	.determine_rate = __clk_mux_determine_rate,
 };
 
-struct clk *s3c24xx_register_clkout(struct device *dev, const char *name,
+struct clk_core *s3c24xx_register_clkout(struct device *dev, const char *name,
 		const char **parent_names, u8 num_parents,
 		u8 shift, u32 mask)
 {
 	struct s3c24xx_clkout *clkout;
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_init_data init;
 
 	/* allocate the clkout */
@@ -237,7 +237,7 @@ static int s3c24xx_dclk_probe(struct platform_device *pdev)
 {
 	struct s3c24xx_dclk *s3c24xx_dclk;
 	struct resource *mem;
-	struct clk **clk_table;
+	struct clk_core **clk_table;
 	struct s3c24xx_dclk_drv_data *dclk_variant;
 	int ret, i;
 
@@ -251,7 +251,7 @@ static int s3c24xx_dclk_probe(struct platform_device *pdev)
 	spin_lock_init(&s3c24xx_dclk->dclk_lock);
 
 	clk_table = devm_kzalloc(&pdev->dev,
-				 sizeof(struct clk *) * DCLK_MAX_CLKS,
+				 sizeof(struct clk_core *) * DCLK_MAX_CLKS,
 				 GFP_KERNEL);
 	if (!clk_table)
 		return -ENOMEM;
@@ -355,7 +355,7 @@ err_clk_register:
 static int s3c24xx_dclk_remove(struct platform_device *pdev)
 {
 	struct s3c24xx_dclk *s3c24xx_dclk = platform_get_drvdata(pdev);
-	struct clk **clk_table = s3c24xx_dclk->clk_data.clks;
+	struct clk_core **clk_table = s3c24xx_dclk->clk_data.clks;
 	int i;
 
 	clk_notifier_unregister(clk_table[DIV_DCLK1],

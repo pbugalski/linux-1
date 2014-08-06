@@ -132,7 +132,7 @@ static int msm_clock_pcom_probe(struct platform_device *pdev)
 
 	for (i = 0; i < pdata->num_lookups; i++) {
 		const struct clk_pcom_desc *desc = &pdata->lookup[i];
-		struct clk *c;
+		struct clk_core *c;
 		struct clk_pcom *p;
 		struct clk_hw *hw;
 		struct clk_init_data init;

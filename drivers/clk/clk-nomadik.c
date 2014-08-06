@@ -254,11 +254,11 @@ static const struct clk_ops pll_clk_ops = {
 	.recalc_rate = pll_clk_recalc_rate,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 pll_clk_register(struct device *dev, const char *name,
 		 const char *parent_name, u32 id)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_pll *pll;
 	struct clk_init_data init;
 
@@ -346,11 +346,11 @@ static const struct clk_ops src_clk_ops = {
 	.recalc_rate = src_clk_recalc_rate,
 };
 
-static struct clk * __init
+static struct clk_core * __init
 src_clk_register(struct device *dev, const char *name,
 		 const char *parent_name, u8 id)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	struct clk_src *sclk;
 	struct clk_init_data init;
 
@@ -510,7 +510,7 @@ module_init(nomadik_src_clk_init_debugfs);
 
 static void __init of_nomadik_pll_setup(struct device_node *np)
 {
-	struct clk *clk = ERR_PTR(-EINVAL);
+	struct clk_core *clk = ERR_PTR(-EINVAL);
 	const char *clk_name = np->name;
 	const char *parent_name;
 	u32 pll_id;
@@ -533,7 +533,7 @@ CLK_OF_DECLARE(nomadik_pll_clk,
 
 static void __init of_nomadik_hclk_setup(struct device_node *np)
 {
-	struct clk *clk = ERR_PTR(-EINVAL);
+	struct clk_core *clk = ERR_PTR(-EINVAL);
 	const char *clk_name = np->name;
 	const char *parent_name;
 
@@ -557,7 +557,7 @@ CLK_OF_DECLARE(nomadik_hclk_clk,
 
 static void __init of_nomadik_src_clk_setup(struct device_node *np)
 {
-	struct clk *clk = ERR_PTR(-EINVAL);
+	struct clk_core *clk = ERR_PTR(-EINVAL);
 	const char *clk_name = np->name;
 	const char *parent_name;
 	u32 clk_id;

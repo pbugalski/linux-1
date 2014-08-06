@@ -26,7 +26,7 @@ enum exynos_audss_clk_type {
 };
 
 static DEFINE_SPINLOCK(lock);
-static struct clk **clk_table;
+static struct clk_core **clk_table;
 static void __iomem *reg_base;
 static struct clk_onecell_data clk_data;
 
@@ -83,7 +83,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
 	const char *mout_audss_p[] = {"fin_pll", "fout_epll"};
 	const char *mout_i2s_p[] = {"mout_audss", "cdclk0", "sclk_audio0"};
 	const char *sclk_pcm_p = "sclk_pcm0";
-	struct clk *pll_ref, *pll_in, *cdclk, *sclk_audio, *sclk_pcm_in;
+	struct clk_core *pll_ref, *pll_in, *cdclk, *sclk_audio, *sclk_pcm_in;
 	const struct of_device_id *match;
 	enum exynos_audss_clk_type variant;
 
@@ -100,7 +100,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
 	}
 
 	clk_table = devm_kzalloc(&pdev->dev,
-				sizeof(struct clk *) * EXYNOS_AUDSS_MAX_CLKS,
+				sizeof(struct clk_core *) * EXYNOS_AUDSS_MAX_CLKS,
 				GFP_KERNEL);
 	if (!clk_table)
 		return -ENOMEM;
@@ -111,8 +111,8 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
 	else
 		clk_data.clk_num = EXYNOS_AUDSS_MAX_CLKS - 1;
 
-	pll_ref = devm_clk_get(&pdev->dev, "pll_ref");
-	pll_in = devm_clk_get(&pdev->dev, "pll_in");
+	pll_ref = devm_clk_provider_get(&pdev->dev, "pll_ref");
+	pll_in = devm_clk_provider_get(&pdev->dev, "pll_in");
 	if (!IS_ERR(pll_ref))
 		mout_audss_p[0] = __clk_get_name(pll_ref);
 	if (!IS_ERR(pll_in))
@@ -122,8 +122,8 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
 				CLK_SET_RATE_NO_REPARENT,
 				reg_base + ASS_CLK_SRC, 0, 1, 0, &lock);
 
-	cdclk = devm_clk_get(&pdev->dev, "cdclk");
-	sclk_audio = devm_clk_get(&pdev->dev, "sclk_audio");
+	cdclk = devm_clk_provider_get(&pdev->dev, "cdclk");
+	sclk_audio = devm_clk_provider_get(&pdev->dev, "sclk_audio");
 	if (!IS_ERR(cdclk))
 		mout_i2s_p[1] = __clk_get_name(cdclk);
 	if (!IS_ERR(sclk_audio))
@@ -161,7 +161,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
 				 "sclk_pcm", CLK_SET_RATE_PARENT,
 				reg_base + ASS_CLK_GATE, 4, 0, &lock);
 
-	sclk_pcm_in = devm_clk_get(&pdev->dev, "sclk_pcm_in");
+	sclk_pcm_in = devm_clk_provider_get(&pdev->dev, "sclk_pcm_in");
 	if (!IS_ERR(sclk_pcm_in))
 		sclk_pcm_p = __clk_get_name(sclk_pcm_in);
 	clk_table[EXYNOS_SCLK_PCM] = clk_register_gate(NULL, "sclk_pcm",

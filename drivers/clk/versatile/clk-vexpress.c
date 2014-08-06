@@ -17,7 +17,7 @@
 #include <linux/err.h>
 #include <linux/vexpress.h>
 
-static struct clk *vexpress_sp810_timerclken[4];
+static struct clk_core *vexpress_sp810_timerclken[4];
 static DEFINE_SPINLOCK(vexpress_sp810_lock);
 
 static void __init vexpress_sp810_init(void __iomem *base)
@@ -54,7 +54,7 @@ static const char * const vexpress_clk_24mhz_periphs[] __initconst = {
 
 void __init vexpress_clk_init(void __iomem *sp810_base)
 {
-	struct clk *clk;
+	struct clk_core *clk;
 	int i;
 
 	clk = clk_register_fixed_rate(NULL, "dummy_apb_pclk", NULL,
@@ -77,7 +77,7 @@ void __init vexpress_clk_init(void __iomem *sp810_base)
 	vexpress_sp810_init(sp810_base);
 
 	for (i = 0; i < ARRAY_SIZE(vexpress_sp810_timerclken); i++)
-		WARN_ON(clk_set_parent(vexpress_sp810_timerclken[i], clk));
+		WARN_ON(clk_provider_set_parent(vexpress_sp810_timerclken[i], clk));
 
 	WARN_ON(clk_register_clkdev(vexpress_sp810_timerclken[0],
 				"v2m-timer0", "sp804"));

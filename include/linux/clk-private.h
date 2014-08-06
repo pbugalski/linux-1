@@ -57,6 +57,10 @@ struct clk_core {
 
 struct clk {
 	struct clk_core	*core;
+	unsigned int	enable_count;
+	const char	*dev_id;
+	const char	*con_id;
+	void		*last_disable;
 };
 
 /*

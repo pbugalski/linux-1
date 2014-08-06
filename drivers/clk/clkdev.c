@@ -76,7 +76,9 @@ struct clk_core *of_clk_provider_get(struct device_node *np, int index)
 
 struct clk *of_clk_get(struct device_node *np, int index)
 {
-	return __clk_create_clk(of_clk_provider_get(np, index));
+	struct clk_core *clk = of_clk_provider_get(np, index);
+
+	return __clk_create_clk(clk, np->full_name, NULL);
 }
 EXPORT_SYMBOL(of_clk_get);
 
@@ -129,7 +131,9 @@ struct clk_core *of_clk_provider_get_by_name(struct device_node *np, const char 
  */
 struct clk *of_clk_get_by_name(struct device_node *np, const char *name)
 {
-	return __clk_create_clk(of_clk_provider_get_by_name(np, name));
+	struct clk_core *clk = of_clk_provider_get_by_name(np, name);
+
+	return __clk_create_clk(clk, np->full_name, NULL);
 }
 EXPORT_SYMBOL(of_clk_get_by_name);
 #endif
@@ -201,7 +205,7 @@ struct clk *clk_get_sys(const char *dev_id, const char *con_id)
 #if defined(CONFIG_COMMON_CLK)
 	struct clk_core *clk = clk_provider_get_sys(dev_id, con_id);
 
-	return __clk_create_clk(clk);
+	return __clk_create_clk(clk, dev_id, con_id);
 #else
 	struct clk_lookup *cl;
 
@@ -243,7 +247,7 @@ struct clk *clk_get(struct device *dev, const char *con_id)
 #if defined(CONFIG_COMMON_CLK)
 	const char *dev_id = dev ? dev_name(dev) : NULL;
 
-	return __clk_create_clk(clk_provider_get(dev, con_id));
+	return __clk_create_clk(clk_provider_get(dev, con_id), dev_id, con_id);
 #else
 	const char *dev_id = dev ? dev_name(dev) : NULL;
 	struct clk *clk;

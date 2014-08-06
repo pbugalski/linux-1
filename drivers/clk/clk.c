@@ -543,7 +543,8 @@ static int clk_disable_unused(void)
 }
 late_initcall_sync(clk_disable_unused);
 
-struct clk *__clk_create_clk(struct clk_core *clk_core)
+struct clk *__clk_create_clk(struct clk_core *clk_core, const char *dev,
+			     const char *con)
 {
 	struct clk *clk;
 
@@ -556,6 +557,8 @@ struct clk *__clk_create_clk(struct clk_core *clk_core)
 		return ERR_PTR(-ENOMEM);
 
 	clk->core = clk_core;
+	clk->dev_id = dev;
+	clk->con_id = con;
 
 	return clk;
 }
@@ -936,10 +939,25 @@ EXPORT_SYMBOL_GPL(clk_provider_disable);
  */
 void clk_disable(struct clk *clk_user)
 {
+	struct clk_core *clk;
+	unsigned long flags;
+
 	if (IS_ERR_OR_NULL(clk_user))
 		return;
 
-	clk_provider_disable(clk_to_clk_core(clk_user));
+	clk = clk_to_clk_core(clk_user);
+
+	flags = clk_enable_lock();
+	if (!WARN(clk_user->enable_count == 0,
+		  "incorrect disable clk dev %s con %s last disabler %pF\n",
+		  clk_user->dev_id, clk_user->con_id, clk_user->last_disable)) {
+
+		clk_user->last_disable = __builtin_return_address(0);
+		clk_user->enable_count--;
+
+		__clk_disable(clk);
+	}
+	clk_enable_unlock(flags);
 }
 EXPORT_SYMBOL_GPL(clk_disable);
 
@@ -1000,10 +1018,22 @@ EXPORT_SYMBOL_GPL(clk_provider_enable);
  */
 int clk_enable(struct clk *clk_user)
 {
+	struct clk_core *clk;
+	unsigned long flags;
+	int ret;
+
 	if (!clk_user)
 		return 0;
 
-	return clk_provider_enable(clk_to_clk_core(clk_user));
+	clk = clk_to_clk_core(clk_user);
+
+	flags = clk_enable_lock();
+	ret = __clk_enable(clk);
+	if (!ret)
+		clk_user->enable_count++;
+	clk_enable_unlock(flags);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(clk_enable);
 
@@ -1698,7 +1728,7 @@ struct clk *clk_get_parent(struct clk *clk_user)
 	clk = clk_to_clk_core(clk_user);
 	parent = clk_provider_get_parent(clk);
 
-	return __clk_create_clk(parent);
+	return __clk_create_clk(parent, clk_user->dev_id, clk_user->con_id);
 }
 EXPORT_SYMBOL_GPL(clk_get_parent);
 

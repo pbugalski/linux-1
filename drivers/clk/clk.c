@@ -560,6 +560,8 @@ struct clk *__clk_create_clk(struct clk_core *clk_core, const char *dev,
 	clk->dev_id = dev;
 	clk->con_id = con;
 
+	hlist_add_head(&clk->child_node, &clk_core->per_user_clks);
+
 	return clk;
 }
 
@@ -1625,6 +1627,7 @@ static void clk_change_rate(struct clk_core *clk)
 int clk_provider_set_rate(struct clk_core *clk, unsigned long rate)
 {
 	struct clk_core *top, *fail_clk;
+	struct clk *clk_user;
 	int ret = 0;
 
 	if (!clk)
@@ -1632,6 +1635,13 @@ int clk_provider_set_rate(struct clk_core *clk, unsigned long rate)
 
 	/* prevent racing with updates to the clock topology */
 	clk_prepare_lock();
+
+	hlist_for_each_entry(clk_user, &clk->per_user_clks, child_node) {
+		rate = max(rate, clk_user->floor_constraint);
+
+		if (clk_user->ceiling_constraint > 0)
+			rate = min(rate, clk_user->ceiling_constraint);
+	}
 
 	/* bail early if nothing to do */
 	if (rate == clk_provider_get_rate(clk))
@@ -1698,6 +1708,24 @@ int clk_set_rate(struct clk *clk_user, unsigned long rate)
 	return clk_provider_set_rate(clk_to_clk_core(clk_user), rate);
 }
 EXPORT_SYMBOL_GPL(clk_set_rate);
+
+int clk_set_floor_rate(struct clk *clk_user, unsigned long rate)
+{
+	struct clk_core *clk = clk_to_clk_core(clk_user);
+
+	clk_user->floor_constraint = rate;
+	return clk_provider_set_rate(clk, clk_provider_get_rate(clk));
+}
+EXPORT_SYMBOL_GPL(clk_set_floor_rate);
+
+int clk_set_ceiling_rate(struct clk *clk_user, unsigned long rate)
+{
+	struct clk_core *clk = clk_to_clk_core(clk_user);
+
+	clk_user->ceiling_constraint = rate;
+	return clk_provider_set_rate(clk, clk_provider_get_rate(clk));
+}
+EXPORT_SYMBOL_GPL(clk_set_ceiling_rate);
 
 struct clk_core *clk_provider_get_parent(struct clk_core *clk)
 {
@@ -2042,6 +2070,8 @@ int __clk_init(struct device *dev, struct clk_core *clk)
 				break;
 			}
 	 }
+
+	INIT_HLIST_HEAD(&clk->per_user_clks);
 
 	/*
 	 * optional platform-specific magic
@@ -2478,6 +2508,12 @@ int clk_notifier_unregister(struct clk *clk_user, struct notifier_block *nb)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(clk_notifier_unregister);
+
+void __clk_free_clk(struct clk *clk_user)
+{
+	hlist_del(&clk_user->child_node);
+	kfree(clk_user);
+}
 
 #ifdef CONFIG_OF
 /**

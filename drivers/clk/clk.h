@@ -21,4 +21,5 @@ void of_clk_unlock(void);
 #if defined(CONFIG_COMMON_CLK)
 struct clk *__clk_create_clk(struct clk_core *clk_core, const char *dev,
 			     const char *con);
+void __clk_free_clk(struct clk *clk_user);
 #endif

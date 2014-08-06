@@ -270,7 +270,7 @@ void clk_put(struct clk *clk)
 #if defined(CONFIG_COMMON_CLK)
 	clk_core_t *core = clk_to_clk_core(clk);
 
-	kfree(clk);
+	__clk_free_clk(clk);
 	__clk_put(core);
 #else
 	__clk_put(clk);

@@ -22,6 +22,8 @@ struct clk;
 
 #ifdef CONFIG_COMMON_CLK
 
+struct clk_core;
+
 /**
  * DOC: clk notifier callback types
  *
@@ -56,7 +58,7 @@ struct clk;
  * @notifier_head.
  */
 struct clk_notifier {
-	struct clk			*clk;
+	struct clk_core			*clk;
 	struct srcu_notifier_head	notifier_head;
 	struct list_head		node;
 };
@@ -73,7 +75,7 @@ struct clk_notifier {
  * current rate (this was done to optimize the implementation).
  */
 struct clk_notifier_data {
-	struct clk		*clk;
+	struct clk_core		*clk;
 	unsigned long		old_rate;
 	unsigned long		new_rate;
 };
@@ -307,6 +309,14 @@ struct clk *clk_get_parent(struct clk *clk);
  */
 struct clk *clk_get_sys(const char *dev_id, const char *con_id);
 
+/**
+ * clk_get_name - get a clock's name
+ * @clk: clock source
+ *
+ * Returns the name of the provided clock.
+ */
+const char *clk_get_name(struct clk *clk);
+
 #else /* !CONFIG_HAVE_CLK */
 
 static inline struct clk *clk_get(struct device *dev, const char *id)
@@ -398,7 +408,8 @@ struct of_phandle_args;
 #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
 struct clk *of_clk_get(struct device_node *np, int index);
 struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
-struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+struct clk_core *of_clk_provider_get_by_name(struct device_node *np, const char *name);
+struct clk_core *of_clk_get_from_provider(struct of_phandle_args *clkspec);
 #else
 static inline struct clk *of_clk_get(struct device_node *np, int index)
 {
@@ -409,6 +420,21 @@ static inline struct clk *of_clk_get_by_name(struct device_node *np,
 {
 	return ERR_PTR(-ENOENT);
 }
+
+#if defined(CONFIG_COMMON_CLK)
+static inline struct clk_core *of_clk_provider_get_by_name(struct device_node *np,
+							   const char *name)
+{
+	return ERR_PTR(-ENOENT);
+}
+#else
+static inline struct clk *of_clk_provider_get_by_name(struct device_node *np,
+						      const char *name)
+{
+	return ERR_PTR(-ENOENT);
+}
+#endif /* CONFIG_COMMON_CLK */
+
 #endif
 
 #endif

@@ -21,7 +21,7 @@
 
 int clk_reset(struct clk *clk, enum clk_reset_action action)
 {
-	struct clk_hw *hw = __clk_get_hw(clk);
+	struct clk_hw *hw = __clk_get_hw(clk_to_clk_core(clk));
 	struct msm_clk *m = to_msm_clk(hw);
 	return m->reset(hw, action);
 }

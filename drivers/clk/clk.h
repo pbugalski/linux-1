@@ -9,9 +9,15 @@
  * published by the Free Software Foundation.
  */
 
+#include <linux/clk-private.h>
+
 #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
 struct clk_core *of_clk_get_by_clkspec(struct of_phandle_args *clkspec);
 struct clk_core *__of_clk_get_from_provider(struct of_phandle_args *clkspec);
 void of_clk_lock(void);
 void of_clk_unlock(void);
+#endif
+
+#if defined(CONFIG_COMMON_CLK)
+struct clk *__clk_create_clk(struct clk_core *clk_core);
 #endif

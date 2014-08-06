@@ -17,11 +17,23 @@
 struct clk;
 struct device;
 
+/*
+ * To avoid a mass-rename of all non-common clock implementations (spread out
+ * in arch-specific code), we let them use struct clk for both the internal and
+ * external view.
+ */
+#ifdef CONFIG_COMMON_CLK
+struct clk_core;
+#define clk_core_t struct clk_core
+#else
+#define clk_core_t struct clk
+#endif
+
 struct clk_lookup {
 	struct list_head	node;
 	const char		*dev_id;
 	const char		*con_id;
-	struct clk		*clk;
+	clk_core_t		*clk;
 };
 
 #define CLKDEV_INIT(d, n, c)	\
@@ -31,7 +43,7 @@ struct clk_lookup {
 		.clk = c,	\
 	}
 
-struct clk_lookup *clkdev_alloc(struct clk *clk, const char *con_id,
+struct clk_lookup *clkdev_alloc(clk_core_t *clk, const char *con_id,
 	const char *dev_fmt, ...);
 
 void clkdev_add(struct clk_lookup *cl);
@@ -40,12 +52,12 @@ void clkdev_drop(struct clk_lookup *cl);
 void clkdev_add_table(struct clk_lookup *, size_t);
 int clk_add_alias(const char *, const char *, char *, struct device *);
 
-int clk_register_clkdev(struct clk *, const char *, const char *, ...);
-int clk_register_clkdevs(struct clk *, struct clk_lookup *, size_t);
+int clk_register_clkdev(clk_core_t *, const char *, const char *, ...);
+int clk_register_clkdevs(clk_core_t *, struct clk_lookup *, size_t);
 
 #ifdef CONFIG_COMMON_CLK
-int __clk_get(struct clk *clk);
-void __clk_put(struct clk *clk);
+int __clk_get(struct clk_core *clk);
+void __clk_put(struct clk_core *clk);
 #endif
 
 #endif

@@ -28,20 +28,20 @@
 
 struct module;
 
-struct clk {
+struct clk_core {
 	const char		*name;
 	const struct clk_ops	*ops;
 	struct clk_hw		*hw;
 	struct module		*owner;
-	struct clk		*parent;
+	struct clk_core		*parent;
 	const char		**parent_names;
-	struct clk		**parents;
+	struct clk_core		**parents;
 	u8			num_parents;
 	u8			new_parent_index;
 	unsigned long		rate;
 	unsigned long		new_rate;
-	struct clk		*new_parent;
-	struct clk		*new_child;
+	struct clk_core		*new_parent;
+	struct clk_core		*new_child;
 	unsigned long		flags;
 	unsigned int		enable_count;
 	unsigned int		prepare_count;
@@ -55,6 +55,10 @@ struct clk {
 	struct kref		ref;
 };
 
+struct clk {
+	struct clk_core	*core;
+};
+
 /*
  * DOC: Basic clock implementations common to many platforms
  *
@@ -66,7 +70,7 @@ struct clk {
 
 #define DEFINE_CLK(_name, _ops, _flags, _parent_names,		\
 		_parents)					\
-	static struct clk _name = {				\
+	static struct clk_core _name = {				\
 		.name = #_name,					\
 		.ops = &_ops,					\
 		.hw = &_name##_hw.hw,				\
@@ -78,7 +82,7 @@ struct clk {
 
 #define DEFINE_CLK_FIXED_RATE(_name, _flags, _rate,		\
 				_fixed_rate_flags)		\
-	static struct clk _name;				\
+	static struct clk_core _name;				\
 	static const char *_name##_parent_names[] = {};		\
 	static struct clk_fixed_rate _name##_hw = {		\
 		.hw = {						\
@@ -93,11 +97,11 @@ struct clk {
 #define DEFINE_CLK_GATE(_name, _parent_name, _parent_ptr,	\
 				_flags, _reg, _bit_idx,		\
 				_gate_flags, _lock)		\
-	static struct clk _name;				\
+	static struct clk_core _name;				\
 	static const char *_name##_parent_names[] = {		\
 		_parent_name,					\
 	};							\
-	static struct clk *_name##_parents[] = {		\
+	static struct clk_core *_name##_parents[] = {		\
 		_parent_ptr,					\
 	};							\
 	static struct clk_gate _name##_hw = {			\
@@ -115,11 +119,11 @@ struct clk {
 #define _DEFINE_CLK_DIVIDER(_name, _parent_name, _parent_ptr,	\
 				_flags, _reg, _shift, _width,	\
 				_divider_flags, _table, _lock)	\
-	static struct clk _name;				\
+	static struct clk_core _name;				\
 	static const char *_name##_parent_names[] = {		\
 		_parent_name,					\
 	};							\
-	static struct clk *_name##_parents[] = {		\
+	static struct clk_core *_name##_parents[] = {		\
 		_parent_ptr,					\
 	};							\
 	static struct clk_divider _name##_hw = {		\
@@ -154,7 +158,7 @@ struct clk {
 #define DEFINE_CLK_MUX(_name, _parent_names, _parents, _flags,	\
 				_reg, _shift, _width,		\
 				_mux_flags, _lock)		\
-	static struct clk _name;				\
+	static struct clk_core _name;				\
 	static struct clk_mux _name##_hw = {			\
 		.hw = {						\
 			.clk = &_name,				\
@@ -171,11 +175,11 @@ struct clk {
 #define DEFINE_CLK_FIXED_FACTOR(_name, _parent_name,		\
 				_parent_ptr, _flags,		\
 				_mult, _div)			\
-	static struct clk _name;				\
+	static struct clk_core _name;				\
 	static const char *_name##_parent_names[] = {		\
 		_parent_name,					\
 	};							\
-	static struct clk *_name##_parents[] = {		\
+	static struct clk_core *_name##_parents[] = {		\
 		_parent_ptr,					\
 	};							\
 	static struct clk_fixed_factor _name##_hw = {		\
@@ -196,7 +200,7 @@ struct clk {
  * Initializes the lists in struct clk, queries the hardware for the
  * parent and rate and sets them both.
  *
- * Any struct clk passed into __clk_init must have the following members
+ * Any struct clk_core passed into __clk_init must have the following members
  * populated:
  * 	.name
  * 	.ops
@@ -210,9 +214,9 @@ struct clk {
  *
  * Returns 0 on success, otherwise an error code.
  */
-int __clk_init(struct device *dev, struct clk *clk);
+int __clk_init(struct device *dev, struct clk_core *clk);
 
-struct clk *__clk_register(struct device *dev, struct clk_hw *hw);
+struct clk_core *__clk_register(struct device *dev, struct clk_hw *hw);
 
 #endif /* CONFIG_COMMON_CLK */
 #endif /* CLK_PRIVATE_H */

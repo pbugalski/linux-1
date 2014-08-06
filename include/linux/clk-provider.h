@@ -16,6 +16,29 @@
 
 #ifdef CONFIG_COMMON_CLK
 
+/* Temporarily map the to-be-added API to the old API, just so stuff compiles */
+#define clk_core			clk
+
+#define __clk_create_clk
+
+#define clk_provider_get		clk_get
+#define clk_provider_get_sys		clk_get_sys
+#define devm_clk_provider_get		devm_clk_get
+#define of_clk_provider_get		of_clk_get
+#define of_clk_provider_get_by_name	of_clk_get_by_name
+
+#define clk_provider_set_rate		clk_set_rate
+#define clk_provider_get_rate		clk_get_rate
+#define clk_provider_round_rate		clk_round_rate
+#define clk_provider_set_parent		clk_set_parent
+#define clk_provider_get_parent		clk_get_parent
+#define clk_provider_prepare		clk_prepare
+#define clk_provider_unprepare		clk_unprepare
+#define clk_provider_enable		clk_enable
+#define clk_provider_disable		clk_disable
+#define clk_provider_prepare_enable	clk_prepare_enable
+#define clk_provider_disable_unprepare	clk_unprepare
+
 /*
  * flags used across common struct clk.  these flags should only affect the
  * top-level framework.  custom flags for dealing with hardware specifics

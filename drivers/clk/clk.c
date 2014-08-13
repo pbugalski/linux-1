@@ -363,7 +363,7 @@ static void clk_debug_unregister(struct clk_core *clk)
 	debugfs_remove_recursive(clk->dentry);
 }
 
-struct dentry *clk_debugfs_add_file(struct clk *clk, char *name, umode_t mode,
+struct dentry *clk_debugfs_add_file(struct clk_core *clk, char *name, umode_t mode,
 				void *data, const struct file_operations *fops)
 {
 	struct dentry *d = NULL;

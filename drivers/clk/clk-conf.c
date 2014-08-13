@@ -8,6 +8,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/clkdev.h>
 #include <linux/clk-provider.h>
 #include <linux/clk/clk-conf.h>
 #include <linux/device.h>
@@ -19,7 +20,7 @@ static int __set_clk_parents(struct device_node *node, bool clk_supplier)
 {
 	struct of_phandle_args clkspec;
 	int index, rc, num_parents;
-	struct clk *clk, *pclk;
+	struct clk_core *clk, *pclk;
 
 	num_parents = of_count_phandle_with_args(node, "assigned-clock-parents",
 						 "#clock-cells");
@@ -62,16 +63,16 @@ static int __set_clk_parents(struct device_node *node, bool clk_supplier)
 			goto err;
 		}
 
-		rc = clk_set_parent(clk, pclk);
+		rc = clk_provider_set_parent(clk, pclk);
 		if (rc < 0)
 			pr_err("clk: failed to reparent %s to %s: %d\n",
 			       __clk_get_name(clk), __clk_get_name(pclk), rc);
-		clk_put(clk);
-		clk_put(pclk);
+		__clk_put(clk);
+		__clk_put(pclk);
 	}
 	return 0;
 err:
-	clk_put(pclk);
+	__clk_put(pclk);
 	return rc;
 }
 
@@ -81,7 +82,7 @@ static int __set_clk_rates(struct device_node *node, bool clk_supplier)
 	struct property	*prop;
 	const __be32 *cur;
 	int rc, index = 0;
-	struct clk *clk;
+	struct clk_core *clk;
 	u32 rate;
 
 	of_property_for_each_u32(node, "assigned-clock-rates", prop, cur, rate) {
@@ -105,11 +106,11 @@ static int __set_clk_rates(struct device_node *node, bool clk_supplier)
 				return PTR_ERR(clk);
 			}
 
-			rc = clk_set_rate(clk, rate);
+			rc = clk_provider_set_rate(clk, rate);
 			if (rc < 0)
 				pr_err("clk: couldn't set %s clock rate: %d\n",
 				       __clk_get_name(clk), rc);
-			clk_put(clk);
+			__clk_put(clk);
 		}
 		index++;
 	}

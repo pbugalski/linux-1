@@ -112,7 +112,6 @@ static int panel_simple_get_fixed_modes(struct panel_simple *panel)
 		}
 
 		drm_display_mode_from_videomode(&vm, mode);
-		drm_mode_set_name(mode);
 
 		drm_mode_probed_add(connector, mode);
 		num++;

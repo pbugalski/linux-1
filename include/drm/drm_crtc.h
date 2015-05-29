@@ -868,6 +868,61 @@ struct drm_plane {
 	struct drm_plane_state *state;
 };
 
+struct drm_encoder_chain;
+struct drm_encoder_element;
+
+struct drm_encoder_element_funcs {
+	const u32 *(*supported_bus_formats)(struct drm_encoder_element *elem,
+					    int *num);
+	int (*set_bus_format)(struct drm_encoder_element *elem, u32 format);
+	int (*attach)(struct drm_encoder_element *elem,
+		      struct drm_encoder_element *next);
+
+	void (*destroy)(struct drm_encoder_element *elem);
+	enum drm_connector_status (*detect)(struct drm_encoder_element *elem,
+					    struct drm_connector *connector);
+
+	void (*disable)(struct drm_encoder_element *elem);
+	void (*post_disable)(struct drm_encoder_element *elem);
+	void (*mode_set)(struct drm_encoder_element *elem,
+			 struct drm_display_mode *mode,
+			 struct drm_display_mode *adjusted_mode);
+	void (*pre_enable)(struct drm_encoder_element *elem);
+	void (*enable)(struct drm_encoder_element *elem);
+
+	/* atomic helpers */
+	int (*atomic_check)(struct drm_encoder_element *elem,
+			    struct drm_crtc_state *crtc_state,
+			    struct drm_connector_state *conn_state);
+};
+
+struct drm_encoder_element {
+	struct list_head node;
+	int encoder_type;
+	u32 possible_crtcs;
+	u32 possible_clones;
+	struct drm_encoder_chain *chain;
+	struct drm_encoder_element_funcs *funcs;
+};
+
+struct drm_encoder_chain {
+	struct drm_device *dev;
+	struct list_head elems;
+	struct drm_encoder encoder;
+};
+
+struct drm_encoder_chain *drm_encoder_chain_alloc(void);
+void drm_encoder_chain_free(struct drm_encoder_chain *chain);
+
+int drm_encoder_chain_init(struct drm_device *dev,
+			   struct drm_encoder_chain *chain,
+			   u32 possible_crtcs,
+			   u32 possible_clones);
+int drm_encoder_chain_helper_attach(struct drm_encoder_element *elem,
+				    struct drm_encoder_element *next);
+int drm_encoder_chain_attach_element(struct drm_encoder_chain *chain,
+				     struct drm_encoder_element *elem);
+
 /**
  * struct drm_bridge_funcs - drm_bridge control functions
  * @attach: Called during drm_bridge_attach

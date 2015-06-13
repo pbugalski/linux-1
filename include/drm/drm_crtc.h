@@ -668,6 +668,7 @@ struct drm_connector {
 	struct drm_device *dev;
 	struct device *kdev;
 	struct device_attribute *attr;
+	struct device_node *of_node;
 	struct list_head head;
 
 	struct drm_mode_object base;
@@ -871,12 +872,14 @@ struct drm_plane {
 struct drm_encoder_chain;
 struct drm_encoder_element;
 
+struct drm_encoder_bus_format_funcs {
+	const u32 *(*supported)(struct drm_encoder_element *elem, int *num);
+	int (*set)(struct drm_encoder_element *elem, u32 format);
+};
+
 struct drm_encoder_element_funcs {
-	const u32 *(*supported_bus_formats)(struct drm_encoder_element *elem,
-					    int *num);
-	int (*set_bus_format)(struct drm_encoder_element *elem, u32 format);
-	int (*attach)(struct drm_encoder_element *elem,
-		      struct drm_encoder_element *next);
+	struct drm_encoder_bus_format_funcs in_format;
+	struct drm_encoder_bus_format_funcs out_format;
 
 	void (*destroy)(struct drm_encoder_element *elem);
 	enum drm_connector_status (*detect)(struct drm_encoder_element *elem,
@@ -898,16 +901,19 @@ struct drm_encoder_element_funcs {
 
 struct drm_encoder_element {
 	struct list_head node;
+	struct list_head chain_node;
 	int encoder_type;
-	u32 possible_crtcs;
-	u32 possible_clones;
 	struct drm_encoder_chain *chain;
+	struct drm_device *dev;
 	struct drm_encoder_element_funcs *funcs;
+	struct device_node *of_node;
 };
 
 struct drm_encoder_chain {
+	struct list_head node;
 	struct drm_device *dev;
 	struct list_head elems;
+	u32 bus_format;
 	struct drm_encoder encoder;
 };
 
@@ -1131,6 +1137,9 @@ struct drm_mode_config {
 	struct list_head connector_list;
 	int num_encoder;
 	struct list_head encoder_list;
+
+	struct list_head encoder_elem_list;
+	struct list_head encoder_chain_list;
 
 	/*
 	 * Track # of overlay planes separately from # of total planes.  By

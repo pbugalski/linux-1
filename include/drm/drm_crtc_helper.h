@@ -153,6 +153,8 @@ struct drm_encoder_helper_funcs {
 	/* detect for DAC style encoders */
 	enum drm_connector_status (*detect)(struct drm_encoder *encoder,
 					    struct drm_connector *connector);
+	int (*get_modes)(struct drm_encoder *encoder,
+			 struct drm_connector *connector);
 	void (*disable)(struct drm_encoder *encoder);
 
 	void (*enable)(struct drm_encoder *encoder);

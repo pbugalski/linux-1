@@ -263,7 +263,7 @@ static inline struct sunxi_nand_chip *to_sunxi_nand(struct nand_chip *nand)
  *			controller events
  */
 struct sunxi_nfc {
-	struct nand_hw_control controller;
+	struct nand_controller controller;
 	struct device *dev;
 	void __iomem *regs;
 	struct clk *ahb_clk;
@@ -274,7 +274,7 @@ struct sunxi_nfc {
 	struct completion complete;
 };
 
-static inline struct sunxi_nfc *to_sunxi_nfc(struct nand_hw_control *ctrl)
+static inline struct sunxi_nfc *to_sunxi_nfc(struct nand_controller *ctrl)
 {
 	return container_of(ctrl, struct sunxi_nfc, controller);
 }

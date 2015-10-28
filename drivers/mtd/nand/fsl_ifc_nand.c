@@ -51,7 +51,7 @@ struct fsl_ifc_mtd {
 
 /* overview of the fsl ifc controller */
 struct fsl_ifc_nand_ctrl {
-	struct nand_hw_control controller;
+	struct nand_controller controller;
 	struct fsl_ifc_mtd *chips[FSL_IFC_BANK_COUNT];
 
 	void __iomem *addr;	/* Address of assigned IFC buffer	*/

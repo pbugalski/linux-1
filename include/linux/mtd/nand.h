@@ -428,14 +428,16 @@ struct nand_jedec_params {
 } __packed;
 
 /**
- * struct nand_hw_control - Control structure for hardware controller (e.g ECC generator) shared among independent devices
+ * struct nand_controller - Control structure for hardware controller
+ *			    (e.g ECC generator) shared among independent
+ *			    devices
  * @lock:               protection lock
  * @active:		the mtd device which holds the controller currently
  * @wq:			wait queue to sleep on if a NAND operation is in
  *			progress used instead of the per chip wait queue
  *			when a hw controller is available.
  */
-struct nand_hw_control {
+struct nand_controller {
 	spinlock_t lock;
 	struct nand_chip *active;
 	wait_queue_head_t wq;
@@ -703,11 +705,11 @@ struct nand_chip {
 	flstate_t state;
 
 	uint8_t *oob_poi;
-	struct nand_hw_control *controller;
+	struct nand_controller *controller;
 
 	struct nand_ecc_ctrl ecc;
 	struct nand_buffers *buffers;
-	struct nand_hw_control hwcontrol;
+	struct nand_controller hwcontrol;
 
 	uint8_t *bbt;
 	struct nand_bbt_descr *bbt_td;

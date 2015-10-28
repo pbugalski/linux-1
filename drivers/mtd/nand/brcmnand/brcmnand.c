@@ -111,7 +111,7 @@ enum {
 
 struct brcmnand_controller {
 	struct device		*dev;
-	struct nand_hw_control	controller;
+	struct nand_controller	controller;
 	void __iomem		*nand_base;
 	void __iomem		*nand_fc; /* flash cache */
 	void __iomem		*flash_dma_base;

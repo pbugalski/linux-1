@@ -179,7 +179,7 @@ struct pxa3xx_nand_host {
 };
 
 struct pxa3xx_nand_info {
-	struct nand_hw_control	controller;
+	struct nand_controller	controller;
 	struct platform_device	 *pdev;
 
 	struct clk		*clk;

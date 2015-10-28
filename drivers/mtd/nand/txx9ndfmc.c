@@ -73,7 +73,7 @@ struct txx9ndfmc_drvdata {
 	void __iomem *base;
 	unsigned char hold;	/* in gbusclock */
 	unsigned char spw;	/* in gbusclock */
-	struct nand_hw_control hw_control;
+	struct nand_controller hw_control;
 };
 
 static struct platform_device *mtd_to_platdev(struct mtd_info *mtd)

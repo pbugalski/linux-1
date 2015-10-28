@@ -141,7 +141,7 @@ static struct nand_ecclayout bootrom_ecclayout = {
 /* bf5xx nand info */
 struct bf5xx_nand_info {
 	/* mtd info */
-	struct nand_hw_control		controller;
+	struct nand_controller		controller;
 	struct nand_chip		chip;
 
 	/* platform info */

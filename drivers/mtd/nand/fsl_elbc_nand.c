@@ -61,7 +61,7 @@ struct fsl_elbc_mtd {
 /* Freescale eLBC FCM controller information */
 
 struct fsl_elbc_fcm_ctrl {
-	struct nand_hw_control controller;
+	struct nand_controller controller;
 	struct fsl_elbc_mtd *chips[MAX_BANKS];
 
 	u8 __iomem *addr;        /* Address of assigned FCM buffer        */

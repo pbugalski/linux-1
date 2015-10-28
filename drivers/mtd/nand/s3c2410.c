@@ -141,7 +141,7 @@ enum s3c_nand_clk_state {
  */
 struct s3c2410_nand_info {
 	/* mtd info */
-	struct nand_hw_control		controller;
+	struct nand_controller		controller;
 	struct s3c2410_nand_mtd		*mtds;
 	struct s3c2410_platform_nand	*platform;
 

@@ -39,7 +39,7 @@ struct ndfc_controller {
 	void __iomem *ndfcbase;
 	struct nand_chip chip;
 	int chip_select;
-	struct nand_hw_control ndfc_control;
+	struct nand_controller ndfc_control;
 };
 
 static struct ndfc_controller ndfc_ctrl[NDFC_MAX_CS];

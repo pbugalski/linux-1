@@ -431,6 +431,7 @@ struct nand_jedec_params {
  * struct nand_controller - Control structure for hardware controller
  *			    (e.g ECC generator) shared among independent
  *			    devices
+ * @dev:		pointer to the device representing the NAND controller
  * @lock:               protection lock
  * @active:		the mtd device which holds the controller currently
  * @wq:			wait queue to sleep on if a NAND operation is in
@@ -438,6 +439,7 @@ struct nand_jedec_params {
  *			when a hw controller is available.
  */
 struct nand_controller {
+	struct device *dev;
 	spinlock_t lock;
 	struct nand_chip *active;
 	wait_queue_head_t wq;

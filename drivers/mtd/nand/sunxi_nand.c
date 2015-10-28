@@ -248,7 +248,6 @@ static inline struct sunxi_nand_chip *to_sunxi_nand(struct nand_chip *nand)
  * NAND Controller structure: stores sunxi NAND controller information
  *
  * @controller:		base controller structure
- * @dev:		parent device (used to print error messages)
  * @regs:		NAND controller registers
  * @ahb_clk:		NAND Controller AHB clock
  * @mod_clk:		NAND Controller mod clock
@@ -259,7 +258,6 @@ static inline struct sunxi_nand_chip *to_sunxi_nand(struct nand_chip *nand)
  */
 struct sunxi_nfc {
 	struct nand_controller controller;
-	struct device *dev;
 	void __iomem *regs;
 	struct clk *ahb_clk;
 	struct clk *mod_clk;
@@ -303,7 +301,7 @@ static int sunxi_nfc_wait_int(struct sunxi_nfc *nfc, u32 flags,
 
 	if (!wait_for_completion_timeout(&nfc->complete,
 					 msecs_to_jiffies(timeout_ms))) {
-		dev_err(nfc->dev, "wait interrupt timedout\n");
+		dev_err(nfc->controller.dev, "wait interrupt timedout\n");
 		return -ETIMEDOUT;
 	}
 
@@ -320,7 +318,7 @@ static int sunxi_nfc_wait_cmd_fifo_empty(struct sunxi_nfc *nfc)
 			return 0;
 	} while (time_before(jiffies, timeout));
 
-	dev_err(nfc->dev, "wait for empty cmd FIFO timedout\n");
+	dev_err(nfc->controller.dev, "wait for empty cmd FIFO timedout\n");
 	return -ETIMEDOUT;
 }
 
@@ -337,7 +335,8 @@ static int sunxi_nfc_rst(struct sunxi_nfc *nfc)
 			return 0;
 	} while (time_before(jiffies, timeout));
 
-	dev_err(nfc->dev, "wait for NAND controller reset timedout\n");
+	dev_err(nfc->controller.dev,
+		"wait for NAND controller reset timedout\n");
 	return -ETIMEDOUT;
 }
 
@@ -372,7 +371,8 @@ static int sunxi_nfc_dev_ready(struct mtd_info *mtd)
 	case RB_NONE:
 	default:
 		ret = 0;
-		dev_err(nfc->dev, "cannot check R/B NAND status!\n");
+		dev_err(nfc->controller.dev,
+			"cannot check R/B NAND status!\n");
 		break;
 	}
 
@@ -383,7 +383,7 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
 {
 	struct nand_chip *nand = mtd_to_nand(mtd);
 	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
-	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand->controller);
+	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
 	struct sunxi_nand_chip_sel *sel;
 	u32 ctl;
 
@@ -925,26 +925,26 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
 	tWB  = sunxi_nand_lookup_timing(tWB_lut, timings->tWB_max,
 					min_clk_period);
 	if (tWB < 0) {
-		dev_err(nfc->dev, "unsupported tWB\n");
+		dev_err(nfc->controller.dev, "unsupported tWB\n");
 		return tWB;
 	}
 
 	tADL = DIV_ROUND_UP(timings->tADL_min, min_clk_period) >> 3;
 	if (tADL > 3) {
-		dev_err(nfc->dev, "unsupported tADL\n");
+		dev_err(nfc->controller.dev, "unsupported tADL\n");
 		return -EINVAL;
 	}
 
 	tWHR = DIV_ROUND_UP(timings->tWHR_min, min_clk_period) >> 3;
 	if (tWHR > 3) {
-		dev_err(nfc->dev, "unsupported tWHR\n");
+		dev_err(nfc->controller.dev, "unsupported tWHR\n");
 		return -EINVAL;
 	}
 
 	tRHW = sunxi_nand_lookup_timing(tRHW_lut, timings->tRHW_min,
 					min_clk_period);
 	if (tRHW < 0) {
-		dev_err(nfc->dev, "unsupported tRHW\n");
+		dev_err(nfc->controller.dev, "unsupported tRHW\n");
 		return tRHW;
 	}
 
@@ -1040,7 +1040,7 @@ static int sunxi_nand_hw_common_ecc_ctrl_init(struct mtd_info *mtd,
 	}
 
 	if (i >= ARRAY_SIZE(strengths)) {
-		dev_err(nfc->dev, "unsupported strength\n");
+		dev_err(nfc->controller.dev, "unsupported strength\n");
 		ret = -ENOTSUPP;
 		goto err;
 	}
@@ -1395,7 +1395,6 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 	if (!nfc)
 		return -ENOMEM;
 
-	nfc->dev = dev;
 	nand_controller_init(&nfc->controller, dev);
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);

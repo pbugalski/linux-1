@@ -351,9 +351,9 @@ static int sunxi_nfc_dev_ready(struct mtd_info *mtd)
 {
 	struct nand_chip *nand = mtd_to_nand(mtd);
 	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
-	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
+	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
 	struct sunxi_nand_rb *rb;
-	unsigned long timeo = (sunxi_nand->nand.state == FL_ERASING ? 400 : 20);
+	unsigned long timeo = (nand->state == FL_ERASING ? 400 : 20);
 	int ret;
 
 	if (sunxi_nand->selected < 0)
@@ -433,8 +433,7 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
 static void sunxi_nfc_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
 {
 	struct nand_chip *nand = mtd_to_nand(mtd);
-	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
-	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
+	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
 	int ret;
 	int cnt;
 	int offs = 0;
@@ -466,8 +465,7 @@ static void sunxi_nfc_write_buf(struct mtd_info *mtd, const uint8_t *buf,
 				int len)
 {
 	struct nand_chip *nand = mtd_to_nand(mtd);
-	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
-	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
+	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
 	int ret;
 	int cnt;
 	int offs = 0;
@@ -507,8 +505,7 @@ static void sunxi_nfc_cmd_ctrl(struct mtd_info *mtd, int dat,
 			       unsigned int ctrl)
 {
 	struct nand_chip *nand = mtd_to_nand(mtd);
-	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
-	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
+	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
 	int ret;
 	u32 tmp;
 
@@ -1031,8 +1028,7 @@ static int sunxi_nand_hw_common_ecc_ctrl_init(struct mtd_info *mtd,
 {
 	static const u8 strengths[] = { 16, 24, 28, 32, 40, 48, 56, 60, 64 };
 	struct nand_chip *nand = mtd_to_nand(mtd);
-	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
-	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
+	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
 	struct sunxi_nand_hw_ecc *data;
 	struct nand_ecclayout *layout;
 	int nsectors;

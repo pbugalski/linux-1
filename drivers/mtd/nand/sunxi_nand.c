@@ -222,9 +222,7 @@ struct sunxi_nand_hw_ecc {
 /*
  * NAND chip structure: stores NAND chip device related information
  *
- * @node:		used to store NAND chips into a list
- * @nand:		base NAND chip structure
- * @mtd:		base MTD structure
+ * @nand:		pointer to an allocated NAND chip structure
  * @clk_rate:		clk_rate required for this NAND chip
  * @timing_cfg		TIMING_CFG register value for this NAND chip
  * @selected:		current active CS
@@ -232,8 +230,7 @@ struct sunxi_nand_hw_ecc {
  * @sels:		array of CS lines descriptions
  */
 struct sunxi_nand_chip {
-	struct list_head node;
-	struct nand_chip nand;
+	struct nand_chip *nand;
 	unsigned long clk_rate;
 	u32 timing_cfg;
 	u32 timing_ctl;
@@ -244,7 +241,7 @@ struct sunxi_nand_chip {
 
 static inline struct sunxi_nand_chip *to_sunxi_nand(struct nand_chip *nand)
 {
-	return container_of(nand, struct sunxi_nand_chip, nand);
+	return nand_get_controller_data(nand);
 }
 
 /*
@@ -257,8 +254,6 @@ static inline struct sunxi_nand_chip *to_sunxi_nand(struct nand_chip *nand)
  * @mod_clk:		NAND Controller mod clock
  * @assigned_cs:	bitmask describing already assigned CS lines
  * @clk_rate:		NAND controller current clock rate
- * @chips:		a list containing all the NAND chips attached to
- *			this NAND controller
  * @complete:		a completion object used to wait for NAND
  *			controller events
  */
@@ -270,7 +265,6 @@ struct sunxi_nfc {
 	struct clk *mod_clk;
 	unsigned long assigned_cs;
 	unsigned long clk_rate;
-	struct list_head chips;
 	struct completion complete;
 };
 
@@ -389,7 +383,7 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
 {
 	struct nand_chip *nand = mtd_to_nand(mtd);
 	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
-	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
+	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand->controller);
 	struct sunxi_nand_chip_sel *sel;
 	u32 ctl;
 
@@ -863,7 +857,7 @@ static int _sunxi_nand_lookup_timing(const s32 *lut, int lut_size, u32 duration,
 static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
 				       const struct nand_sdr_timings *timings)
 {
-	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->nand.controller);
+	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->nand->controller);
 	u32 min_clk_period = 0;
 	s32 tWB, tADL, tWHR, tRHW, tCAD;
 
@@ -987,14 +981,14 @@ static int sunxi_nand_chip_set_timings(struct sunxi_nand_chip *chip,
 static int sunxi_nand_chip_init_timings(struct sunxi_nand_chip *chip,
 					struct device_node *np)
 {
-	struct mtd_info *mtd = nand_to_mtd(&chip->nand);
+	struct mtd_info *mtd = nand_to_mtd(chip->nand);
 	const struct nand_sdr_timings *timings;
 	int ret;
 	int mode;
 
-	mode = onfi_get_async_timing_mode(&chip->nand);
+	mode = onfi_get_async_timing_mode(chip->nand);
 	if (mode == ONFI_TIMING_MODE_UNKNOWN) {
-		mode = chip->nand.onfi_timing_mode_default;
+		mode = chip->nand->onfi_timing_mode_default;
 	} else {
 		uint8_t feature[ONFI_SUBFEATURE_PARAM_LEN] = {};
 		int i;
@@ -1005,11 +999,11 @@ static int sunxi_nand_chip_init_timings(struct sunxi_nand_chip *chip,
 
 		feature[0] = mode;
 		for (i = 0; i < chip->nsels; i++) {
-			chip->nand.select_chip(mtd, i);
-			ret = chip->nand.onfi_set_features(mtd,	&chip->nand,
+			chip->nand->select_chip(mtd, i);
+			ret = chip->nand->onfi_set_features(mtd, chip->nand,
 						ONFI_FEATURE_ADDR_TIMING_MODE,
 						feature);
-			chip->nand.select_chip(mtd, -1);
+			chip->nand->select_chip(mtd, -1);
 			if (ret)
 				return ret;
 		}
@@ -1222,13 +1216,15 @@ static int sunxi_nand_ecc_init(struct mtd_info *mtd, struct nand_ecc_ctrl *ecc,
 	return 0;
 }
 
-static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
-				struct device_node *np)
+static int sunxi_nfc_add_chip(struct nand_controller *ctrl,
+			      struct nand_chip *nand)
 {
+	struct device_node *np = nand_chip_get_node(nand);
+	struct sunxi_nfc *nfc = to_sunxi_nfc(ctrl);
 	const struct nand_sdr_timings *timings;
+	struct device *dev = ctrl->dev;
 	struct sunxi_nand_chip *chip;
 	struct mtd_info *mtd;
-	struct nand_chip *nand;
 	int nsels;
 	int ret;
 	int i;
@@ -1300,6 +1296,13 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		}
 	}
 
+	chip->nand = nand;
+	if (IS_ERR(nand))
+		return PTR_ERR(nand);
+
+	nand_set_controller_data(nand, chip);
+	mtd = nand_to_mtd(nand);
+
 	timings = onfi_async_timing_mode_to_sdr_timings(0);
 	if (IS_ERR(timings)) {
 		ret = PTR_ERR(timings);
@@ -1315,7 +1318,6 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		return ret;
 	}
 
-	nand = &chip->nand;
 	/* Default tR value specified in the ONFI spec (chapter 4.15.1) */
 	nand->chip_delay = 200;
 	nand->controller = &nfc->controller;
@@ -1366,46 +1368,20 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 		return ret;
 	}
 
-	list_add_tail(&chip->node, &nfc->chips);
-
 	return 0;
 }
 
-static int sunxi_nand_chips_init(struct device *dev, struct sunxi_nfc *nfc)
+static void sunxi_nfc_remove_chip(struct nand_controller *ctrl,
+			     struct nand_chip *chip)
 {
-	struct device_node *np = dev->of_node;
-	struct device_node *nand_np;
-	int nchips = of_get_child_count(np);
-	int ret;
-
-	if (nchips > 8) {
-		dev_err(dev, "too many NAND chips: %d (max = 8)\n", nchips);
-		return -EINVAL;
-	}
-
-	for_each_child_of_node(np, nand_np) {
-		ret = sunxi_nand_chip_init(dev, nfc, nand_np);
-		if (ret) {
-			of_node_put(nand_np);
-			return ret;
-		}
-	}
-
-	return 0;
+	nand_release(nand_to_mtd(chip));
+	sunxi_nand_ecc_cleanup(&chip->ecc);
 }
 
-static void sunxi_nand_chips_cleanup(struct sunxi_nfc *nfc)
-{
-	struct sunxi_nand_chip *chip;
-
-	while (!list_empty(&nfc->chips)) {
-		chip = list_first_entry(&nfc->chips, struct sunxi_nand_chip,
-					node);
-		nand_release(nand_to_mtd(&chip->nand));
-		sunxi_nand_ecc_cleanup(&chip->nand.ecc);
-		list_del(&chip->node);
-	}
-}
+static const struct nand_controller_ops nfc_ops = {
+	.add = sunxi_nfc_add_chip,
+	.remove = sunxi_nfc_remove_chip,
+};
 
 static int sunxi_nfc_probe(struct platform_device *pdev)
 {
@@ -1421,7 +1397,6 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 
 	nfc->dev = dev;
 	nand_controller_init(&nfc->controller, dev);
-	INIT_LIST_HEAD(&nfc->chips);
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	nfc->regs = devm_ioremap_resource(dev, r);
@@ -1467,7 +1442,7 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, nfc);
 
-	ret = sunxi_nand_chips_init(dev, nfc);
+	ret = nand_controller_register(&nfc->controller);
 	if (ret) {
 		dev_err(dev, "failed to init nand chips\n");
 		goto out_mod_clk_unprepare;
@@ -1487,7 +1462,7 @@ static int sunxi_nfc_remove(struct platform_device *pdev)
 {
 	struct sunxi_nfc *nfc = platform_get_drvdata(pdev);
 
-	sunxi_nand_chips_cleanup(nfc);
+	nand_controller_unregister(&nfc->controller);
 
 	return 0;
 }

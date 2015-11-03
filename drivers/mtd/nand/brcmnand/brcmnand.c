@@ -182,7 +182,7 @@ struct brcmnand_cfg {
 struct brcmnand_host {
 	struct list_head	node;
 
-	struct nand_chip	chip;
+	struct nand_chip	*chip;
 	int			cs;
 
 	unsigned int		last_cmd;
@@ -548,7 +548,7 @@ static inline u32 brcmnand_count_corrected(struct brcmnand_controller *ctrl)
 static void brcmnand_wr_corr_thresh(struct brcmnand_host *host, u8 val)
 {
 	struct brcmnand_controller *ctrl =
-			to_brcmnand_controller(host->chip.controller);
+			to_brcmnand_controller(host->chip->controller);
 	unsigned int shift = 0, bits;
 	enum brcmnand_reg reg = BRCMNAND_CORR_THRESHOLD;
 	int cs = host->cs;
@@ -619,7 +619,7 @@ static inline u32 brcmnand_ecc_level_mask(struct brcmnand_controller *ctrl)
 static void brcmnand_set_ecc_enabled(struct brcmnand_host *host, int en)
 {
 	struct brcmnand_controller *ctrl =
-			to_brcmnand_controller(host->chip.controller);
+			to_brcmnand_controller(host->chip->controller);
 	u16 offs = brcmnand_cs_offset(ctrl, host->cs, BRCMNAND_CS_ACC_CONTROL);
 	u32 acc_control = nand_readreg(ctrl, offs);
 	u32 ecc_flags = ACC_CONTROL_WR_ECC | ACC_CONTROL_RD_ECC;
@@ -649,7 +649,7 @@ static inline int brcmnand_sector_1k_shift(struct brcmnand_controller *ctrl)
 static int brcmnand_get_sector_size_1k(struct brcmnand_host *host)
 {
 	struct brcmnand_controller *ctrl =
-			to_brcmnand_controller(host->chip.controller);
+			to_brcmnand_controller(host->chip->controller);
 	int shift = brcmnand_sector_1k_shift(ctrl);
 	u16 acc_control_offs = brcmnand_cs_offset(ctrl, host->cs,
 						  BRCMNAND_CS_ACC_CONTROL);
@@ -663,7 +663,7 @@ static int brcmnand_get_sector_size_1k(struct brcmnand_host *host)
 static void brcmnand_set_sector_size_1k(struct brcmnand_host *host, int val)
 {
 	struct brcmnand_controller *ctrl =
-			to_brcmnand_controller(host->chip.controller);
+			to_brcmnand_controller(host->chip->controller);
 	int shift = brcmnand_sector_1k_shift(ctrl);
 	u16 acc_control_offs = brcmnand_cs_offset(ctrl, host->cs,
 						  BRCMNAND_CS_ACC_CONTROL);
@@ -759,7 +759,7 @@ static inline bool is_hamming_ecc(struct brcmnand_cfg *cfg)
 static struct nand_ecclayout *brcmnand_create_layout(int ecc_level,
 						     struct brcmnand_host *host)
 {
-	struct device *dev = host->chip.controller->dev;
+	struct device *dev = host->chip->controller->dev;
 	struct brcmnand_cfg *cfg = &host->hwcfg;
 	int i, j;
 	struct nand_ecclayout *layout;
@@ -871,7 +871,7 @@ static struct nand_ecclayout *brcmstb_choose_ecc_layout(
 
 	layout = brcmnand_create_layout(ecc_level, host);
 	if (!layout) {
-		dev_err(host->chip.controller->dev,
+		dev_err(host->chip->controller->dev,
 			"no proper ecc_layout for this NAND cfg\n");
 		return NULL;
 	}
@@ -1021,7 +1021,7 @@ static irqreturn_t brcmnand_dma_irq(int irq, void *data)
 static void brcmnand_send_cmd(struct brcmnand_host *host, int cmd)
 {
 	struct brcmnand_controller *ctrl =
-			to_brcmnand_controller(host->chip.controller);
+			to_brcmnand_controller(host->chip->controller);
 	u32 intfc;
 
 	dev_dbg(ctrl->controller.dev, "send native cmd %d addr_lo 0x%x\n", cmd,
@@ -1086,7 +1086,7 @@ static int brcmnand_low_level_op(struct brcmnand_host *host,
 				 enum brcmnand_llop_type type, u32 data,
 				 bool last_op)
 {
-	struct nand_chip *chip = &host->chip;
+	struct nand_chip *chip = host->chip;
 	struct mtd_info *mtd = nand_to_mtd(chip);
 	struct brcmnand_controller *ctrl =
 			to_brcmnand_controller(chip->controller);
@@ -1355,7 +1355,7 @@ static int brcmnand_fill_dma_desc(struct brcmnand_host *host,
 static void brcmnand_dma_run(struct brcmnand_host *host, dma_addr_t desc)
 {
 	struct brcmnand_controller *ctrl =
-			to_brcmnand_controller(host->chip.controller);
+			to_brcmnand_controller(host->chip->controller);
 	unsigned long timeo = msecs_to_jiffies(100);
 
 	flash_dma_writel(ctrl, FLASH_DMA_FIRST_DESC, lower_32_bits(desc));
@@ -1382,7 +1382,7 @@ static int brcmnand_dma_trans(struct brcmnand_host *host, u64 addr, u32 *buf,
 			      u32 len, u8 dma_cmd)
 {
 	struct brcmnand_controller *ctrl =
-			to_brcmnand_controller(host->chip.controller);
+			to_brcmnand_controller(host->chip->controller);
 	dma_addr_t buf_pa;
 	int dir = dma_cmd == CMD_PAGE_READ ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
 
@@ -1699,7 +1699,7 @@ static int brcmnand_write_oob_raw(struct mtd_info *mtd, struct nand_chip *chip,
 static int brcmnand_set_cfg(struct brcmnand_host *host,
 			    struct brcmnand_cfg *cfg)
 {
-	struct nand_chip *chip = &host->chip;
+	struct nand_chip *chip = host->chip;
 	struct brcmnand_controller *ctrl =
 			to_brcmnand_controller(chip->controller);
 	u16 cfg_offs = brcmnand_cs_offset(ctrl, host->cs, BRCMNAND_CS_CFG);
@@ -1831,7 +1831,7 @@ static inline int get_blk_adr_bytes(u64 size, u32 writesize)
 
 static int brcmnand_setup_dev(struct brcmnand_host *host)
 {
-	struct nand_chip *chip = &host->chip;
+	struct nand_chip *chip = host->chip;
 	struct mtd_info *mtd = nand_to_mtd(chip);
 	struct brcmnand_controller *ctrl =
 			to_brcmnand_controller(chip->controller);
@@ -1932,15 +1932,20 @@ static int brcmnand_setup_dev(struct brcmnand_host *host)
 	return 0;
 }
 
-static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
+static int brcmnand_add_chip(struct nand_controller *controller,
+			     struct nand_chip *chip)
 {
-	struct brcmnand_controller *ctrl =
-			to_brcmnand_controller(host->chip.controller);
-	struct device *dev = host->chip.controller->dev;
+	struct brcmnand_controller *ctrl = to_brcmnand_controller(controller);
+	struct device_node *dn = nand_get_flash_node(chip);
+	struct device *dev = controller->dev;
+	struct brcmnand_host *host;
 	struct mtd_info *mtd;
-	struct nand_chip *chip;
 	int ret;
 	u16 cfg_offs;
+
+	host = devm_kzalloc(controller->dev, sizeof(*host), GFP_KERNEL);
+	if (!host)
+		return -ENOMEM;
 
 	ret = of_property_read_u32(dn, "reg", &host->cs);
 	if (ret) {
@@ -1948,9 +1953,8 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
 		return -ENXIO;
 	}
 
-	mtd = nand_to_mtd(&host->chip);
-	chip = &host->chip;
-
+	mtd = nand_to_mtd(chip);
+	host->chip = chip;
 	nand_set_flash_node(chip, dn);
 	nand_set_controller_data(chip, host);
 	mtd->name = devm_kasprintf(dev, GFP_KERNEL, "brcmnand.%d",
@@ -2020,11 +2024,22 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
 	return mtd_device_register(mtd, NULL, 0);
 }
 
+static void brcmnand_remove_chip(struct nand_controller *controller,
+				 struct nand_chip *chip)
+{
+	nand_release(nand_to_mtd(chip));
+}
+
+static const struct nand_controller_ops brcmnand_ops = {
+	.add = brcmnand_add_chip,
+	.remove = brcmnand_remove_chip,
+};
+
 static void brcmnand_save_restore_cs_config(struct brcmnand_host *host,
 					    int restore)
 {
 	struct brcmnand_controller *ctrl =
-			to_brcmnand_controller(host->chip.controller);
+			to_brcmnand_controller(host->chip->controller);
 	u16 cfg_offs = brcmnand_cs_offset(ctrl, host->cs, BRCMNAND_CS_CFG);
 	u16 cfg_ext_offs = brcmnand_cs_offset(ctrl, host->cs,
 			BRCMNAND_CS_CFG_EXT);
@@ -2092,7 +2107,7 @@ static int brcmnand_resume(struct device *dev)
 	}
 
 	list_for_each_entry(host, &ctrl->host_list, node) {
-		struct nand_chip *chip = &host->chip;
+		struct nand_chip *chip = host->chip;
 		struct mtd_info *mtd = nand_to_mtd(chip);
 
 		brcmnand_save_restore_cs_config(host, 1);
@@ -2128,7 +2143,7 @@ MODULE_DEVICE_TABLE(of, brcmnand_of_match);
 int brcmnand_probe(struct platform_device *pdev, struct brcmnand_soc *soc)
 {
 	struct device *dev = &pdev->dev;
-	struct device_node *dn = dev->of_node, *child;
+	struct device_node *dn = dev->of_node;
 	struct brcmnand_controller *ctrl;
 	struct resource *res;
 	int ret;
@@ -2256,28 +2271,13 @@ int brcmnand_probe(struct platform_device *pdev, struct brcmnand_soc *soc)
 		return ret;
 	}
 
-	for_each_available_child_of_node(dn, child) {
-		if (of_device_is_compatible(child, "brcm,nandcs")) {
-			struct brcmnand_host *host;
-
-			host = devm_kzalloc(dev, sizeof(*host), GFP_KERNEL);
-			if (!host) {
-				of_node_put(child);
-				return -ENOMEM;
-			}
-
-			ret = brcmnand_init_cs(host, child);
-			if (ret) {
-				devm_kfree(dev, host);
-				continue; /* Try all chip-selects */
-			}
-
-			list_add_tail(&host->node, &ctrl->host_list);
-		}
-	}
+	ctrl->controller.ops = &brcmnand_ops;
+	ret = nand_controller_register(&ctrl->controller);
+	if (ret)
+		return ret;
 
 	/* No chip-selects could initialize properly */
-	if (list_empty(&ctrl->host_list))
+	if (list_empty(&ctrl->controller.chips))
 		return -ENODEV;
 
 	return 0;
@@ -2290,7 +2290,7 @@ int brcmnand_remove(struct platform_device *pdev)
 	struct brcmnand_host *host;
 
 	list_for_each_entry(host, &ctrl->host_list, node)
-		nand_release(nand_to_mtd(&host->chip));
+		nand_release(nand_to_mtd(host->chip));
 
 	dev_set_drvdata(&pdev->dev, NULL);
 

@@ -154,6 +154,12 @@ struct brcmnand_controller {
 	u32			flash_dma_mode;
 };
 
+static inline struct brcmnand_controller *
+to_brcmnand_controller(struct nand_controller *ctrl)
+{
+	return container_of(ctrl, struct brcmnand_controller, controller);
+}
+
 struct brcmnand_cfg {
 	u64			device_size;
 	unsigned int		block_size;
@@ -183,7 +189,6 @@ struct brcmnand_host {
 	unsigned int		last_byte;
 	u64			last_addr;
 	struct brcmnand_cfg	hwcfg;
-	struct brcmnand_controller *ctrl;
 };
 
 enum brcmnand_reg {
@@ -542,7 +547,8 @@ static inline u32 brcmnand_count_corrected(struct brcmnand_controller *ctrl)
 
 static void brcmnand_wr_corr_thresh(struct brcmnand_host *host, u8 val)
 {
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(host->chip.controller);
 	unsigned int shift = 0, bits;
 	enum brcmnand_reg reg = BRCMNAND_CORR_THRESHOLD;
 	int cs = host->cs;
@@ -612,7 +618,8 @@ static inline u32 brcmnand_ecc_level_mask(struct brcmnand_controller *ctrl)
 
 static void brcmnand_set_ecc_enabled(struct brcmnand_host *host, int en)
 {
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(host->chip.controller);
 	u16 offs = brcmnand_cs_offset(ctrl, host->cs, BRCMNAND_CS_ACC_CONTROL);
 	u32 acc_control = nand_readreg(ctrl, offs);
 	u32 ecc_flags = ACC_CONTROL_WR_ECC | ACC_CONTROL_RD_ECC;
@@ -641,7 +648,8 @@ static inline int brcmnand_sector_1k_shift(struct brcmnand_controller *ctrl)
 
 static int brcmnand_get_sector_size_1k(struct brcmnand_host *host)
 {
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(host->chip.controller);
 	int shift = brcmnand_sector_1k_shift(ctrl);
 	u16 acc_control_offs = brcmnand_cs_offset(ctrl, host->cs,
 						  BRCMNAND_CS_ACC_CONTROL);
@@ -654,7 +662,8 @@ static int brcmnand_get_sector_size_1k(struct brcmnand_host *host)
 
 static void brcmnand_set_sector_size_1k(struct brcmnand_host *host, int val)
 {
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(host->chip.controller);
 	int shift = brcmnand_sector_1k_shift(ctrl);
 	u16 acc_control_offs = brcmnand_cs_offset(ctrl, host->cs,
 						  BRCMNAND_CS_ACC_CONTROL);
@@ -873,8 +882,8 @@ static struct nand_ecclayout *brcmstb_choose_ecc_layout(
 static void brcmnand_wp(struct mtd_info *mtd, int wp)
 {
 	struct nand_chip *chip = mtd_to_nand(mtd);
-	struct brcmnand_host *host = nand_get_controller_data(chip);
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(chip->controller);
 
 	if ((ctrl->features & BRCMNAND_HAS_WP) && wp_on == 1) {
 		static int old_wp = -1;
@@ -1011,7 +1020,8 @@ static irqreturn_t brcmnand_dma_irq(int irq, void *data)
 
 static void brcmnand_send_cmd(struct brcmnand_host *host, int cmd)
 {
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(host->chip.controller);
 	u32 intfc;
 
 	dev_dbg(ctrl->controller.dev, "send native cmd %d addr_lo 0x%x\n", cmd,
@@ -1040,8 +1050,8 @@ static void brcmnand_cmd_ctrl(struct mtd_info *mtd, int dat,
 static int brcmnand_waitfunc(struct mtd_info *mtd, struct nand_chip *this)
 {
 	struct nand_chip *chip = mtd_to_nand(mtd);
-	struct brcmnand_host *host = nand_get_controller_data(chip);
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(chip->controller);
 	unsigned long timeo = msecs_to_jiffies(100);
 
 	dev_dbg(ctrl->controller.dev, "wait on native cmd %d\n",
@@ -1076,9 +1086,10 @@ static int brcmnand_low_level_op(struct brcmnand_host *host,
 				 enum brcmnand_llop_type type, u32 data,
 				 bool last_op)
 {
-	struct mtd_info *mtd = nand_to_mtd(&host->chip);
 	struct nand_chip *chip = &host->chip;
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct mtd_info *mtd = nand_to_mtd(chip);
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(chip->controller);
 	u32 tmp;
 
 	tmp = data & LLOP_DATA_MASK;
@@ -1117,7 +1128,8 @@ static void brcmnand_cmdfunc(struct mtd_info *mtd, unsigned command,
 {
 	struct nand_chip *chip = mtd_to_nand(mtd);
 	struct brcmnand_host *host = nand_get_controller_data(chip);
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(chip->controller);
 	u64 addr = (u64)page_addr << chip->page_shift;
 	int native_cmd = 0;
 
@@ -1223,7 +1235,8 @@ static uint8_t brcmnand_read_byte(struct mtd_info *mtd)
 {
 	struct nand_chip *chip = mtd_to_nand(mtd);
 	struct brcmnand_host *host = nand_get_controller_data(chip);
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(chip->controller);
 	uint8_t ret = 0;
 	int addr, offs;
 
@@ -1341,7 +1354,8 @@ static int brcmnand_fill_dma_desc(struct brcmnand_host *host,
  */
 static void brcmnand_dma_run(struct brcmnand_host *host, dma_addr_t desc)
 {
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(host->chip.controller);
 	unsigned long timeo = msecs_to_jiffies(100);
 
 	flash_dma_writel(ctrl, FLASH_DMA_FIRST_DESC, lower_32_bits(desc));
@@ -1367,7 +1381,8 @@ static void brcmnand_dma_run(struct brcmnand_host *host, dma_addr_t desc)
 static int brcmnand_dma_trans(struct brcmnand_host *host, u64 addr, u32 *buf,
 			      u32 len, u8 dma_cmd)
 {
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(host->chip.controller);
 	dma_addr_t buf_pa;
 	int dir = dma_cmd == CMD_PAGE_READ ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
 
@@ -1401,7 +1416,8 @@ static int brcmnand_read_by_pio(struct mtd_info *mtd, struct nand_chip *chip,
 				u8 *oob, u64 *err_addr)
 {
 	struct brcmnand_host *host = nand_get_controller_data(chip);
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(chip->controller);
 	int i, j, ret = 0;
 
 	/* Clear error addresses */
@@ -1464,7 +1480,8 @@ static int brcmnand_read(struct mtd_info *mtd, struct nand_chip *chip,
 			 u64 addr, unsigned int trans, u32 *buf, u8 *oob)
 {
 	struct brcmnand_host *host = nand_get_controller_data(chip);
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(chip->controller);
 	u64 err_addr = 0;
 	int err;
 
@@ -1561,7 +1578,8 @@ static int brcmnand_write(struct mtd_info *mtd, struct nand_chip *chip,
 			  u64 addr, const u32 *buf, u8 *oob)
 {
 	struct brcmnand_host *host = nand_get_controller_data(chip);
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(chip->controller);
 	unsigned int i, j, trans = mtd->writesize >> FC_SHIFT;
 	int status, ret = 0;
 
@@ -1681,8 +1699,9 @@ static int brcmnand_write_oob_raw(struct mtd_info *mtd, struct nand_chip *chip,
 static int brcmnand_set_cfg(struct brcmnand_host *host,
 			    struct brcmnand_cfg *cfg)
 {
-	struct brcmnand_controller *ctrl = host->ctrl;
 	struct nand_chip *chip = &host->chip;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(chip->controller);
 	u16 cfg_offs = brcmnand_cs_offset(ctrl, host->cs, BRCMNAND_CS_CFG);
 	u16 cfg_ext_offs = brcmnand_cs_offset(ctrl, host->cs,
 			BRCMNAND_CS_CFG_EXT);
@@ -1812,9 +1831,10 @@ static inline int get_blk_adr_bytes(u64 size, u32 writesize)
 
 static int brcmnand_setup_dev(struct brcmnand_host *host)
 {
-	struct mtd_info *mtd = nand_to_mtd(&host->chip);
 	struct nand_chip *chip = &host->chip;
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct mtd_info *mtd = nand_to_mtd(chip);
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(chip->controller);
 	struct brcmnand_cfg *cfg = &host->hwcfg;
 	char msg[128];
 	u32 offs, tmp, oob_sector;
@@ -1914,7 +1934,8 @@ static int brcmnand_setup_dev(struct brcmnand_host *host)
 
 static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
 {
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(host->chip.controller);
 	struct device *dev = host->chip.controller->dev;
 	struct mtd_info *mtd;
 	struct nand_chip *chip;
@@ -2002,7 +2023,8 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
 static void brcmnand_save_restore_cs_config(struct brcmnand_host *host,
 					    int restore)
 {
-	struct brcmnand_controller *ctrl = host->ctrl;
+	struct brcmnand_controller *ctrl =
+			to_brcmnand_controller(host->chip.controller);
 	u16 cfg_offs = brcmnand_cs_offset(ctrl, host->cs, BRCMNAND_CS_CFG);
 	u16 cfg_ext_offs = brcmnand_cs_offset(ctrl, host->cs,
 			BRCMNAND_CS_CFG_EXT);
@@ -2243,7 +2265,6 @@ int brcmnand_probe(struct platform_device *pdev, struct brcmnand_soc *soc)
 				of_node_put(child);
 				return -ENOMEM;
 			}
-			host->ctrl = ctrl;
 
 			ret = brcmnand_init_cs(host, child);
 			if (ret) {

@@ -177,7 +177,6 @@ struct brcmnand_host {
 	struct list_head	node;
 
 	struct nand_chip	chip;
-	struct platform_device	*pdev;
 	int			cs;
 
 	unsigned int		last_cmd;
@@ -751,6 +750,7 @@ static inline bool is_hamming_ecc(struct brcmnand_cfg *cfg)
 static struct nand_ecclayout *brcmnand_create_layout(int ecc_level,
 						     struct brcmnand_host *host)
 {
+	struct device *dev = host->chip.controller->dev;
 	struct brcmnand_cfg *cfg = &host->hwcfg;
 	int i, j;
 	struct nand_ecclayout *layout;
@@ -759,7 +759,7 @@ static struct nand_ecclayout *brcmnand_create_layout(int ecc_level,
 	int sas;
 	int idx1, idx2;
 
-	layout = devm_kzalloc(&host->pdev->dev, sizeof(*layout), GFP_KERNEL);
+	layout = devm_kzalloc(dev, sizeof(*layout), GFP_KERNEL);
 	if (!layout)
 		return NULL;
 
@@ -803,7 +803,7 @@ static struct nand_ecclayout *brcmnand_create_layout(int ecc_level,
 	 */
 	req = DIV_ROUND_UP(ecc_level * 14, 8);
 	if (req >= sas) {
-		dev_err(&host->pdev->dev,
+		dev_err(dev,
 			"error: ECC too large for OOB (ECC bytes %d, spare sector %d)\n",
 			req, sas);
 		return NULL;
@@ -862,8 +862,8 @@ static struct nand_ecclayout *brcmstb_choose_ecc_layout(
 
 	layout = brcmnand_create_layout(ecc_level, host);
 	if (!layout) {
-		dev_err(&host->pdev->dev,
-				"no proper ecc_layout for this NAND cfg\n");
+		dev_err(host->chip.controller->dev,
+			"no proper ecc_layout for this NAND cfg\n");
 		return NULL;
 	}
 
@@ -1915,7 +1915,7 @@ static int brcmnand_setup_dev(struct brcmnand_host *host)
 static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
 {
 	struct brcmnand_controller *ctrl = host->ctrl;
-	struct platform_device *pdev = host->pdev;
+	struct device *dev = host->chip.controller->dev;
 	struct mtd_info *mtd;
 	struct nand_chip *chip;
 	int ret;
@@ -1923,7 +1923,7 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
 
 	ret = of_property_read_u32(dn, "reg", &host->cs);
 	if (ret) {
-		dev_err(&pdev->dev, "can't get chip-select\n");
+		dev_err(dev, "can't get chip-select\n");
 		return -ENXIO;
 	}
 
@@ -1932,10 +1932,10 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
 
 	nand_set_flash_node(chip, dn);
 	nand_set_controller_data(chip, host);
-	mtd->name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "brcmnand.%d",
+	mtd->name = devm_kasprintf(dev, GFP_KERNEL, "brcmnand.%d",
 				   host->cs);
 	mtd->owner = THIS_MODULE;
-	mtd->dev.parent = &pdev->dev;
+	mtd->dev.parent = dev;
 
 	chip->IO_ADDR_R = (void __iomem *)0xdeadbeef;
 	chip->IO_ADDR_W = (void __iomem *)0xdeadbeef;
@@ -2243,7 +2243,6 @@ int brcmnand_probe(struct platform_device *pdev, struct brcmnand_soc *soc)
 				of_node_put(child);
 				return -ENOMEM;
 			}
-			host->pdev = pdev;
 			host->ctrl = ctrl;
 
 			ret = brcmnand_init_cs(host, child);

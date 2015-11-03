@@ -1727,8 +1727,8 @@ static int alloc_nand_resource(struct platform_device *pdev)
 		chip->cmdfunc		= nand_cmdfunc;
 	}
 
-	spin_lock_init(&chip->controller->lock);
-	init_waitqueue_head(&chip->controller->wq);
+	nand_controller_init(&info->controller, &pdev->dev);
+
 	info->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(info->clk)) {
 		dev_err(&pdev->dev, "failed to get nand clock\n");

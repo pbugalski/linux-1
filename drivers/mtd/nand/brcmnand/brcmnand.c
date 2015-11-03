@@ -2115,8 +2115,7 @@ int brcmnand_probe(struct platform_device *pdev, struct brcmnand_soc *soc)
 
 	init_completion(&ctrl->done);
 	init_completion(&ctrl->dma_done);
-	spin_lock_init(&ctrl->controller.lock);
-	init_waitqueue_head(&ctrl->controller.wq);
+	nand_controller_init(&ctrl->controller, dev);
 	INIT_LIST_HEAD(&ctrl->host_list);
 
 	/* NAND register range */

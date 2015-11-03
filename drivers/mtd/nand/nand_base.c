@@ -3156,9 +3156,8 @@ static void nand_set_defaults(struct nand_chip *chip, int busw)
 		chip->scan_bbt = nand_default_bbt;
 
 	if (!chip->controller) {
+		nand_controller_init(&chip->hwcontrol, chip->mtd.dev.parent);
 		chip->controller = &chip->hwcontrol;
-		spin_lock_init(&chip->controller->lock);
-		init_waitqueue_head(&chip->controller->wq);
 	}
 
 }

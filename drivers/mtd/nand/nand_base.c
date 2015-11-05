@@ -3974,6 +3974,23 @@ static int nand_dt_init(struct nand_chip *chip)
 }
 
 /**
+ * nand_controller_init - [NAND Interface] Initialize a nand_controller struct
+ * @controller: NAND controller this chip is attached to
+ * @dev: the device providing thid NAND controller
+ *
+ * Initialize several fields of the nand_controller structure.
+ */
+void nand_controller_init(struct nand_controller *controller,
+			  struct device *dev)
+{
+	controller->active = NULL;
+	controller->dev = dev;
+	spin_lock_init(&controller->lock);
+	init_waitqueue_head(&controller->wq);
+}
+EXPORT_SYMBOL_GPL(nand_controller_init);
+
+/**
  * nand_scan_ident - [NAND Interface] Scan for the NAND device
  * @mtd: MTD device structure
  * @maxchips: number of chips to scan for

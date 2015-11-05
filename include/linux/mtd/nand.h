@@ -27,6 +27,11 @@
 struct mtd_info;
 struct nand_flash_dev;
 struct device_node;
+struct nand_controller;
+
+/* Initialize a nand_controller struct */
+void nand_controller_init(struct nand_controller *controller,
+			  struct device *dev);
 
 /* Scan and identify a NAND device */
 extern int nand_scan(struct mtd_info *mtd, int max_chips);

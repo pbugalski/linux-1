@@ -3973,6 +3973,131 @@ static int nand_dt_init(struct nand_chip *chip)
 }
 
 /**
+ * nand_chip_alloc - [NAND Interface] Allocate a NAND chip device
+ * @controller: NAND controller this chip is attached to
+ *
+ * Allocate a new nand_chip struct and attach it to a NAND controller.
+ */
+static struct nand_chip *nand_chip_alloc(struct nand_controller *controller)
+{
+	struct nand_chip *chip;
+
+	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
+	if (!chip)
+		return ERR_PTR(-ENOMEM);
+
+	if (controller) {
+		struct mtd_info *mtd = nand_to_mtd(chip);
+
+		chip->controller = controller;
+		mtd->dev.parent = controller->dev;
+	}
+
+	return chip;
+}
+
+static int nand_conctroller_add_chip(struct nand_controller *controller,
+				     struct nand_chip *chip)
+{
+	int ret = 0;
+
+	if (controller->ops && controller->ops->add)
+		ret = controller->ops->add(controller, chip);
+
+	if (!ret)
+		list_add_tail(&chip->node, &controller->chips);
+
+	return ret;
+}
+
+static void nand_conctroller_remove_chip(struct nand_controller *controller,
+					 struct nand_chip *chip)
+{
+	list_del(&chip->node);
+
+	if (controller->ops && controller->ops->remove)
+		controller->ops->remove(controller, chip);
+
+	kfree(chip);
+}
+
+#if defined(CONFIG_OF)
+static int of_register_nand_chip(struct nand_controller *controller,
+				 struct device_node *np)
+{
+	struct nand_chip *chip;
+	int ret;
+
+	chip = nand_chip_alloc(controller);
+	if (!chip)
+		return -ENOMEM;
+
+	chip->mtd.dev.of_node = np;
+
+	ret = nand_conctroller_add_chip(controller, chip);
+	if (ret)
+		kfree(chip);
+
+	return ret;
+}
+
+static void of_register_nand_chips(struct nand_controller *controller)
+{
+	struct device_node *np = controller->dev->of_node, *nc;
+	int nchips = of_get_child_count(np);
+	int ret;
+
+	if (nchips > controller->numcs) {
+		dev_err(controller->dev, "Too many NAND chip nodes under %s\n",
+			np->full_name);
+		return;
+	}
+
+	for_each_available_child_of_node(np, nc) {
+		ret = of_register_nand_chip(controller, nc);
+		if (ret)
+			dev_warn(controller->dev,
+				 "Failed to create NAND device for %s\n",
+				 nc->full_name);
+	}
+}
+#else
+static void of_register_nand_chips(struct nand_controller *controller) { }
+#endif
+
+static int bi_register_nand_chip(struct nand_controller *controller,
+				 const struct nand_board_info *bi)
+{
+	struct nand_chip *chip;
+	int ret;
+
+	chip = nand_chip_alloc(controller);
+	if (!chip)
+		return -ENOMEM;
+
+	chip->bi = bi;
+
+	ret = nand_conctroller_add_chip(controller, chip);
+	if (ret)
+		kfree(chip);
+
+	return ret;
+}
+
+static void bi_register_nand_chips(struct nand_controller *controller)
+{
+	int i, ret;
+
+	for (i = 0; i < controller->bi.numchips; i++) {
+		ret = bi_register_nand_chip(controller,
+					    &controller->bi.info[i]);
+		if (ret)
+			dev_warn(controller->dev,
+				 "Failed to create NAND device\n");
+	}
+}
+
+/**
  * nand_controller_init - [NAND Interface] Initialize a nand_controller struct
  * @controller: NAND controller this chip is attached to
  * @dev: the device providing thid NAND controller
@@ -3982,12 +4107,46 @@ static int nand_dt_init(struct nand_chip *chip)
 void nand_controller_init(struct nand_controller *controller,
 			  struct device *dev)
 {
-	controller->active = NULL;
+	memset(controller, 0, sizeof(*controller));
 	controller->dev = dev;
 	spin_lock_init(&controller->lock);
 	init_waitqueue_head(&controller->wq);
+	INIT_LIST_HEAD(&controller->chips);
 }
 EXPORT_SYMBOL_GPL(nand_controller_init);
+
+/**
+ * nand_controller_register - [NAND Interface] Register a NAND controller
+ * @controller: NAND controller to register
+ *
+ * Register a NAND controller to the NAND framework
+ */
+int nand_controller_register(struct nand_controller *controller)
+{
+	if (!controller->ops)
+		return -EINVAL;
+
+	of_register_nand_chips(controller);
+	bi_register_nand_chips(controller);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(nand_controller_register);
+
+/**
+ * nand_controller_unregister - [NAND Interface] Unregister a NAND controller
+ * @controller: NAND controller to unregister
+ *
+ * Unregister a NAND controller from the NAND framework
+ */
+void nand_controller_unregister(struct nand_controller *controller)
+{
+	struct nand_chip *chip, *tmp;
+
+	list_for_each_entry_safe(chip, tmp, &controller->chips, node)
+		nand_conctroller_remove_chip(controller, chip);
+}
+EXPORT_SYMBOL_GPL(nand_controller_unregister);
 
 /**
  * nand_scan_ident - [NAND Interface] Scan for the NAND device

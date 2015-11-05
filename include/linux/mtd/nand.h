@@ -32,6 +32,8 @@ struct nand_controller;
 /* Initialize a nand_controller struct */
 void nand_controller_init(struct nand_controller *controller,
 			  struct device *dev);
+int nand_controller_register(struct nand_controller *controller);
+void nand_controller_unregister(struct nand_controller *controller);
 
 /* Scan and identify a NAND device */
 extern int nand_scan(struct mtd_info *mtd, int max_chips);
@@ -432,6 +434,26 @@ struct nand_jedec_params {
 	__le16 crc;
 } __packed;
 
+struct nand_board_info {
+	void *priv;
+};
+
+struct nand_board_info_table {
+	int numchips;
+	const struct nand_board_info *info;
+};
+
+/**
+ * struct nand_controller_ops - NAND controller operations
+ *
+ * @add: attach a new chip to the NAND controller
+ * @remove: detach a chip from the NAND controller
+ */
+struct nand_controller_ops {
+	int (*add)(struct nand_controller *ctrl, struct nand_chip *chip);
+	void (*remove)(struct nand_controller *ctrl, struct nand_chip *chip);
+};
+
 /**
  * struct nand_controller - Control structure for hardware controller
  *			    (e.g ECC generator) shared among independent
@@ -442,12 +464,20 @@ struct nand_jedec_params {
  * @wq:			wait queue to sleep on if a NAND operation is in
  *			progress used instead of the per chip wait queue
  *			when a hw controller is available.
+ * @chips:		list of NAND chips attached to this controller
+ * @numcs:		maximum number of CS lines
+ * @bi:			board information
+ * @ops:		pointer to the controller operation struct
  */
 struct nand_controller {
 	struct device *dev;
 	spinlock_t lock;
 	struct nand_chip *active;
 	wait_queue_head_t wq;
+	struct list_head chips;
+	int numcs;
+	struct nand_board_info_table bi;
+	const struct nand_controller_ops *ops;
 };
 
 /**
@@ -549,6 +579,9 @@ struct nand_buffers {
 
 /**
  * struct nand_chip - NAND Private Flash Chip Data
+ * @bi:			board info
+ * @node:		node element to add the NAND chip to the NAND
+ *			controller chips list
  * @mtd:		MTD device registered to the MTD framework
  * @IO_ADDR_R:		[BOARDSPECIFIC] address to read the 8 I/O lines of the
  *			flash device
@@ -649,9 +682,12 @@ struct nand_buffers {
  */
 
 struct nand_chip {
+	struct list_head node;
 	struct mtd_info mtd;
 	void __iomem *IO_ADDR_R;
 	void __iomem *IO_ADDR_W;
+
+	const struct nand_board_info *bi;
 
 	uint8_t (*read_byte)(struct mtd_info *mtd);
 	u16 (*read_word)(struct mtd_info *mtd);
@@ -756,6 +792,11 @@ static inline void *nand_get_controller_data(struct nand_chip *chip)
 static inline void nand_set_controller_data(struct nand_chip *chip, void *priv)
 {
 	chip->priv = priv;
+}
+
+static inline struct device_node *nand_chip_get_node(struct nand_chip *chip)
+{
+	return chip->mtd.dev.of_node;
 }
 
 /*

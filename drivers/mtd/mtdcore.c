@@ -588,11 +588,13 @@ int mtd_device_parse_register(struct mtd_info *mtd, const char * const *types,
 			      const struct mtd_partition *parts,
 			      int nr_parts)
 {
-	int ret;
+	int ret, i;
 	struct mtd_partition *real_parts = NULL;
 
 	ret = parse_mtd_partitions(mtd, types, &real_parts, parser_data);
-	if (ret <= 0 && nr_parts && parts) {
+	if (ret > 0) {
+		nr_parts = ret;
+	} else if (nr_parts && parts) {
 		real_parts = kmemdup(parts, sizeof(*parts) * nr_parts,
 				     GFP_KERNEL);
 		if (!real_parts)
@@ -608,7 +610,7 @@ int mtd_device_parse_register(struct mtd_info *mtd, const char * const *types,
 		ret = 0;
 	}
 
-	ret = mtd_add_device_partitions(mtd, real_parts, ret);
+	ret = mtd_add_device_partitions(mtd, real_parts, nr_parts);
 	if (ret)
 		goto out;
 
@@ -628,7 +630,13 @@ int mtd_device_parse_register(struct mtd_info *mtd, const char * const *types,
 	}
 
 out:
-	kfree(real_parts);
+	if (real_parts) {
+		for (i = 0; i < nr_parts; i++)
+			of_node_put(real_parts[i].of_node);
+
+		kfree(real_parts);
+	}
+
 	return ret;
 }
 EXPORT_SYMBOL_GPL(mtd_device_parse_register);

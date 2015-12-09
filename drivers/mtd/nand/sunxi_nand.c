@@ -41,6 +41,8 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 
+#error "test"
+
 #define NFC_REG_CTL		0x0000
 #define NFC_REG_ST		0x0004
 #define NFC_REG_INT		0x0008

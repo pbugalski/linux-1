@@ -75,10 +75,8 @@ tmp2	.req	r5
  * void at91_pm_suspend_in_sram(void __iomem *pmc, void __iomem *sdramc,
  *			void __iomem *ramc1, int memctrl)
  * @input param:
- * 	@r0: base address of AT91_PMC
- *  	@r1: base address of SDRAM Controller (SDRAM, DDRSDR, or AT91_SYS)
- *	@r2: base address of second SDRAM Controller or 0 if not present
- *	@r3: pm information
+ * 	@r0: base address of struct
+ *	@r1: pm information
  */
 /* at91_pm_suspend_in_sram must be 8-byte aligned per the requirements of fncpy() */
 	.align 3
@@ -90,25 +88,76 @@ ENTRY(at91_pm_suspend_in_sram)
 	mov	tmp1, #0
 	mcr	p15, 0, tmp1, c7, c10, 4
 
-	str	r0, .pmc_base
-	str	r1, .sramc_base
-	str	r2, .sramc1_base
-
-	and	r0, r3, #AT91_PM_MEMTYPE_MASK
-	str	r0, .memtype
-
-	lsr	r0, r3, #AT91_PM_MODE_OFFSET
-	and	r0, r0, #AT91_PM_MODE_MASK
-	str	r0, .pm_mode
+	ldr	tmp1, [r0, #0]
+	str	tmp1, .pmc_base
+	ldr	tmp1, [r0, #0x4]
+	str	tmp1, .sramc_base
+	ldr	tmp1, [r0, #0x8]
+	str	tmp1, .sramc1_base
+	ldr	tmp1, [r0, #0xC]
+	str	tmp1, .memtype
+	ldr	tmp1, [r0, #0x10]
+	str	tmp1, .pm_mode
+	ldr	tmp1, [r0, #0x14]
+	str	tmp1, .shdwc
+	cmp	tmp1, #0
+	ldrne	tmp2, [tmp1, #0]
+	ldr	tmp1, [r0, #0x18]
+	str	tmp1, .sfr
+	cmp	tmp1, #0
+	ldrne	tmp2, [tmp1, #0x10]
 
 	/* Active the self-refresh mode */
 	mov	r0, #SRAMC_SELF_FRESH_ACTIVE
 	bl	at91_sramc_self_refresh
 
 	ldr	r0, .pm_mode
-	tst	r0, #AT91_PM_SLOW_CLOCK
-	beq	skip_disable_main_clock
+	cmp	r0, #AT91_PM_SLOW_CLOCK
+	beq	slow_clock
+	cmp	r0, #AT91_PM_BACKUP
+	beq	backup_mode
 
+	/* Wait for interrupt */
+	ldr	pmc, .pmc_base
+	at91_cpu_idle
+	b	exit_suspend
+
+slow_clock:
+	bl	at91_slowck_mode
+	b	exit_suspend
+backup_mode:
+	bl	at91_backup_mode
+	b	exit_suspend
+
+exit_suspend:
+	/* Exit the self-refresh mode */
+	mov	r0, #SRAMC_SELF_FRESH_EXIT
+	bl	at91_sramc_self_refresh
+
+	/* Restore registers, and return */
+	ldmfd	sp!, {r4 - r12, pc}
+ENDPROC(at91_pm_suspend_in_sram)
+
+ENTRY(at91_backup_mode)
+	#if 0
+	/* Read LPR */
+	ldr	r2, .sramc_base
+	ldr	r3, [r2, #AT91_DDRSDRC_LPR]
+	#endif
+
+	/*BUMEN*/
+	ldr	r0, .sfr
+	mov	tmp1, #(0x1)
+	str	tmp1, [r0, #0x10]
+
+	/* Shutdown */
+	ldr	r0, .shdwc
+	movs    tmp1, #0x1
+	movt    tmp1, #0xA500
+	str	tmp1, [r0, #0]
+ENDPROC(at91_backup_mode)
+
+ENTRY(at91_slowck_mode)
 	ldr	pmc, .pmc_base
 
 	/* Save Master clock setting */
@@ -137,17 +186,8 @@ ENTRY(at91_pm_suspend_in_sram)
 	orr	tmp1, tmp1, #AT91_PMC_KEY
 	str	tmp1, [pmc, #AT91_CKGR_MOR]
 
-skip_disable_main_clock:
-	ldr	pmc, .pmc_base
-
 	/* Wait for interrupt */
 	at91_cpu_idle
-
-	ldr	r0, .pm_mode
-	tst	r0, #AT91_PM_SLOW_CLOCK
-	beq	skip_enable_main_clock
-
-	ldr	pmc, .pmc_base
 
 	/* Turn on the main oscillator */
 	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
@@ -177,14 +217,8 @@ skip_disable_main_clock:
 
 	wait_mckrdy
 
-skip_enable_main_clock:
-	/* Exit the self-refresh mode */
-	mov	r0, #SRAMC_SELF_FRESH_EXIT
-	bl	at91_sramc_self_refresh
-
-	/* Restore registers, and return */
-	ldmfd	sp!, {r4 - r12, pc}
-ENDPROC(at91_pm_suspend_in_sram)
+	mov	pc, lr
+ENDPROC(at91_slowck_mode)
 
 /*
  * void at91_sramc_self_refresh(unsigned int is_active)
@@ -316,6 +350,10 @@ ENDPROC(at91_sramc_self_refresh)
 .sramc_base:
 	.word 0
 .sramc1_base:
+	.word 0
+.shdwc:
+	.word 0
+.sfr:
 	.word 0
 .memtype:
 	.word 0

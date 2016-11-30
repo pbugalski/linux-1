@@ -22,6 +22,7 @@
 #include <linux/of_platform.h>
 #include <linux/of_address.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/machine.h>
 #include <linux/io.h>
 #include <linux/clk/at91_pmc.h>
 
@@ -95,7 +96,7 @@ static suspend_state_t target_state;
 static int at91_pm_begin(suspend_state_t state)
 {
 	target_state = state;
-	return 0;
+	return regulator_suspend_begin(target_state);
 }
 
 /*
@@ -244,6 +245,7 @@ error:
 static void at91_pm_end(void)
 {
 	target_state = PM_SUSPEND_ON;
+	regulator_suspend_end();
 }
 
 

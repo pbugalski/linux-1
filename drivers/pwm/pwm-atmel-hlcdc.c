@@ -42,6 +42,11 @@ struct atmel_hlcdc_pwm {
 	struct atmel_hlcdc *hlcdc;
 	struct clk *cur_clk;
 	const struct atmel_hlcdc_pwm_errata *errata;
+	struct {
+		u32 cfg0;
+		u32 cfg6;
+		bool enabled;
+	} suspend_ctx;
 };
 
 static inline struct atmel_hlcdc_pwm *to_atmel_hlcdc_pwm(struct pwm_chip *chip)
@@ -216,6 +221,55 @@ static const struct atmel_hlcdc_pwm_errata atmel_hlcdc_pwm_sama5d3_errata = {
 	.div1_clk_erratum = true,
 };
 
+static int atmel_hlcdc_pwm_suspend(struct device *dev)
+{
+	struct atmel_hlcdc_pwm *chip = dev_get_drvdata(dev);
+	struct atmel_hlcdc *hlcdc = chip->hlcdc;
+	u32 status;
+
+	regmap_read(hlcdc->regmap, ATMEL_HLCDC_CFG(0),
+		    &chip->suspend_ctx.cfg0);
+	regmap_read(hlcdc->regmap, ATMEL_HLCDC_CFG(6),
+		    &chip->suspend_ctx.cfg6);
+
+	regmap_read(hlcdc->regmap, ATMEL_HLCDC_SR, &status);
+	if (status & ATMEL_HLCDC_PWM) {
+		atmel_hlcdc_pwm_disable(&chip->chip, &chip->chip.pwms[0]);
+		chip->suspend_ctx.enabled = true;
+	} else {
+		chip->suspend_ctx.enabled = false;
+	}
+
+	clk_disable_unprepare(chip->cur_clk);
+	clk_disable_unprepare(chip->hlcdc->periph_clk);
+
+	return 0;
+}
+
+static int atmel_hlcdc_pwm_resume(struct device *dev)
+{
+	struct atmel_hlcdc_pwm *chip = dev_get_drvdata(dev);
+	struct atmel_hlcdc *hlcdc = chip->hlcdc;
+
+	clk_prepare_enable(chip->hlcdc->periph_clk);
+	clk_prepare_enable(chip->cur_clk);
+
+	regmap_update_bits(hlcdc->regmap, ATMEL_HLCDC_CFG(0),
+			   ATMEL_HLCDC_CLKPWMSEL, chip->suspend_ctx.cfg0);
+	regmap_update_bits(hlcdc->regmap, ATMEL_HLCDC_CFG(6),
+			   ATMEL_HLCDC_PWMCVAL_MASK | ATMEL_HLCDC_PWMPS_MASK |
+			   ATMEL_HLCDC_PWMPOL,
+			   chip->suspend_ctx.cfg6);
+
+	if (chip->suspend_ctx.enabled)
+		atmel_hlcdc_pwm_enable(&chip->chip, &chip->chip.pwms[0]);
+
+	return 0;
+}
+
+static SIMPLE_DEV_PM_OPS(atmel_hlcdc_pwm_pm_ops,
+			 atmel_hlcdc_pwm_suspend, atmel_hlcdc_pwm_resume);
+
 static const struct of_device_id atmel_hlcdc_dt_ids[] = {
 	{
 		.compatible = "atmel,at91sam9n12-hlcdc",
@@ -306,6 +360,7 @@ static struct platform_driver atmel_hlcdc_pwm_driver = {
 	.driver = {
 		.name = "atmel-hlcdc-pwm",
 		.of_match_table = atmel_hlcdc_pwm_dt_ids,
+		.pm = &atmel_hlcdc_pwm_pm_ops,
 	},
 	.probe = atmel_hlcdc_pwm_probe,
 	.remove = atmel_hlcdc_pwm_remove,

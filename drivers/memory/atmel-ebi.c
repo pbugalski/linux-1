@@ -274,6 +274,54 @@ static int atmel_ebi_xslate_smc_config(struct atmel_ebi_dev *ebid,
 	return required;
 }
 
+static int at91rm9200_ebi_xslate_smc_config(struct atmel_ebi_dev *ebid,
+					    struct device_node *np,
+					    struct atmel_ebi_dev_config *conf)
+{
+	struct atmel_smc_cs_conf *smcconf = &conf->smcconf;
+	bool required = false;
+	const char *tmp_str;
+	u32 tmp;
+	int ret;
+
+	ret = of_property_read_u32(np, "atmel,smc-bus-width", &tmp);
+	if (!ret) {
+		switch (tmp) {
+		case 8:
+			smcconf->csr |= ATMEL_SMC_CSR_DBW_8;
+			break;
+
+		case 16:
+			smcconf->mode |= ATMEL_SMC_CSR_DBW_16;
+			break;
+
+		default:
+			return -EINVAL;
+		}
+
+		required = true;
+	}
+
+	tmp_str = NULL;
+	of_property_read_string(np, "atmel,smc-byte-access-type", &tmp_str);
+	if (tmp_str && !strcmp(tmp_str, "select")) {
+		smcconf->mode |= ATMEL_SMC_CSR_BAT_SELECT;
+		required = true;
+	}
+
+	ret = at91rm9200_ebi_xslate_smc_timings(ebid, np, &conf->smcconf);
+	if (ret)
+		return -EINVAL;
+
+	if ((ret > 0 && !required) || (!ret && required)) {
+		dev_err(ebid->ebi->dev, "missing atmel,smc- properties in %s",
+			np->full_name);
+		return -EINVAL;
+	}
+
+	return required;
+}
+
 static void at91sam9_ebi_apply_config(struct atmel_ebi_dev *ebid,
 				      struct atmel_ebi_dev_config *conf)
 {

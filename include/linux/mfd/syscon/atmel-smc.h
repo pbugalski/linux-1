@@ -17,6 +17,20 @@
 #include <linux/kernel.h>
 #include <linux/regmap.h>
 
+#define ATMEL_SMC_CSR(cs)			((cs) * 0x4)
+#define ATMEL_SMC_CSR_NWS_MASK			GENMASK(6, 0)
+#define ATMEL_SMC_CSR_TDF_MASK			GENMASK(11, 8)
+#define ATMEL_SMC_CSR_BAT_MASK			BIT(12)
+#define ATMEL_SMC_CSR_BAT_SELECT		(1 << 12)
+#define ATMEL_SMC_CSR_BAT_WRITE			(0 << 12)
+#define ATMEL_SMC_CSR_DBW_MASK			GENMASK(14, 13)
+#define ATMEL_SMC_CSR_DBW_16			(1 << 13)
+#define ATMEL_SMC_CSR_DBW_8			(2 << 13)
+#define ATMEL_SMC_CSR_DRP_EARLY			BIT(15)
+#define ATMEL_SMC_CSR_ACSS_MASK			GENMASK(17, 16)
+#define ATMEL_SMC_CSR_NRW_SETUP_MASK		GENMASK(26, 24)
+#define ATMEL_SMC_CSR_NRW_HOLD_MASK		GENMASK(30, 28)
+
 #define ATMEL_SMC_SETUP(cs)			(((cs) * 0x10))
 #define ATMEL_HSMC_SETUP(cs)			(0x600 + ((cs) * 0x14))
 #define ATMEL_SMC_PULSE(cs)			(((cs) * 0x10) + 0x4)
@@ -76,13 +90,17 @@
  * @timings: advanced NAND related timings (only applicable to HSMC)
  * @mode: all kind of config parameters (see the fields definition above).
  *	  The mode fields are different on at91rm9200
+ * @csr: same as @mode but for the at91rm9200 SMC
  */
 struct atmel_smc_cs_conf {
 	u32 setup;
 	u32 pulse;
 	u32 cycle;
 	u32 timings;
-	u32 mode;
+	union {
+		u32 mode;
+		u32 csr;
+	};
 };
 
 /**

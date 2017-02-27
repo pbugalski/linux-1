@@ -1275,13 +1275,10 @@ static int atmel_nand_register(struct atmel_nand *nand)
 {
 	struct nand_chip *chip = &nand->base;
 	struct mtd_info *mtd = nand_to_mtd(chip);
-	const struct mtd_partition *parts = NULL;
 	struct atmel_nand_controller *nc;
-	struct atmel_nand_data *pdata;
-	int nparts = 0, ret;
+	int ret;
 
 	nc = to_nand_controller(chip->controller);
-	pdata = dev_get_platdata(nc->dev);
 
 	if (nc->caps->legacy_of_bindings || !nc->dev->of_node) {
 		/*
@@ -1316,12 +1313,7 @@ static int atmel_nand_register(struct atmel_nand *nand)
 		return ret;
 	}
 
-	if (pdata) {
-		parts = pdata->parts;
-		nparts = pdata->num_parts;
-	}
-
-	ret = mtd_device_register(mtd, parts, nparts);
+	ret = mtd_device_register(mtd, NULL, 0);
 	if (ret) {
 		dev_err(nc->dev, "Failed to register mtd device: %d\n", ret);
 		nand_cleanup(chip);
@@ -1333,48 +1325,9 @@ static int atmel_nand_register(struct atmel_nand *nand)
 	return 0;
 }
 
-struct gpio_desc *
-atmel_nand_pdata_get_gpio(struct atmel_nand_controller *nc, int gpioid,
-			  const char *name, bool active_low,
-			  enum gpiod_flags flags)
-{
-	unsigned long oflags;
-	int ret;
-
-	if (!gpio_is_valid(gpioid))
-		return NULL;
-
-	switch (flags) {
-	case GPIOD_IN:
-		oflags = GPIOF_IN;
-		break;
-	case GPIOD_OUT_LOW:
-		oflags = GPIOF_OUT_INIT_LOW;
-		break;
-	case GPIOD_OUT_HIGH:
-		oflags = GPIOF_OUT_INIT_HIGH;
-		break;
-	default:
-		dev_err(nc->dev, "Unsupported GPIO config\n");
-		return ERR_PTR(-EINVAL);
-	}
-
-	if (active_low)
-		oflags |= GPIOF_ACTIVE_LOW;
-
-	ret = devm_gpio_request_one(nc->dev, gpioid, oflags, name);
-	if (ret < 0) {
-		dev_err(nc->dev, "Could not request %s GPIO (err = %d)\n",
-			name, ret);
-		return ERR_PTR(ret);
-	}
-
-	return gpio_to_desc(gpioid);
-}
-
-static struct atmel_nand *
-atmel_of_nand_create(struct atmel_nand_controller *nc,
-		     struct device_node *np, int reg_cells)
+static struct atmel_nand *atmel_nand_create(struct atmel_nand_controller *nc,
+					    struct device_node *np,
+					    int reg_cells)
 {
 	struct atmel_nand *nand;
 	struct gpio_desc *gpio;
@@ -1520,59 +1473,10 @@ atmel_nand_controller_remove_nands(struct atmel_nand_controller *nc)
 }
 
 static int
-atmel_nand_controller_of_add_nands(struct atmel_nand_controller *nc)
-{
-	struct device_node *np, *nand_np;
-	struct device *dev = nc->dev;
-	int ret, reg_cells;
-	u32 val;
-
-	np = dev->of_node;
-
-	ret = of_property_read_u32(np, "#address-cells", &val);
-	if (ret) {
-		dev_err(dev, "missing #address-cells property\n");
-		return ret;
-	}
-
-	reg_cells = val;
-
-	ret = of_property_read_u32(np, "#size-cells", &val);
-	if (ret) {
-		dev_err(dev, "missing #address-cells property\n");
-		return ret;
-	}
-
-	reg_cells += val;
-
-	for_each_child_of_node(np, nand_np) {
-		struct atmel_nand *nand;
-
-		nand = atmel_of_nand_create(nc, nand_np, reg_cells);
-		if (IS_ERR(nand)) {
-			ret = PTR_ERR(nand);
-			goto err;
-		}
-
-		ret = atmel_nand_controller_add_nand(nc, nand);
-		if (ret)
-			goto err;
-	}
-
-	return 0;
-
-err:
-	atmel_nand_controller_remove_nands(nc);
-
-	return ret;
-}
-
-static int
 atmel_nand_controller_legacy_add_nands(struct atmel_nand_controller *nc)
 {
 	struct device *dev = nc->dev;
 	struct platform_device *pdev = to_platform_device(dev);
-	struct atmel_nand_data *pdata = dev_get_platdata(dev);
 	struct atmel_nand *nand;
 	struct gpio_desc *gpio;
 	struct resource *res;
@@ -1606,14 +1510,7 @@ atmel_nand_controller_legacy_add_nands(struct atmel_nand_controller *nc)
 	nand->cs[0].id = 3;
 
 	/* R/B GPIO. */
-	if (pdata)
-		gpio = atmel_nand_pdata_get_gpio(nc, pdata->rdy_pin,
-						 "nand-rb",
-						 pdata->rdy_pin_active_low,
-						 GPIOD_IN);
-	else
-		gpio = devm_gpiod_get_index_optional(dev, NULL, 0,
-						     GPIOD_IN);
+	gpio = devm_gpiod_get_index_optional(dev, NULL, 0,  GPIOD_IN);
 	if (IS_ERR(gpio)) {
 		dev_err(dev, "Failed to get R/B gpio (err = %ld)\n",
 			PTR_ERR(gpio));
@@ -1626,12 +1523,7 @@ atmel_nand_controller_legacy_add_nands(struct atmel_nand_controller *nc)
 	}
 
 	/* CS GPIO. */
-	if (pdata)
-		gpio = atmel_nand_pdata_get_gpio(nc, pdata->enable_pin,
-						 "nand-cs", 0, GPIOD_OUT_HIGH);
-	else
-		gpio = devm_gpiod_get_index_optional(dev, NULL, 1,
-						     GPIOD_OUT_HIGH);
+	gpio = devm_gpiod_get_index_optional(dev, NULL, 1, GPIOD_OUT_HIGH);
 	if (IS_ERR(gpio)) {
 		dev_err(dev, "Failed to get CS gpio (err = %ld)\n",
 			PTR_ERR(gpio));
@@ -1641,12 +1533,7 @@ atmel_nand_controller_legacy_add_nands(struct atmel_nand_controller *nc)
 	nand->cs[0].csgpio = gpio;
 
 	/* Card detect GPIO. */
-	if (pdata)
-		gpio = atmel_nand_pdata_get_gpio(nc, pdata->det_pin,
-						 "nand-cd", 0, GPIOD_IN);
-	else
-		gpio = devm_gpiod_get_index_optional(nc->dev, NULL, 2,
-						     GPIOD_IN);
+	gpio = devm_gpiod_get_index_optional(nc->dev, NULL, 2, GPIOD_IN);
 	if (IS_ERR(gpio)) {
 		dev_err(dev,
 			"Failed to get detect gpio (err = %ld)\n",
@@ -1656,36 +1543,60 @@ atmel_nand_controller_legacy_add_nands(struct atmel_nand_controller *nc)
 
 	nand->cdgpio = gpio;
 
-	if (pdata) {
-		if (pdata->bus_width_16)
-			nand->base.options |= NAND_BUSWIDTH_16;
-
-		/*
-		 * The only supported mode when pdata is involved is software
-		 * hamming ECC. Fallback to no ECC at all in other case.
-		 */
-		if (pdata->ecc_mode == NAND_ECC_SOFT) {
-			nand->base.ecc.mode = NAND_ECC_SOFT;
-			nand->base.ecc.algo = NAND_ECC_HAMMING;
-		}
-
-		if (pdata->on_flash_bbt)
-			nand->base.bbt_options |= NAND_BBT_USE_FLASH;
-	}
-
 	nand_set_flash_node(&nand->base, nc->dev->of_node);
 
 	return atmel_nand_controller_add_nand(nc, nand);
 }
 
-static int
-atmel_nand_controller_add_nands(struct atmel_nand_controller *nc)
+static int atmel_nand_controller_add_nands(struct atmel_nand_controller *nc)
 {
-	/* We do not retrieve the SMC syscon when parsing old DTs or pdata. */
-	if (nc->caps->legacy_of_bindings || !nc->dev->of_node)
+	struct device_node *np, *nand_np;
+	struct device *dev = nc->dev;
+	int ret, reg_cells;
+	u32 val;
+
+	/* We do not retrieve the SMC syscon when parsing old DTs. */
+	if (nc->caps->legacy_of_bindings)
 		return atmel_nand_controller_legacy_add_nands(nc);
 
-	return atmel_nand_controller_of_add_nands(nc);
+	np = dev->of_node;
+
+	ret = of_property_read_u32(np, "#address-cells", &val);
+	if (ret) {
+		dev_err(dev, "missing #address-cells property\n");
+		return ret;
+	}
+
+	reg_cells = val;
+
+	ret = of_property_read_u32(np, "#size-cells", &val);
+	if (ret) {
+		dev_err(dev, "missing #address-cells property\n");
+		return ret;
+	}
+
+	reg_cells += val;
+
+	for_each_child_of_node(np, nand_np) {
+		struct atmel_nand *nand;
+
+		nand = atmel_nand_create(nc, nand_np, reg_cells);
+		if (IS_ERR(nand)) {
+			ret = PTR_ERR(nand);
+			goto err;
+		}
+
+		ret = atmel_nand_controller_add_nand(nc, nand);
+		if (ret)
+			goto err;
+	}
+
+	return 0;
+
+err:
+	atmel_nand_controller_remove_nands(nc);
+
+	return ret;
 }
 
 static void atmel_nand_controller_cleanup(struct atmel_nand_controller *nc)
@@ -1762,8 +1673,8 @@ static int atmel_nand_controller_init(struct atmel_nand_controller *nc,
 			dev_err(nc->dev, "Failed to request DMA channel\n");
 	}
 
-	/* We do not retrieve the SMC syscon when parsing old DTs or pdata. */
-	if (nc->caps->legacy_of_bindings || !nc->dev->of_node)
+	/* We do not retrieve the SMC syscon when parsing old DTs. */
+	if (nc->caps->legacy_of_bindings)
 		return 0;
 
 	np = of_parse_phandle(dev->parent->of_node, "atmel,smc", 0);
@@ -1791,11 +1702,8 @@ atmel_smc_nand_controller_init(struct atmel_smc_nand_controller *nc)
 	struct device_node *np;
 	int ret;
 
-	/*
-	 * We do not retrieve the matrix syscon when parsing old DTs or
-	 * pdata.
-	 */
-	if (nc->base.caps->legacy_of_bindings || !dev->of_node)
+	/* We do not retrieve the matrix syscon when parsing old DTs. */
+	if (nc->base.caps->legacy_of_bindings)
 		return 0;
 
 	np = of_parse_phandle(dev->parent->of_node, "atmel,matrix", 0);
@@ -2217,15 +2125,6 @@ static const struct of_device_id atmel_nand_controller_of_ids[] = {
 };
 MODULE_DEVICE_TABLE(of, atmel_nc_id_table);
 
-static const struct platform_device_id atmel_nand_controller_platform_ids[] = {
-	{
-		.name = "atmel_nand",
-		.driver_data = (kernel_ulong_t)&atmel_rm9200_nc_caps,
-	},
-	{ /* sentinel */ }
-};
-MODULE_DEVICE_TABLE(platform, atmel_nc_platform_ids);
-
 static int atmel_nand_controller_probe(struct platform_device *pdev)
 {
 	const struct atmel_nand_controller_caps *caps;
@@ -2240,7 +2139,7 @@ static int atmel_nand_controller_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	if (caps->legacy_of_bindings && pdev->dev.of_node) {
+	if (caps->legacy_of_bindings) {
 		u32 ale_offs = 21;
 
 		/*
@@ -2290,7 +2189,6 @@ static struct platform_driver atmel_nand_controller_driver = {
 	},
 	.probe = atmel_nand_controller_probe,
 	.remove = atmel_nand_controller_remove,
-	.id_table = atmel_nand_controller_platform_ids
 };
 module_platform_driver(atmel_nand_controller_driver);
 

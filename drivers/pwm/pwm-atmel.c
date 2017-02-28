@@ -59,6 +59,12 @@
 #define PRD_MAX_PRES		10
 
 struct atmel_pwm_data {
+	void (*update_cdty)(struct pwm_chip *chip,
+			    struct pwm_device *pwm,
+			    u32 cdty);
+	void (*set_cprd_cdty)(struct pwm_chip *chip,
+			      struct pwm_device *pwm,
+			      u32 cprd, u32 cdty);
 	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
 		       unsigned long dty, unsigned long prd);
 };
@@ -68,6 +74,7 @@ struct atmel_pwm_chip {
 	struct clk *clk;
 	void __iomem *base;
 	const struct atmel_pwm_data *data;
+	atomic_t isr;
 
 	unsigned int updated_pwms;
 	/* ISR is cleared when read, ensure only one thread does that */
@@ -190,6 +197,25 @@ static void atmel_pwm_config_v1(struct pwm_chip *chip, struct pwm_device *pwm,
 	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, prd);
 }
 
+static void atmel_pwm_update_cdty_v1(struct pwm_chip *chip,
+				     struct pwm_device *pwm,
+				     u32 cdty)
+{
+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+
+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, cdty);
+}
+
+static void atmel_pwm_set_cprd_cdty_v1(struct pwm_chip *chip,
+				       struct pwm_device *pwm,
+				       u32 cprd, u32 cdty)
+{
+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+
+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, cdty);
+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, cprd);
+}
+
 static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
 				unsigned long dty, unsigned long prd)
 {
@@ -209,6 +235,25 @@ static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
 		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTY, dty);
 		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CPRD, prd);
 	}
+}
+
+static void atmel_pwm_update_cdty_v2(struct pwm_chip *chip,
+				     struct pwm_device *pwm,
+				     u32 cdty)
+{
+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+
+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTYUPD, cdty);
+}
+
+static void atmel_pwm_set_cprd_cdty_v2(struct pwm_chip *chip,
+				       struct pwm_device *pwm,
+				       u32 cprd, u32 cdty)
+{
+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+
+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTY, cdty);
+	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CPRD, cprd);
 }
 
 static int atmel_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
@@ -288,20 +333,182 @@ static void atmel_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 	clk_disable(atmel_pwm->clk);
 }
 
+static int atmel_pwm_stop(struct pwm_chip *chip, struct pwm_device *pwm)
+{
+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+	unsigned long timeout;
+
+	atmel_pwm_writel(atmel_pwm, PWM_DIS, BIT(pwm->hwpwm));
+
+	/*
+	 * Wait for the PWM channel disable operation to be effective before
+	 * stopping the clock.
+	 */
+	timeout = jiffies + 2 * HZ;
+	do {
+		if (!(atmel_pwm_readl(atmel_pwm, PWM_SR) & BIT(pwm->hwpwm)))
+			break;
+
+		usleep_range(10, 100);
+	} while (time_before(jiffies, timeout));
+
+	if (atmel_pwm_readl(atmel_pwm, PWM_SR) & BIT(pwm->hwpwm))
+		return -ETIMEDOUT;
+
+	clk_disable(atmel_pwm->clk);
+
+	return 0;
+}
+
+static int atmel_pwm_calculate_cprd_and_pres(struct pwm_chip *chip,
+					     const struct pwm_state *state,
+					     u32 *cprd, u32 *pres)
+{
+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+	unsigned long long cycles = state->period;
+
+	/* Calculate the period cycles and prescale value */
+	cycles *= clk_get_rate(atmel_pwm->clk);
+	do_div(cycles, NSEC_PER_SEC);
+
+	for (*pres = 0; cycles > PWM_MAX_PRD; cycles >>= 1)
+		(*pres)++;
+
+	if (*pres > PRD_MAX_PRES) {
+		dev_err(chip->dev, "pres exceeds the maximum value\n");
+		return -EINVAL;
+	}
+
+	*cprd = cycles;
+
+	return 0;
+}
+
+static void atmel_pwm_calculate_cdty(const struct pwm_state *state,
+				     u32 cprd, u32 *cdty)
+{
+	unsigned long long cycles = state->duty_cycle;
+
+	cycles *= cprd;
+	do_div(cycles, state->period);
+
+	*cdty = cycles;
+}
+
+static int atmel_pwm_wait_counter_event(struct pwm_chip *chip,
+					struct pwm_device *pwm)
+{
+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+	unsigned long timeout = jiffies + 2 * HZ;
+	u32 isr;
+
+	/* Flush the current status. */
+	atomic_and(~BIT(pwm->hwpwm), &atmel_pwm->isr);
+
+	do {
+		isr = atmel_pwm_readl(atmel_pwm, PWM_ISR);
+		atomic_or(isr, &atmel_pwm->isr);
+		if (atomic_read(&atmel_pwm->isr) & BIT(pwm->hwpwm))
+			return 0;
+
+		usleep_range(10, 100);
+	} while (time_before(jiffies, timeout));
+
+	return -ETIMEDOUT;
+}
+
+static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+			   struct pwm_state *state)
+{
+	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+	struct pwm_state cstate;
+	u32 cprd, cdty, pres;
+	int ret = 0;
+
+	pwm_get_state(pwm, &cstate);
+
+	if (state->enabled) {
+		/*
+		 * We must stop the PWM before changing the polarity or the
+		 * period.
+		 */
+		if (cstate.enabled &&
+		    (state->polarity != cstate.polarity ||
+		     state->period != cstate.period)) {
+			ret = atmel_pwm_stop(chip, pwm);
+			if (ret)
+				return ret;
+
+			cstate.enabled = false;
+		}
+
+		/*
+		 * If the PWM is still enabled we only update CDTY, otherwise,
+		 * we update all parameters and start the PWM.
+		 */
+		if (cstate.enabled) {
+			cprd = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm,
+						  PWMV1_CPRD);
+			atmel_pwm_calculate_cdty(state, cprd, &cdty);
+			atmel_pwm->data->update_cdty(chip, pwm, cdty);
+			ret = atmel_pwm_wait_counter_event(chip, pwm);
+		} else {
+			u32 cmr;
+
+			ret = atmel_pwm_calculate_cprd_and_pres(chip,
+								state, &cprd,
+								&pres);
+			if (ret)
+				return ret;
+
+			cmr = pres;
+			if (state->polarity == PWM_POLARITY_NORMAL)
+				cmr |= PWM_CMR_CPOL;
+
+			atmel_pwm_calculate_cdty(state, cprd, &cdty);
+
+			/* Enable the clock before accessing registers. */
+			ret = clk_enable(atmel_pwm->clk);
+			if (ret) {
+				dev_err(chip->dev,
+					"failed to enable PWM clock\n");
+				return ret;
+			}
+
+			atmel_pwm->data->set_cprd_cdty(chip, pwm, cprd, cdty);
+			atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR,
+					    cmr);
+
+			/* Start the PWM. */
+			atmel_pwm_writel(atmel_pwm, PWM_ENA, BIT(pwm->hwpwm));
+		}
+	} else if (cstate.enabled) {
+		/* Stop the PWM only if it was enabled. */
+		ret = atmel_pwm_stop(chip, pwm);
+	}
+
+	return ret;
+}
+
 static const struct pwm_ops atmel_pwm_ops = {
 	.config = atmel_pwm_config,
 	.set_polarity = atmel_pwm_set_polarity,
 	.enable = atmel_pwm_enable,
 	.disable = atmel_pwm_disable,
+	.apply = atmel_pwm_apply,
 	.owner = THIS_MODULE,
 };
 
 static const struct atmel_pwm_data atmel_pwm_data_v1 = {
 	.config = atmel_pwm_config_v1,
+	.update_cdty = atmel_pwm_update_cdty_v1,
+	.set_cprd_cdty = atmel_pwm_set_cprd_cdty_v1,
 };
 
 static const struct atmel_pwm_data atmel_pwm_data_v2 = {
 	.config = atmel_pwm_config_v2,
+	.update_cdty = atmel_pwm_update_cdty_v2,
+	.set_cprd_cdty = atmel_pwm_set_cprd_cdty_v2,
 };
 
 static const struct platform_device_id atmel_pwm_devtypes[] = {
@@ -382,6 +589,7 @@ static int atmel_pwm_probe(struct platform_device *pdev)
 	atmel_pwm->chip.base = -1;
 	atmel_pwm->chip.npwm = 4;
 	atmel_pwm->chip.can_sleep = true;
+	atomic_set(&atmel_pwm->isr, 0);
 	atmel_pwm->updated_pwms = 0;
 	mutex_init(&atmel_pwm->isr_lock);
 

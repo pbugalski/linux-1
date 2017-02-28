@@ -58,17 +58,20 @@
 #define PWM_MAX_PRD		0xFFFF
 #define PRD_MAX_PRES		10
 
+struct atmel_pwm_data {
+	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
+		       unsigned long dty, unsigned long prd);
+};
+
 struct atmel_pwm_chip {
 	struct pwm_chip chip;
 	struct clk *clk;
 	void __iomem *base;
+	const struct atmel_pwm_data *data;
 
 	unsigned int updated_pwms;
 	/* ISR is cleared when read, ensure only one thread does that */
 	struct mutex isr_lock;
-
-	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
-		       unsigned long dty, unsigned long prd);
 };
 
 static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
@@ -150,7 +153,7 @@ static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 	val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
 	val = (val & ~PWM_CMR_CPRE_MSK) | (pres & PWM_CMR_CPRE_MSK);
 	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
-	atmel_pwm->config(chip, pwm, dty, prd);
+	atmel_pwm->data->config(chip, pwm, dty, prd);
 	mutex_lock(&atmel_pwm->isr_lock);
 	atmel_pwm->updated_pwms |= atmel_pwm_readl(atmel_pwm, PWM_ISR);
 	atmel_pwm->updated_pwms &= ~(1 << pwm->hwpwm);
@@ -293,11 +296,6 @@ static const struct pwm_ops atmel_pwm_ops = {
 	.owner = THIS_MODULE,
 };
 
-struct atmel_pwm_data {
-	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
-		       unsigned long dty, unsigned long prd);
-};
-
 static const struct atmel_pwm_data atmel_pwm_data_v1 = {
 	.config = atmel_pwm_config_v1,
 };
@@ -374,6 +372,7 @@ static int atmel_pwm_probe(struct platform_device *pdev)
 
 	atmel_pwm->chip.dev = &pdev->dev;
 	atmel_pwm->chip.ops = &atmel_pwm_ops;
+	atmel_pwm->data = data;
 
 	if (pdev->dev.of_node) {
 		atmel_pwm->chip.of_xlate = of_pwm_xlate_with_flags;
@@ -383,7 +382,6 @@ static int atmel_pwm_probe(struct platform_device *pdev)
 	atmel_pwm->chip.base = -1;
 	atmel_pwm->chip.npwm = 4;
 	atmel_pwm->chip.can_sleep = true;
-	atmel_pwm->config = data->config;
 	atmel_pwm->updated_pwms = 0;
 	mutex_init(&atmel_pwm->isr_lock);
 

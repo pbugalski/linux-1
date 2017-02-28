@@ -311,9 +311,6 @@ static const struct platform_device_id atmel_pwm_devtypes[] = {
 		.name = "at91sam9rl-pwm",
 		.driver_data = (kernel_ulong_t)&atmel_pwm_data_v1,
 	}, {
-		.name = "sama5d3-pwm",
-		.driver_data = (kernel_ulong_t)&atmel_pwm_data_v2,
-	}, {
 		/* sentinel */
 	},
 };

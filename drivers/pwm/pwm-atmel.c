@@ -10,7 +10,7 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/err.h>
-#include <linux/io.h>
+#include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/of.h>
@@ -30,23 +30,24 @@
 /* The following register is PWM channel related registers */
 #define PWM_CH_REG_OFFSET	0x200
 #define PWM_CH_REG_SIZE		0x20
+#define PWM_CH_BASE(c)		(PWM_CH_REG_SIZE * c + PWM_CH_REG_OFFSET)
 
-#define PWM_CMR			0x0
+#define PWM_CMR(c)		PWM_CH_BASE(c)
 /* Bit field in CMR */
 #define PWM_CMR_CPOL		(1 << 9)
 #define PWM_CMR_UPD_CDTY	(1 << 10)
 #define PWM_CMR_CPRE_MSK	0xF
 
 /* The following registers for PWM v1 */
-#define PWMV1_CDTY		0x04
-#define PWMV1_CPRD		0x08
-#define PWMV1_CUPD		0x10
+#define PWMV1_CDTY(c)		(PWM_CH_BASE(c) + 0x04)
+#define PWMV1_CPRD(c)		(PWM_CH_BASE(c) + 0x08)
+#define PWMV1_CUPD(c)		(PWM_CH_BASE(c) + 0x10)
 
 /* The following registers for PWM v2 */
-#define PWMV2_CDTY		0x04
-#define PWMV2_CDTYUPD		0x08
-#define PWMV2_CPRD		0x0C
-#define PWMV2_CPRDUPD		0x10
+#define PWMV2_CDTY(c)		(PWM_CH_BASE(c) + 0x04)
+#define PWMV2_CDTYUPD(c)	(PWM_CH_BASE(c) + 0x08)
+#define PWMV2_CPRD(c)		(PWM_CH_BASE(c) + 0x0C)
+#define PWMV2_CPRDUPD(c)	(PWM_CH_BASE(c) + 0x10)
 
 /*
  * Max value for duty and period
@@ -80,42 +81,13 @@ static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
 	return container_of(chip, struct atmel_pwm_chip, chip);
 }
 
-static inline u32 atmel_pwm_readl(struct atmel_pwm_chip *chip,
-				  unsigned long offset)
-{
-	return readl_relaxed(chip->base + offset);
-}
-
-static inline void atmel_pwm_writel(struct atmel_pwm_chip *chip,
-				    unsigned long offset, unsigned long val)
-{
-	writel_relaxed(val, chip->base + offset);
-}
-
-static inline u32 atmel_pwm_ch_readl(struct atmel_pwm_chip *chip,
-				     unsigned int ch, unsigned long offset)
-{
-	unsigned long base = PWM_CH_REG_OFFSET + ch * PWM_CH_REG_SIZE;
-
-	return readl_relaxed(chip->base + base + offset);
-}
-
-static inline void atmel_pwm_ch_writel(struct atmel_pwm_chip *chip,
-				       unsigned int ch, unsigned long offset,
-				       unsigned long val)
-{
-	unsigned long base = PWM_CH_REG_OFFSET + ch * PWM_CH_REG_SIZE;
-
-	writel_relaxed(val, chip->base + base + offset);
-}
-
 static void atmel_pwm_update_cdty_v1(struct pwm_chip *chip,
 				     struct pwm_device *pwm,
 				     u32 cdty)
 {
 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
 
-	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, cdty);
+	writel_relaxed(cdty, atmel_pwm->base + PWMV1_CUPD(pwm->hwpwm));
 }
 
 static void atmel_pwm_set_cprd_cdty_v1(struct pwm_chip *chip,
@@ -124,8 +96,8 @@ static void atmel_pwm_set_cprd_cdty_v1(struct pwm_chip *chip,
 {
 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
 
-	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, cdty);
-	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, cprd);
+	writel_relaxed(cdty, atmel_pwm->base + PWMV1_CDTY(pwm->hwpwm));
+	writel_relaxed(cprd, atmel_pwm->base + PWMV1_CPRD(pwm->hwpwm));
 }
 
 static void atmel_pwm_update_cdty_v2(struct pwm_chip *chip,
@@ -134,7 +106,7 @@ static void atmel_pwm_update_cdty_v2(struct pwm_chip *chip,
 {
 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
 
-	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTYUPD, cdty);
+	writel_relaxed(cdty, atmel_pwm->base + PWMV2_CDTYUPD(pwm->hwpwm));
 }
 
 static void atmel_pwm_set_cprd_cdty_v2(struct pwm_chip *chip,
@@ -143,31 +115,27 @@ static void atmel_pwm_set_cprd_cdty_v2(struct pwm_chip *chip,
 {
 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
 
-	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTY, cdty);
-	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CPRD, cprd);
+	writel_relaxed(cdty, atmel_pwm->base + PWMV2_CDTY(pwm->hwpwm));
+	writel_relaxed(cprd, atmel_pwm->base + PWMV2_CPRD(pwm->hwpwm));
 }
 
 static int atmel_pwm_stop(struct pwm_chip *chip, struct pwm_device *pwm)
 {
 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-	unsigned long timeout;
+	int ret;
+	u32 sr;
 
-	atmel_pwm_writel(atmel_pwm, PWM_DIS, BIT(pwm->hwpwm));
+	writel_relaxed(BIT(pwm->hwpwm), atmel_pwm->base + PWM_DIS);
 
 	/*
 	 * Wait for the PWM channel disable operation to be effective before
 	 * stopping the clock.
 	 */
-	timeout = jiffies + 2 * HZ;
-	do {
-		if (!(atmel_pwm_readl(atmel_pwm, PWM_SR) & BIT(pwm->hwpwm)))
-			break;
-
-		usleep_range(10, 100);
-	} while (time_before(jiffies, timeout));
-
-	if (atmel_pwm_readl(atmel_pwm, PWM_SR) & BIT(pwm->hwpwm))
-		return -ETIMEDOUT;
+	ret = readl_relaxed_poll_timeout(atmel_pwm->base + PWM_SR, sr,
+					 !(sr & BIT(pwm->hwpwm)), 100,
+					 2 * USEC_PER_SEC);
+	if (ret)
+		return ret;
 
 	clk_disable(atmel_pwm->clk);
 
@@ -209,26 +177,24 @@ static void atmel_pwm_calculate_cdty(const struct pwm_state *state,
 	*cdty = cycles;
 }
 
+static u32 atmel_pwm_update_isr(struct atmel_pwm_chip *atmel_pwm, u32 val)
+{
+	atomic_or(val, &atmel_pwm->isr);
+	return atomic_read(&atmel_pwm->isr);
+}
+
 static int atmel_pwm_wait_counter_event(struct pwm_chip *chip,
 					struct pwm_device *pwm)
 {
 	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
-	unsigned long timeout = jiffies + 2 * HZ;
 	u32 isr;
 
 	/* Flush the current status. */
 	atomic_and(~BIT(pwm->hwpwm), &atmel_pwm->isr);
 
-	do {
-		isr = atmel_pwm_readl(atmel_pwm, PWM_ISR);
-		atomic_or(isr, &atmel_pwm->isr);
-		if (atomic_read(&atmel_pwm->isr) & BIT(pwm->hwpwm))
-			return 0;
-
-		usleep_range(10, 100);
-	} while (time_before(jiffies, timeout));
-
-	return -ETIMEDOUT;
+	return readl_relaxed_poll_timeout(atmel_pwm->base + PWM_SR, isr,
+			atmel_pwm_update_isr(atmel_pwm, isr) & BIT(pwm->hwpwm),
+			100, 2 * USEC_PER_SEC);
 }
 
 static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
@@ -261,8 +227,8 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 		 * we update all parameters and start the PWM.
 		 */
 		if (cstate.enabled) {
-			cprd = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm,
-						  PWMV1_CPRD);
+			cprd = readl_relaxed(atmel_pwm->base +
+					     PWMV1_CPRD(pwm->hwpwm));
 			atmel_pwm_calculate_cdty(state, cprd, &cdty);
 			atmel_pwm->data->update_cdty(chip, pwm, cdty);
 			ret = atmel_pwm_wait_counter_event(chip, pwm);
@@ -290,11 +256,12 @@ static int atmel_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 			}
 
 			atmel_pwm->data->set_cprd_cdty(chip, pwm, cprd, cdty);
-			atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR,
-					    cmr);
+			writel_relaxed(cmr,
+				       atmel_pwm->base + PWM_CMR(pwm->hwpwm));
 
 			/* Start the PWM. */
-			atmel_pwm_writel(atmel_pwm, PWM_ENA, BIT(pwm->hwpwm));
+			writel_relaxed(BIT(pwm->hwpwm),
+				       atmel_pwm->base + PWM_ENA);
 		}
 	} else if (cstate.enabled) {
 		/* Stop the PWM only if it was enabled. */

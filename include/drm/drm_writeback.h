@@ -66,7 +66,7 @@ struct drm_writeback_job {
 int drm_writeback_connector_init(struct drm_device *dev,
 				 struct drm_writeback_connector *wb_connector,
 				 const struct drm_connector_funcs *funcs,
-				 u32 *formats, int n_formats);
+				 const u32 *formats, int n_formats);
 
 void drm_writeback_queue_job(struct drm_writeback_connector *wb_connector,
 			     struct drm_writeback_job *job);

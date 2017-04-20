@@ -92,7 +92,7 @@ static bool create_writeback_properties(struct drm_device *dev)
 int drm_writeback_connector_init(struct drm_device *dev,
 				 struct drm_writeback_connector *wb_connector,
 				 const struct drm_connector_funcs *funcs,
-				 u32 *formats, int n_formats)
+				 const u32 *formats, int n_formats)
 {
 	int ret;
 	struct drm_property_blob *blob;

@@ -1144,6 +1144,88 @@ static void nand_release_data_interface(struct nand_chip *chip)
 	kfree(chip->data_interface);
 }
 
+static int nand_sp_exec_read_page_op(struct nand_chip *chip, unsigned int page,
+				     unsigned int column, void *buf,
+				     unsigned int len)
+{
+	struct mtd_info *mtd = nand_to_mtd(chip);
+	u8 addrs[4];
+	struct nand_op_instr instrs[] = {
+		NAND_OP_CMD(NAND_CMD_READ0),
+		NAND_OP_ADDR(3, addrs),
+		/* Set timeout to tR. */
+		NAND_OP_WAIT_RDY(0),
+		NAND_OP_DATA_IN(len, buf),
+	};
+	unsigned int ninstrs = ARRAY_SIZE(instrs);
+
+	/* Drop the DATA_OUT instruction if len is set to 0. */
+	if (!len)
+		ninstrs--;
+
+	/*
+	 * column is expressed in bytes, if the NAND bus is 16bits wide,
+	 * column must be divided by 2.
+	 */
+	if (chip->options & NAND_BUSWIDTH_16)
+		column /= 2;
+
+	if (column >= mtd->writesize)
+		instrs[0].cmd.opcode = NAND_CMD_READOOB;
+	else if (column >= 256)
+		instrs[0].cmd.opcode = NAND_CMD_READ1;
+
+	addrs[0] = column;
+	addrs[1] = page;
+	addrs[2] = page >> 8;
+
+	if (chip->chipsize > SZ_32M) {
+		addrs[3] = page >> 16;
+		instrs[1].addr.naddrs++;
+	}
+
+	return nand_exec_op(chip, instrs, ninstrs);
+}
+
+static int nand_lp_exec_read_page_op(struct nand_chip *chip, unsigned int page,
+				     unsigned int column, void *buf,
+				     unsigned int len)
+{
+	u8 addrs[5];
+	struct nand_op_instr instrs[] = {
+		NAND_OP_CMD(NAND_CMD_READ0),
+		NAND_OP_ADDR(4, addrs),
+		NAND_OP_CMD(NAND_CMD_READSTART),
+		/* Set timeout to tR. */
+		NAND_OP_WAIT_RDY(0),
+		NAND_OP_DATA_IN(len, buf),
+	};
+	unsigned int ninstrs = ARRAY_SIZE(instrs);
+
+	/* Drop the DATA_OUT instruction if len is set to 0. */
+	if (!len)
+		ninstrs--;
+
+	/*
+	 * column is expressed in bytes, if the NAND bus is 16bits wide,
+	 * column must be divided by 2.
+	 */
+	if (chip->options & NAND_BUSWIDTH_16)
+		column /= 2;
+
+	addrs[0] = column;
+	addrs[1] = column >> 8;
+	addrs[2] = page;
+	addrs[3] = page >> 8;
+
+	if (chip->chipsize > SZ_128M) {
+		addrs[4] = page >> 16;
+		instrs[1].addr.naddrs++;
+	}
+
+	return nand_exec_op(chip, instrs, ninstrs);
+}
+
 /**
  * nand_read_page_op - Do a READ PAGE operation
  * @chip: The NAND chip
@@ -1167,6 +1249,14 @@ int nand_read_page_op(struct nand_chip *chip, unsigned int page,
 
 	if (column + len > mtd->writesize + mtd->oobsize)
 		return -EINVAL;
+
+	if (chip->exec_op) {
+		if (mtd->writesize > 512)
+			return nand_lp_exec_read_page_op(chip, page, column,
+							 buf, len);
+
+		return nand_sp_exec_read_page_op(chip, page, column, buf, len);
+	}
 
 	chip->cmdfunc(mtd, NAND_CMD_READ0, column, page);
 	if (len)
@@ -1198,6 +1288,18 @@ static int nand_read_param_page_op(struct nand_chip *chip, u8 page, void *buf,
 	if (len && !buf)
 		return -EINVAL;
 
+	if (chip->exec_op) {
+		struct nand_op_instr instrs[] = {
+			NAND_OP_CMD(NAND_CMD_PARAM),
+			NAND_OP_ADDR(1, &page),
+			/* Set timeout to tR. */
+			NAND_OP_WAIT_RDY(0),
+			NAND_OP_DATA_IN(len, buf),
+		};
+
+		return nand_exec_op(chip, instrs, ARRAY_SIZE(instrs));
+	}
+
 	chip->cmdfunc(mtd, NAND_CMD_PARAM, page, -1);
 	for (i = 0; i < len; i++)
 		p[i] = chip->read_byte(mtd);
@@ -1227,6 +1329,21 @@ int nand_change_read_column_op(struct nand_chip *chip, unsigned int column,
 
 	if (column + len > mtd->writesize + mtd->oobsize)
 		return -EINVAL;
+
+	/* Small page NANDs do not support column change. */
+	if (mtd->writesize <= 512)
+		return -ENOTSUPP;
+
+	if (chip->exec_op) {
+		u8 addrs[2] = {	column, column >> 8};
+		struct nand_op_instr instrs[] = {
+			NAND_OP_CMD(NAND_CMD_RNDOUT),
+			NAND_OP_ADDR(2, addrs),
+			NAND_OP_DATA_IN(len, buf),
+		};
+
+		return nand_exec_op(chip, instrs, ARRAY_SIZE(instrs));
+	}
 
 	chip->cmdfunc(mtd, NAND_CMD_RNDOUT, column, -1);
 	if (len)
@@ -1260,6 +1377,16 @@ int nand_read_oob_op(struct nand_chip *chip, unsigned int page,
 	if (column + len > mtd->oobsize)
 		return -EINVAL;
 
+	if (chip->exec_op) {
+		column += mtd->writesize;
+
+		if (mtd->writesize > 512)
+			return nand_lp_exec_read_page_op(chip, page, column,
+							 buf, len);
+
+		return nand_sp_exec_read_page_op(chip, page, column, buf, len);
+	}
+
 	chip->cmdfunc(mtd, NAND_CMD_READOOB, column, page);
 	if (len)
 		chip->read_buf(mtd, buf, len);
@@ -1267,6 +1394,67 @@ int nand_read_oob_op(struct nand_chip *chip, unsigned int page,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(nand_read_oob_op);
+
+static int nand_exec_prog_page_op(struct nand_chip *chip,
+				  unsigned int page, unsigned int column,
+				  const void *buf, unsigned int len,
+				  bool prog)
+{
+	struct mtd_info *mtd = nand_to_mtd(chip);
+	u8 addrs[5];
+	struct nand_op_instr instrs[] = {
+		/*
+		 * Pointer command will be adjusted if we're dealing
+		 * with a small page NAND.
+		 */
+		NAND_OP_CMD(NAND_CMD_READ0),
+		NAND_OP_CMD(NAND_CMD_SEQIN),
+		NAND_OP_ADDR(0, addrs),
+		NAND_OP_DATA_OUT(len, buf),
+		NAND_OP_CMD(NAND_CMD_PAGEPROG),
+		/* Set timeout to tPROG. */
+		NAND_OP_WAIT_RDY(0),
+	};
+	unsigned int naddrs = 0, ninstrs = ARRAY_SIZE(instrs);
+
+	/* Drop the last instruction if we're not programming the page. */
+	if (!prog)
+		ninstrs--;
+
+	/*
+	 * column is expressed in bytes, if the NAND bus is 16bits wide,
+	 * column must be divided by 2.
+	 */
+	if (chip->options & NAND_BUSWIDTH_16)
+		column /= 2;
+
+	addrs[naddrs++] = column;
+	if (mtd->writesize > 512)
+		addrs[naddrs++] = column >> 8;
+
+	addrs[naddrs++] = page;
+	addrs[naddrs++] = page >> 8;
+	if ((mtd->writesize > 512 && chip->chipsize > SZ_128M) ||
+	    (mtd->writesize <= 512 && chip->chipsize > SZ_32M))
+		addrs[naddrs++] = page >> 16;
+
+	instrs[2].addr.naddrs = naddrs;
+
+	if (mtd->writesize <= 512) {
+		if (column >= mtd->writesize)
+			instrs[0].cmd.opcode = NAND_CMD_READOOB;
+		else if (column >= 256)
+			instrs[0].cmd.opcode = NAND_CMD_READ1;
+
+		return nand_exec_op(chip, instrs, ninstrs);
+	}
+
+	/*
+	 * Drop the instruction command if we're dealing with a large page
+	 * NAND.
+	 */
+	return nand_exec_op(chip, instrs + 1, ninstrs - 1);
+}
 
 /**
  * nand_prog_page_begin_op - starts a PROG PAGE operation
@@ -1292,6 +1480,10 @@ int nand_prog_page_begin_op(struct nand_chip *chip, unsigned int page,
 
 	if (column + len > mtd->writesize + mtd->oobsize)
 		return -EINVAL;
+
+	if (chip->exec_op)
+		return nand_exec_prog_page_op(chip, page, column, buf, len,
+					      false);
 
 	chip->cmdfunc(mtd, NAND_CMD_SEQIN, column, page);
 
@@ -1319,6 +1511,16 @@ int nand_prog_page_end_op(struct nand_chip *chip)
 {
 	struct mtd_info *mtd = nand_to_mtd(chip);
 	int status;
+
+	if (chip->exec_op) {
+		struct nand_op_instr instrs[] = {
+			NAND_OP_CMD(NAND_CMD_PAGEPROG),
+			/* Set timeout to tPROG. */
+			NAND_OP_WAIT_RDY(0),
+		};
+
+		return nand_exec_op(chip, instrs, ARRAY_SIZE(instrs));
+	}
 
 	chip->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
 
@@ -1355,6 +1557,10 @@ int nand_prog_page_op(struct nand_chip *chip, unsigned int page,
 	if (column + len > mtd->writesize + mtd->oobsize)
 		return -EINVAL;
 
+	if (chip->exec_op)
+		return nand_exec_prog_page_op(chip, page, column, buf, len,
+					      true);
+
 	chip->cmdfunc(mtd, NAND_CMD_SEQIN, column, page);
 	chip->write_buf(mtd, buf, len);
 	chip->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
@@ -1390,6 +1596,21 @@ int nand_change_write_column_op(struct nand_chip *chip, unsigned int column,
 	if (column + len > mtd->writesize + mtd->oobsize)
 		return -EINVAL;
 
+	/* Small page NANDs do not support column change. */
+	if (mtd->writesize <= 512)
+		return -ENOTSUPP;
+
+	if (chip->exec_op) {
+		u8 addrs[2] = {	column, column >> 8};
+		struct nand_op_instr instrs[] = {
+			NAND_OP_CMD(NAND_CMD_RNDIN),
+			NAND_OP_ADDR(2, addrs),
+			NAND_OP_DATA_OUT(len, buf),
+		};
+
+		return nand_exec_op(chip, instrs, ARRAY_SIZE(instrs));
+	}
+
 	chip->cmdfunc(mtd, NAND_CMD_RNDIN, column, -1);
 	if (len)
 		chip->write_buf(mtd, buf, len);
@@ -1421,6 +1642,16 @@ int nand_readid_op(struct nand_chip *chip, u8 addr,
 	if (!len || !buf)
 		return -EINVAL;
 
+	if (chip->exec_op) {
+		struct nand_op_instr instrs[] = {
+			NAND_OP_CMD(NAND_CMD_READID),
+			NAND_OP_ADDR(1, &addr),
+			NAND_OP_8BIT_DATA_IN(len, buf),
+		};
+
+		return nand_exec_op(chip, instrs, ARRAY_SIZE(instrs));
+	}
+
 	chip->cmdfunc(mtd, NAND_CMD_READID, addr, -1);
 
 	for (i = 0; i < len; i++)
@@ -1444,6 +1675,19 @@ EXPORT_SYMBOL_GPL(nand_readid_op);
 int nand_status_op(struct nand_chip *chip, u8 *status)
 {
 	struct mtd_info *mtd = nand_to_mtd(chip);
+
+	if (chip->exec_op) {
+		struct nand_op_instr instrs[] = {
+			NAND_OP_CMD(NAND_CMD_STATUS),
+			NAND_OP_8BIT_DATA_IN(1, status),
+		};
+		int ninstrs = ARRAY_SIZE(instrs);
+
+		if (!status)
+			ninstrs--;
+
+		return nand_exec_op(chip, instrs, ninstrs);
+	}
 
 	chip->cmdfunc(mtd, NAND_CMD_STATUS, -1, -1);
 	if (status)
@@ -1470,6 +1714,23 @@ int nand_erase_op(struct nand_chip *chip, unsigned int eraseblock)
 	unsigned int page = eraseblock <<
 			    (chip->phys_erase_shift - chip->page_shift);
 	int status;
+
+	if (chip->exec_op) {
+		u8 addrs[3] = {	page, page >> 8, page >> 16 };
+		struct nand_op_instr instrs[] = {
+			NAND_OP_CMD(NAND_CMD_ERASE1),
+			NAND_OP_ADDR(2, addrs),
+			NAND_OP_CMD(NAND_CMD_ERASE2),
+			/* Put tBERS here. */
+			NAND_OP_WAIT_RDY(0),
+		};
+
+		if ((mtd->writesize > 512 && chip->chipsize > SZ_128M) ||
+		    (mtd->writesize <= 512 && chip->chipsize > SZ_32M))
+			instrs[1].addr.naddrs++;
+
+		return nand_exec_op(chip, instrs, ARRAY_SIZE(instrs));
+	}
 
 	chip->cmdfunc(mtd, NAND_CMD_ERASE1, -1, page);
 	chip->cmdfunc(mtd, NAND_CMD_ERASE2, -1, -1);
@@ -1505,6 +1766,18 @@ static int nand_set_features_op(struct nand_chip *chip, u8 feature,
 	const u8 *params = data;
 	int i, status;
 
+	if (chip->exec_op) {
+		struct nand_op_instr instrs[] = {
+			NAND_OP_CMD(NAND_CMD_SET_FEATURES),
+			NAND_OP_ADDR(1, &feature),
+			NAND_OP_8BIT_DATA_OUT(ONFI_SUBFEATURE_PARAM_LEN, data),
+			/* Put tFEAT here. */
+			NAND_OP_WAIT_RDY(0),
+		};
+
+		return nand_exec_op(chip, instrs, ARRAY_SIZE(instrs));
+	}
+
 	chip->cmdfunc(mtd, NAND_CMD_SET_FEATURES, feature, -1);
 	for (i = 0; i < ONFI_SUBFEATURE_PARAM_LEN; ++i)
 		chip->write_byte(mtd, params[i]);
@@ -1535,6 +1808,18 @@ static int nand_get_features_op(struct nand_chip *chip, u8 feature,
 	u8 *params = data;
 	int i;
 
+	if (chip->exec_op) {
+		struct nand_op_instr instrs[] = {
+			NAND_OP_CMD(NAND_CMD_GET_FEATURES),
+			NAND_OP_ADDR(1, &feature),
+			/* Put tFEAT here. */
+			NAND_OP_WAIT_RDY(0),
+			NAND_OP_8BIT_DATA_IN(ONFI_SUBFEATURE_PARAM_LEN, data),
+		};
+
+		return nand_exec_op(chip, instrs, ARRAY_SIZE(instrs));
+	}
+
 	chip->cmdfunc(mtd, NAND_CMD_GET_FEATURES, feature, -1);
 	for (i = 0; i < ONFI_SUBFEATURE_PARAM_LEN; ++i)
 		params[i] = chip->read_byte(mtd);
@@ -1555,6 +1840,16 @@ static int nand_get_features_op(struct nand_chip *chip, u8 feature,
 int nand_reset_op(struct nand_chip *chip)
 {
 	struct mtd_info *mtd = nand_to_mtd(chip);
+
+	if (chip->exec_op) {
+		struct nand_op_instr instrs[] = {
+			NAND_OP_CMD(NAND_CMD_RESET),
+			/* Put tRST here. */
+			NAND_OP_WAIT_RDY(0),
+		};
+
+		return nand_exec_op(chip, instrs, ARRAY_SIZE(instrs));
+	}
 
 	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
 
@@ -1582,6 +1877,17 @@ int nand_read_data_op(struct nand_chip *chip, void *buf, unsigned int len,
 
 	if (!len || !buf)
 		return -EINVAL;
+
+	if (chip->exec_op) {
+		struct nand_op_instr instrs[] = {
+			NAND_OP_DATA_IN(len, buf),
+		};
+
+		if (force_8bits)
+			instrs[0].type = NAND_OP_8BIT_DATA_IN_INSTR;
+
+		return nand_exec_op(chip, instrs, ARRAY_SIZE(instrs));
+	}
 
 	if (force_8bits) {
 		u8 *p = buf;
@@ -1617,6 +1923,17 @@ int nand_write_data_op(struct nand_chip *chip, const void *buf,
 
 	if (!len || !buf)
 		return -EINVAL;
+
+	if (chip->exec_op) {
+		struct nand_op_instr instrs[] = {
+			NAND_OP_DATA_OUT(len, buf),
+		};
+
+		if (force_8bits)
+			instrs[0].type = NAND_OP_8BIT_DATA_OUT_INSTR;
+
+		return nand_exec_op(chip, instrs, ARRAY_SIZE(instrs));
+	}
 
 	if (force_8bits) {
 		const u8 *p = buf;
@@ -3829,7 +4146,7 @@ static void nand_set_defaults(struct nand_chip *chip)
 		chip->chip_delay = 20;
 
 	/* check, if a user supplied command function given */
-	if (chip->cmdfunc == NULL)
+	if (chip->cmdfunc == NULL && !chip->exec_op)
 		chip->cmdfunc = nand_command;
 
 	/* check, if a user supplied wait function given */

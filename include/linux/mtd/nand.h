@@ -707,6 +707,104 @@ struct nand_manufacturer_ops {
 	void (*cleanup)(struct nand_chip *chip);
 };
 
+struct nand_op_cmd_instr {
+	u8 opcode;
+};
+
+struct nand_op_addr_instr {
+	unsigned int naddrs;
+	const u8 *addrs;
+};
+
+struct nand_op_data_instr {
+	unsigned int len;
+	union {
+		void *in;
+		const void *out;
+	};
+};
+
+struct nand_op_waitrdy_instr {
+	unsigned int timeout_ms;
+};
+
+enum nand_op_instr_type {
+	NAND_OP_CMD_INSTR,
+	NAND_OP_ADDR_INSTR,
+	NAND_OP_DATA_IN_INSTR,
+	NAND_OP_DATA_OUT_INSTR,
+	NAND_OP_8BIT_DATA_IN_INSTR,
+	NAND_OP_8BIT_DATA_OUT_INSTR,
+	NAND_OP_WAITRDY_INSTR,
+};
+
+struct nand_op_instr {
+	enum nand_op_instr_type type;
+	union {
+		struct nand_op_cmd_instr cmd;
+		struct nand_op_addr_instr addr;
+		struct nand_op_data_instr data;
+		struct nand_op_waitrdy_instr waitrdy;
+	};
+};
+
+#define NAND_OP_ADDR(ncycles, cycles)			\
+	{						\
+		.type = NAND_OP_ADDR_INSTR,		\
+		.addr = {				\
+			.naddrs = ncycles,		\
+			.addrs = cycles,		\
+		},					\
+	}
+
+#define NAND_OP_CMD(id)					\
+	{						\
+		.type = NAND_OP_CMD_INSTR,		\
+		.cmd.opcode = id,			\
+	}
+
+#define NAND_OP_DATA_IN(l, buf)				\
+	{						\
+		.type = NAND_OP_DATA_IN_INSTR,		\
+		.data = {				\
+			.len = l,			\
+			.in = buf,			\
+		},					\
+	}
+
+#define NAND_OP_DATA_OUT(l, buf)			\
+	{						\
+		.type = NAND_OP_DATA_OUT_INSTR,		\
+		.data = {				\
+			.len = l,			\
+			.out = buf,			\
+		},					\
+	}
+
+#define NAND_OP_8BIT_DATA_IN(l, buf)			\
+	{						\
+		.type = NAND_OP_8BIT_DATA_IN_INSTR,	\
+		.data = {				\
+			.len = l,			\
+			.in = buf,			\
+		},					\
+	}
+
+#define NAND_OP_8BIT_DATA_OUT(l, buf)			\
+	{						\
+		.type = NAND_OP_8BIT_DATA_OUT_INSTR,	\
+		.data = {				\
+			.len = l,			\
+			.out = buf,			\
+		},					\
+	}
+
+#define NAND_OP_WAIT_RDY(tout)				\
+	{						\
+		.type = NAND_OP_WAITRDY_INSTR,		\
+		.waitrdy.timeout_ms = tout,		\
+	}
+
 /**
  * struct nand_chip - NAND Private Flash Chip Data
  * @mtd:		MTD device registered to the MTD framework
@@ -840,6 +938,9 @@ struct nand_chip {
 				    const struct nand_data_interface *conf,
 				    bool check_only);
 
+	int (*exec_op)(struct nand_chip *chip,
+		       const struct nand_op_instr *instrs,
+		       int ninstrs);
 
 	int chip_delay;
 	unsigned int options;
@@ -899,6 +1000,16 @@ struct nand_chip {
 		void *priv;
 	} manufacturer;
 };
+
+static inline int nand_exec_op(struct nand_chip *chip,
+			       struct nand_op_instr *instrs,
+			       unsigned int ninstrs)
+{
+	if (!chip->exec_op)
+		return -ENOTSUPP;
+
+	return chip->exec_op(chip, instrs, ninstrs);
+}
 
 extern const struct mtd_ooblayout_ops nand_ooblayout_sp_ops;
 extern const struct mtd_ooblayout_ops nand_ooblayout_lp_ops;

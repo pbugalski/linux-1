@@ -65,6 +65,7 @@ struct vc4_crtc_state {
 	struct drm_crtc_state base;
 	/* Dlist area for this CRTC configuration. */
 	struct drm_mm_node mm;
+	bool feed_txp;
 };
 
 static inline struct vc4_crtc *
@@ -367,10 +368,8 @@ static struct drm_encoder *vc4_get_crtc_encoder(struct drm_crtc *crtc)
 	return NULL;
 }
 
-static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
+static void vc4_crtc_config_pv(struct drm_crtc *crtc)
 {
-	struct drm_device *dev = crtc->dev;
-	struct vc4_dev *vc4 = to_vc4_dev(dev);
 	struct drm_encoder *encoder = vc4_get_crtc_encoder(crtc);
 	struct vc4_encoder *vc4_encoder = to_vc4_encoder(encoder);
 	struct vc4_crtc *vc4_crtc = to_vc4_crtc(crtc);
@@ -381,12 +380,6 @@ static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
 	bool is_dsi = (vc4_encoder->type == VC4_ENCODER_TYPE_DSI0 ||
 		       vc4_encoder->type == VC4_ENCODER_TYPE_DSI1);
 	u32 format = is_dsi ? PV_CONTROL_FORMAT_DSIV_24 : PV_CONTROL_FORMAT_24;
-	bool debug_dump_regs = false;
-
-	if (debug_dump_regs) {
-		DRM_INFO("CRTC %d regs before:\n", drm_crtc_index(crtc));
-		vc4_crtc_dump_regs(vc4_crtc);
-	}
 
 	/* Reset the PV fifo. */
 	CRTC_WRITE(PV_CONTROL, 0);
@@ -462,6 +455,52 @@ static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
 				 PV_CONTROL_CLK_SELECT) |
 		   PV_CONTROL_FIFO_CLR |
 		   PV_CONTROL_EN);
+}
+
+static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
+{
+	struct drm_device *dev = crtc->dev;
+	struct vc4_dev *vc4 = to_vc4_dev(dev);
+	struct vc4_crtc *vc4_crtc = to_vc4_crtc(crtc);
+	struct vc4_crtc_state *vc4_state = to_vc4_crtc_state(crtc->state);
+	struct drm_display_mode *mode = &crtc->state->adjusted_mode;
+	bool interlace = mode->flags & DRM_MODE_FLAG_INTERLACE;
+	bool debug_dump_regs = false;
+
+	if (debug_dump_regs) {
+		DRM_INFO("CRTC %d regs before:\n", drm_crtc_index(crtc));
+		vc4_crtc_dump_regs(vc4_crtc);
+	}
+
+	if (vc4_crtc->channel == 2) {
+		u32 dispctrl;
+		u32 dsp3_mux;
+
+		/*
+		 * SCALER_DISPCTRL_DSP3 = X, where X < 2 means 'connect DSP3 to
+		 * FIFO X'.
+		 * SCALER_DISPCTRL_DSP3 = 3 means 'disable DSP 3'.
+		 *
+		 * DSP3 is connected to FIFO2 unless the transposer is
+		 * enabled. In this case, FIFO 2 is directly accessed by the
+		 * TXP IP, and we need to prevent disable the
+		 * FIFO2 -> pixelvalve1 route.
+		 */
+		if (vc4_state->feed_txp)
+			dsp3_mux = VC4_SET_FIELD(3, SCALER_DISPCTRL_DSP3_MUX);
+		else
+			dsp3_mux = VC4_SET_FIELD(2, SCALER_DISPCTRL_DSP3_MUX);
+
+		/* Reconfigure the DSP3 mux if required. */
+		dispctrl = HVS_READ(SCALER_DISPCTRL);
+		if ((dispctrl & SCALER_DISPCTRL_DSP3_MUX_MASK) != dsp3_mux) {
+			dispctrl &= ~SCALER_DISPCTRL_DSP3_MUX_MASK;
+			HVS_WRITE(SCALER_DISPCTRL, dispctrl | dsp3_mux);
+		}
+	}
+
+	if (!vc4_state->feed_txp)
+		vc4_crtc_config_pv(crtc);
 
 	HVS_WRITE(SCALER_DISPBKGNDX(vc4_crtc->channel),
 		  SCALER_DISPBKGND_AUTOHS |
@@ -533,22 +572,28 @@ static void vc4_crtc_enable(struct drm_crtc *crtc)
 	struct drm_device *dev = crtc->dev;
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 	struct vc4_crtc *vc4_crtc = to_vc4_crtc(crtc);
-	struct drm_crtc_state *state = crtc->state;
-	struct drm_display_mode *mode = &state->adjusted_mode;
+	struct vc4_crtc_state *vc4_state = to_vc4_crtc_state(crtc->state);
+	struct drm_display_mode *mode = &crtc->state->adjusted_mode;
 
 	require_hvs_enabled(dev);
 
 	/* Turn on the scaler, which will wait for vstart to start
 	 * compositing.
+	 * When feeding the transposer, we should operate in oneshot
+	 * mode.
 	 */
 	HVS_WRITE(SCALER_DISPCTRLX(vc4_crtc->channel),
 		  VC4_SET_FIELD(mode->hdisplay, SCALER_DISPCTRLX_WIDTH) |
 		  VC4_SET_FIELD(mode->vdisplay, SCALER_DISPCTRLX_HEIGHT) |
-		  SCALER_DISPCTRLX_ENABLE);
+		  SCALER_DISPCTRLX_ENABLE |
+		  (vc4_state->feed_txp ? SCALER_DISPCTRLX_ONESHOT : 0));
 
-	/* Turn on the pixel valve, which will emit the vstart signal. */
-	CRTC_WRITE(PV_V_CONTROL,
-		   CRTC_READ(PV_V_CONTROL) | PV_VCONTROL_VIDEN);
+	/* When feeding the composer block the pixelvalve is unneeded and
+	 * should not be enabled.
+	 */
+	if (!vc4_state->feed_txp)
+		CRTC_WRITE(PV_V_CONTROL,
+			   CRTC_READ(PV_V_CONTROL) | PV_VCONTROL_VIDEN);
 
 	/* Enable vblank irq handling after crtc is started. */
 	drm_crtc_vblank_on(crtc);
@@ -577,8 +622,10 @@ static int vc4_crtc_atomic_check(struct drm_crtc *crtc,
 	struct drm_plane *plane;
 	unsigned long flags;
 	const struct drm_plane_state *plane_state;
+	struct drm_connector *conn;
+	struct drm_connector_state *conn_state;
 	u32 dlist_count = 0;
-	int ret;
+	int ret, i;
 
 	/* The pixelvalve can only feed one encoder (and encoders are
 	 * 1:1 with connectors.)
@@ -597,6 +644,19 @@ static int vc4_crtc_atomic_check(struct drm_crtc *crtc,
 	spin_unlock_irqrestore(&vc4->hvs->mm_lock, flags);
 	if (ret)
 		return ret;
+
+	for_each_connector_in_state(state->state, conn, conn_state, i) {
+		if (conn_state->crtc != crtc)
+			continue;
+
+		/* The writeback connector is implemented using the transposer
+		 * block which is directly taking its data from the HVS FIFO.
+		 */
+		if (conn->connector_type == DRM_MODE_CONNECTOR_WRITEBACK)
+			vc4_state->feed_txp = true;
+
+		break;
+	}
 
 	return 0;
 }
@@ -910,6 +970,13 @@ static void vc4_set_crtc_possible_masks(struct drm_device *drm,
 	drm_for_each_encoder(encoder, drm) {
 		struct vc4_encoder *vc4_encoder = to_vc4_encoder(encoder);
 		int i;
+
+		/* HVS FIFO2 can feed the TXP IP. */
+		if (crtc_data->hvs_channel == 2 &&
+		    vc4_encoder->type == VC4_ENCODER_TYPE_TXP) {
+			encoder->possible_crtcs |= drm_crtc_mask(crtc);
+			continue;
+		}
 
 		for (i = 0; i < ARRAY_SIZE(crtc_data->encoder_types); i++) {
 			if (vc4_encoder->type == encoder_types[i]) {

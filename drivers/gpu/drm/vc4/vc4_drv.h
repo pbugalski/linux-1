@@ -20,6 +20,7 @@ struct vc4_dev {
 	struct vc4_dpi *dpi;
 	struct vc4_dsi *dsi1;
 	struct vc4_vec *vec;
+	struct vc4_txp *txp;
 
 	struct drm_fbdev_cma *fbdev;
 
@@ -204,6 +205,7 @@ enum vc4_encoder_type {
 	VC4_ENCODER_TYPE_DSI1,
 	VC4_ENCODER_TYPE_SMI,
 	VC4_ENCODER_TYPE_DPI,
+	VC4_ENCODER_TYPE_TXP,
 };
 
 struct vc4_encoder {
@@ -496,6 +498,10 @@ int vc4_hdmi_debugfs_regs(struct seq_file *m, void *unused);
 /* vc4_hdmi.c */
 extern struct platform_driver vc4_vec_driver;
 int vc4_vec_debugfs_regs(struct seq_file *m, void *unused);
+
+/* vc4_txp.c */
+extern struct platform_driver vc4_txp_driver;
+int vc4_txp_debugfs_regs(struct seq_file *m, void *unused);
 
 /* vc4_irq.c */
 irqreturn_t vc4_irq(int irq, void *arg);

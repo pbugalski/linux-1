@@ -1262,7 +1262,7 @@ static int denali_erase(struct mtd_info *mtd, int page)
 	/* wait for erase to complete or failure to occur */
 	irq_status = wait_for_irq(denali, INTR__ERASE_COMP | INTR__ERASE_FAIL);
 
-	return irq_status & INTR__ERASE_FAIL ? NAND_STATUS_FAIL : PASS;
+	return irq_status & INTR__ERASE_FAIL ? -EIO : 0;
 }
 
 static void denali_cmdfunc(struct mtd_info *mtd, unsigned int cmd, int col,

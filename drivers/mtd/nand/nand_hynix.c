@@ -67,15 +67,11 @@ struct hynix_read_retry_otp {
 
 static bool hynix_nand_has_valid_jedecid(struct nand_chip *chip)
 {
-	struct mtd_info *mtd = nand_to_mtd(chip);
-	u8 jedecid[6] = { };
-	int i = 0;
+	u8 jedecid[5] = { };
 
-	chip->cmdfunc(mtd, NAND_CMD_READID, 0x40, -1);
-	for (i = 0; i < 5; i++)
-		jedecid[i] = chip->read_byte(mtd);
+	nand_readid_op(chip, 0x40, jedecid, sizeof(jedecid));
 
-	return !strcmp("JEDEC", jedecid);
+	return !strncmp("JEDEC", jedecid, sizeof(jedecid));
 }
 
 static int hynix_nand_setup_read_retry(struct mtd_info *mtd, int retry_mode)
@@ -175,7 +171,7 @@ static int hynix_read_rr_otp(struct nand_chip *chip,
 	struct mtd_info *mtd = nand_to_mtd(chip);
 	int i;
 
-	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
+	nand_reset_op(chip);
 
 	chip->cmdfunc(mtd, NAND_HYNIX_CMD_SET_PARAMS, -1, -1);
 
@@ -195,11 +191,10 @@ static int hynix_read_rr_otp(struct nand_chip *chip,
 	chip->cmdfunc(mtd, 0x19, -1, -1);
 
 	/* Now read the page */
-	chip->cmdfunc(mtd, NAND_CMD_READ0, 0x0, info->page);
-	chip->read_buf(mtd, buf, info->size);
+	nand_read_page_op(chip, info->page, 0, buf, info->size);
 
 	/* Put everything back to normal */
-	chip->cmdfunc(mtd, NAND_CMD_RESET, -1, -1);
+	nand_reset_op(chip);
 	chip->cmdfunc(mtd, NAND_HYNIX_CMD_SET_PARAMS, 0x38, -1);
 	chip->write_byte(mtd, 0x0);
 	chip->cmdfunc(mtd, NAND_HYNIX_CMD_APPLY_PARAMS, -1, -1);

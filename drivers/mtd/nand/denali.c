@@ -1033,13 +1033,15 @@ static void denali_setup_dma(struct denali_nand_info *denali, int op)
  * configuration details.
  */
 static int write_page(struct mtd_info *mtd, struct nand_chip *chip,
-			const uint8_t *buf, bool raw_xfer)
+			const uint8_t *buf, int page, bool raw_xfer)
 {
 	struct denali_nand_info *denali = mtd_to_denali(mtd);
 	dma_addr_t addr = denali->buf.dma_buf;
 	size_t size = mtd->writesize + mtd->oobsize;
 	uint32_t irq_status;
 	uint32_t irq_mask = INTR__DMA_CMD_COMP | INTR__PROGRAM_FAIL;
+
+	nand_prog_page_begin_op(chip, page, 0, NULL, 0);
 
 	/*
 	 * if it is a raw xfer, we want to disable ecc and send the spare area.
@@ -1077,7 +1079,7 @@ static int write_page(struct mtd_info *mtd, struct nand_chip *chip,
 	denali_enable_dma(denali, false);
 	dma_sync_single_for_cpu(denali->dev, addr, size, DMA_TO_DEVICE);
 
-	return 0;
+	return nand_prog_page_end_op(chip);
 }
 
 /* NAND core entry points */
@@ -1094,7 +1096,7 @@ static int denali_write_page(struct mtd_info *mtd, struct nand_chip *chip,
 	 * for regular page writes, we let HW handle all the ECC
 	 * data written to the device.
 	 */
-	return write_page(mtd, chip, buf, false);
+	return write_page(mtd, chip, buf, page, false);
 }
 
 /*
@@ -1110,7 +1112,7 @@ static int denali_write_page_raw(struct mtd_info *mtd, struct nand_chip *chip,
 	 * for raw page writes, we want to disable ECC and simply write
 	 * whatever data is in the buffer.
 	 */
-	return write_page(mtd, chip, buf, true);
+	return write_page(mtd, chip, buf, page, true);
 }
 
 static int denali_write_oob(struct mtd_info *mtd, struct nand_chip *chip,
@@ -1139,6 +1141,8 @@ static int denali_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 				INTR__ECC_TRANSACTION_DONE | INTR__ECC_ERR;
 	unsigned long uncor_ecc_flags = 0;
 	int stat = 0;
+
+	nand_read_page_op(chip, page, 0, NULL, 0);
 
 	if (page != denali->page) {
 		dev_err(denali->dev,
@@ -1188,6 +1192,8 @@ static int denali_read_page_raw(struct mtd_info *mtd, struct nand_chip *chip,
 	dma_addr_t addr = denali->buf.dma_buf;
 	size_t size = mtd->writesize + mtd->oobsize;
 	uint32_t irq_mask = INTR__DMA_CMD_COMP;
+
+	nand_read_page_op(chip, page, 0, NULL, 0);
 
 	if (page != denali->page) {
 		dev_err(denali->dev,

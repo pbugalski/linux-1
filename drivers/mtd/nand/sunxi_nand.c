@@ -1241,6 +1241,8 @@ static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
 	int ret, i, cur_off = 0;
 	bool raw_mode = false;
 
+	nand_read_page_op(chip, page, 0, NULL, 0);
+
 	sunxi_nfc_hw_ecc_enable(mtd);
 
 	for (i = 0; i < ecc->steps; i++) {
@@ -1274,14 +1276,14 @@ static int sunxi_nfc_hw_ecc_read_page_dma(struct mtd_info *mtd,
 {
 	int ret;
 
+	nand_read_page_op(chip, page, 0, NULL, 0);
+
 	ret = sunxi_nfc_hw_ecc_read_chunks_dma(mtd, buf, oob_required, page,
 					       chip->ecc.steps);
 	if (ret >= 0)
 		return ret;
 
 	/* Fallback to PIO mode */
-	chip->cmdfunc(mtd, NAND_CMD_RNDOUT, 0, -1);
-
 	return sunxi_nfc_hw_ecc_read_page(mtd, chip, buf, oob_required, page);
 }
 
@@ -1293,6 +1295,8 @@ static int sunxi_nfc_hw_ecc_read_subpage(struct mtd_info *mtd,
 	struct nand_ecc_ctrl *ecc = &chip->ecc;
 	int ret, i, cur_off = 0;
 	unsigned int max_bitflips = 0;
+
+	nand_read_page_op(chip, page, 0, NULL, 0);
 
 	sunxi_nfc_hw_ecc_enable(mtd);
 
@@ -1325,13 +1329,13 @@ static int sunxi_nfc_hw_ecc_read_subpage_dma(struct mtd_info *mtd,
 	int nchunks = DIV_ROUND_UP(data_offs + readlen, chip->ecc.size);
 	int ret;
 
+	nand_read_page_op(chip, page, 0, NULL, 0);
+
 	ret = sunxi_nfc_hw_ecc_read_chunks_dma(mtd, buf, false, page, nchunks);
 	if (ret >= 0)
 		return ret;
 
 	/* Fallback to PIO mode */
-	chip->cmdfunc(mtd, NAND_CMD_RNDOUT, 0, -1);
-
 	return sunxi_nfc_hw_ecc_read_subpage(mtd, chip, data_offs, readlen,
 					     buf, page);
 }
@@ -1343,6 +1347,8 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
 {
 	struct nand_ecc_ctrl *ecc = &chip->ecc;
 	int ret, i, cur_off = 0;
+
+	nand_prog_page_begin_op(chip, page, 0, NULL, 0);
 
 	sunxi_nfc_hw_ecc_enable(mtd);
 
@@ -1365,7 +1371,7 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
 
 	sunxi_nfc_hw_ecc_disable(mtd);
 
-	return 0;
+	return nand_prog_page_end_op(chip);
 }
 
 static int sunxi_nfc_hw_ecc_write_subpage(struct mtd_info *mtd,
@@ -1376,6 +1382,8 @@ static int sunxi_nfc_hw_ecc_write_subpage(struct mtd_info *mtd,
 {
 	struct nand_ecc_ctrl *ecc = &chip->ecc;
 	int ret, i, cur_off = 0;
+
+	nand_prog_page_begin_op(chip, page, 0, NULL, 0);
 
 	sunxi_nfc_hw_ecc_enable(mtd);
 
@@ -1395,7 +1403,7 @@ static int sunxi_nfc_hw_ecc_write_subpage(struct mtd_info *mtd,
 
 	sunxi_nfc_hw_ecc_disable(mtd);
 
-	return 0;
+	return nand_prog_page_end_op(chip);
 }
 
 static int sunxi_nfc_hw_ecc_write_page_dma(struct mtd_info *mtd,
@@ -1424,6 +1432,8 @@ static int sunxi_nfc_hw_ecc_write_page_dma(struct mtd_info *mtd,
 
 		sunxi_nfc_hw_ecc_set_prot_oob_bytes(mtd, oob, i, !i, page);
 	}
+
+	nand_prog_page_begin_op(chip, page, 0, NULL, 0);
 
 	sunxi_nfc_hw_ecc_enable(mtd);
 	sunxi_nfc_randomizer_config(mtd, page, false);
@@ -1455,7 +1465,7 @@ static int sunxi_nfc_hw_ecc_write_page_dma(struct mtd_info *mtd,
 		sunxi_nfc_hw_ecc_write_extra_oob(mtd, chip->oob_poi,
 						 NULL, page);
 
-	return 0;
+	return nand_prog_page_end_op(chip);
 
 pio_fallback:
 	return sunxi_nfc_hw_ecc_write_page(mtd, chip, buf, oob_required, page);
@@ -1470,6 +1480,8 @@ static int sunxi_nfc_hw_syndrome_ecc_read_page(struct mtd_info *mtd,
 	unsigned int max_bitflips = 0;
 	int ret, i, cur_off = 0;
 	bool raw_mode = false;
+
+	nand_read_page_op(chip, page, 0, NULL, 0);
 
 	sunxi_nfc_hw_ecc_enable(mtd);
 
@@ -1507,6 +1519,8 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
 	struct nand_ecc_ctrl *ecc = &chip->ecc;
 	int ret, i, cur_off = 0;
 
+	nand_prog_page_begin_op(chip, page, 0, NULL, 0);
+
 	sunxi_nfc_hw_ecc_enable(mtd);
 
 	for (i = 0; i < ecc->steps; i++) {
@@ -1528,15 +1542,13 @@ static int sunxi_nfc_hw_syndrome_ecc_write_page(struct mtd_info *mtd,
 
 	sunxi_nfc_hw_ecc_disable(mtd);
 
-	return 0;
+	return nand_prog_page_end_op(chip);
 }
 
 static int sunxi_nfc_hw_common_ecc_read_oob(struct mtd_info *mtd,
 					    struct nand_chip *chip,
 					    int page)
 {
-	nand_read_page_op(chip, page, 0, NULL, 0);
-
 	chip->pagebuf = -1;
 
 	return chip->ecc.read_page(mtd, chip, chip->buffers->databuf, 1, page);
@@ -1547,8 +1559,6 @@ static int sunxi_nfc_hw_common_ecc_write_oob(struct mtd_info *mtd,
 					     int page)
 {
 	int ret;
-
-	nand_prog_page_begin_op(chip, page, 0, NULL, 0);
 
 	chip->pagebuf = -1;
 

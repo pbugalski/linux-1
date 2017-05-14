@@ -582,6 +582,8 @@ static int denali_pio_write(struct denali_nand_info *denali,
 	uint32_t irq_status;
 	int i;
 
+	nand_prog_page_begin_op(chip, page, 0, NULL, 0);
+
 	denali_reset_irq(denali);
 
 	iowrite32(DENALI_MAP01 | addr, denali->host + DENALI_HOST_ADDR);
@@ -653,7 +655,10 @@ static int denali_dma_xfer(struct denali_nand_info *denali, void *buf,
 	if (irq_status & INTR__ERASED_PAGE)
 		memset(buf, 0xff, size);
 
-	return ret;
+	if (ret)
+		return ret;
+
+	return nand_prog_page_end_op(chip);
 }
 
 static int denali_data_xfer(struct denali_nand_info *denali, void *buf,
@@ -816,6 +821,8 @@ static int denali_write_oob(struct mtd_info *mtd, struct nand_chip *chip,
 	struct denali_nand_info *denali = mtd_to_denali(mtd);
 	int status;
 
+	nand_read_page_op(chip, page, 0, NULL, 0);
+
 	denali_reset_irq(denali);
 
 	denali_oob_xfer(mtd, chip, page, 1);
@@ -871,6 +878,8 @@ static int denali_write_page_raw(struct mtd_info *mtd, struct nand_chip *chip,
 	int oob_skip = denali->oob_skip_bytes;
 	size_t size = writesize + oobsize;
 	int i, pos, len;
+
+	nand_read_page_op(chip, page, 0, NULL, 0);
 
 	/*
 	 * Fill the buffer with 0xff first except the full page transfer.

@@ -1108,10 +1108,6 @@ static int marvell_nfc_hw_ecc_read_page_raw(struct mtd_info *mtd,
 	u8 *oob = chip->oob_poi;
 	int chunk;
 
-	/*
-	 * Not using standard page accessors, we must provide the ->cmdfunc()
-	 * commands in the raw operations.
-	 */
 	chip->cmdfunc(mtd, NAND_CMD_READ0, 0x00, page);
 
 	if (oob_required)
@@ -1153,10 +1149,6 @@ static int marvell_nfc_hw_ecc_read_oob_raw(struct mtd_info *mtd,
 	int chunk_size = lt->data_bytes + lt->spare_bytes + lt->ecc_bytes;
 	int chunk;
 
-	/*
-	 * Not using standard page accessors, we must provide the ->cmdfunc()
-	 * commands in the raw operations.
-	 */
 	chip->cmdfunc(mtd, NAND_CMD_READ0, 0x00, page);
 
 	for (chunk = 0; chunk < lt->full_chunk_cnt; chunk++) {
@@ -1370,10 +1362,6 @@ static int marvell_nfc_hw_ecc_write_page_raw(struct mtd_info *mtd,
 	int last_oob_size = lt->last_spare_bytes + lt->last_ecc_bytes;
 	int chunk, status;
 
-	/*
-	 * Not using standard page accessors, we must provide the ->cmdfunc()
-	 * commands in the raw operations.
-	 */
 	chip->cmdfunc(mtd, NAND_CMD_SEQIN, 0x00, page);
 
 	for (chunk = 0; chunk < nchunks; chunk++) {
@@ -1426,10 +1414,6 @@ static int marvell_nfc_hw_ecc_write_oob_raw(struct mtd_info *mtd,
 	int last_oob_size = lt->last_spare_bytes + lt->last_ecc_bytes;
 	int chunk, status;
 
-	/*
-	 * Not using standard page accessors, we must provide the ->cmdfunc()
-	 * commands in the raw operations.
-	 */
 	chip->cmdfunc(mtd, NAND_CMD_SEQIN, 0x00, page);
 
 	for (chunk = 0; chunk < nchunks; chunk++) {
@@ -1931,16 +1915,6 @@ static int marvell_nand_chip_init(struct device *dev, struct marvell_nfc *nfc,
 		 * uncorrectable ECC errors.
 		 */
 		nand->options |= NAND_NO_SUBPAGE_WRITE;
-
-		/*
-		 * When using hardware ECC, full control must be given to the
-		 * controller, no need for the core to send the commands before
-		 * calling a ->read/write() function because the controller
-		 * logic will lack some flags like TYPE, XTYPE, OVR_LEN that are
-		 * to be given depending on the situation: ECC area, ECC mode,
-		 * page size,etc.
-		 */
-		nand->ecc.options |= NAND_ECC_CUSTOM_PAGE_ACCESS;
 	}
 
 	ret = nand_scan_tail(mtd);

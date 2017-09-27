@@ -3952,7 +3952,8 @@ static int single_erase(struct mtd_info *mtd, int page)
 	unsigned int eraseblock;
 
 	/* Send commands to erase a block */
-	eraseblock = page >> (chip->page_shift - chip->phys_erase_shift);
+	eraseblock = page >> (chip->phys_erase_shift - chip->page_shift);
+
 	return nand_erase_op(chip, eraseblock);
 }
 

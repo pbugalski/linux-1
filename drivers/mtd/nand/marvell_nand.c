@@ -862,7 +862,7 @@ static int marvell_nfc_hw_ecc_hmg_read_page(struct mtd_info *mtd,
 	struct marvell_nand_chip *marvell_nand = to_marvell_nand(nand);
 	struct marvell_nfc *nfc = to_marvell_nfc(nand->controller);
 	struct marvell_hw_ecc_layout *lt = &to_marvell_nand(nand)->layout;
-	int max_bitflips = 0, ret = 0;
+	int max_bitflips = 0, ret = 0, i;
 	u8 *data, *oob;
 
 	/*
@@ -875,23 +875,8 @@ static int marvell_nfc_hw_ecc_hmg_read_page(struct mtd_info *mtd,
 
 	marvell_nfc_hw_ecc_enable(mtd);
 
-	/*
-	 * Allocating a dummy OOB buffer may be needed because ->write_oob()
-	 * must call ->write_page() (it is not possible to write OOB data
-	 * without writing the whole page with ECC enabled) and in order to
-	 * rewrite the page correctly, ->read_page() must be called too to
-	 * retrieve the data to write. ->read_page() has to read OOB data and
-	 * store it somewhere else than in chip->oob_poi where the actual OOB
-	 * data to be finally written remains.
-	 */
 	data = buf;
-	if (oob_required) {
-		oob = chip->oob_poi;
-	} else {
-		oob = kmalloc(mtd->oobsize, GFP_KERNEL);
-		if (!oob)
-			return -ENOMEM;
-	}
+	oob = chip->oob_poi;
 
 	if ((ret = marvell_nfc_prepare_cmd(mtd)))
 		return ret;
@@ -912,30 +897,28 @@ static int marvell_nfc_hw_ecc_hmg_read_page(struct mtd_info *mtd,
 	marvell_nfc_end_cmd(mtd, NDSR_RDDREQ,
 			    "RDDREQ while draining FIFO (data)");
 
-	/* Read the data, then jump to the spare bytes and read it */
-	ioread32_rep(nfc->regs + NDDB, data, lt->data_bytes / 4);
-	ioread32_rep(nfc->regs + NDDB, oob, lt->spare_bytes / 4);
+	/* Read the data... */
+	if (data)
+		ioread32_rep(nfc->regs + NDDB, data, FIFO_REP(lt->data_bytes));
+	else
+		for (i = 0; i < FIFO_REP(lt->data_bytes); i++)
+			ioread32_rep(nfc->regs + NDDB, nfc->buf, FIFO_DEPTH_32);
+
+	/* ...then the spare bytes */
+	ioread32_rep(nfc->regs + NDDB, oob, FIFO_REP(lt->spare_bytes));
 
 	marvell_nfc_hw_ecc_correct(mtd, data, lt->data_bytes,
 				   oob, lt->spare_bytes, &max_bitflips);
 
 	marvell_nfc_hw_ecc_disable(mtd);
 
-	if (!oob_required)
-		goto out;
-
-	/* Read ECC bytes without ECC enabled */
-	chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
-	chip->cmdfunc(mtd, NAND_CMD_RNDOUT,
-		      lt->data_bytes + lt->spare_bytes, -1);
-	marvell_nfc_read_buf(mtd, oob + lt->spare_bytes, lt->ecc_bytes);
-
-out:
-	if (!oob_required)
-		kfree(oob);
-
-	if (ret)
-		return ret;
+	if (oob_required) {
+		/* Read ECC bytes without ECC enabled */
+		chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
+		chip->cmdfunc(mtd, NAND_CMD_RNDOUT,
+			      lt->data_bytes + lt->spare_bytes, -1);
+		marvell_nfc_read_buf(mtd, oob + lt->spare_bytes, lt->ecc_bytes);
+	}
 
 	return max_bitflips;
 }
@@ -949,7 +932,7 @@ static void marvell_nfc_hw_ecc_bch_read_chunk(struct mtd_info *mtd, int chunk,
 	struct marvell_nand_chip *marvell_nand = to_marvell_nand(nand);
 	struct marvell_nfc *nfc = to_marvell_nfc(nand->controller);
 	struct marvell_hw_ecc_layout *lt = &to_marvell_nand(nand)->layout;
-	int read_len, xtype, i = 0;
+	int read_len, xtype, i, j;
 	u32 command_bytes = 0;
 
 	/*
@@ -995,18 +978,25 @@ static void marvell_nfc_hw_ecc_bch_read_chunk(struct mtd_info *mtd, int chunk,
 	 * Length is a multiple of 32 bytes, hence it is a multiple of 8 too.
 	 *
 	 */
-	for (i = 0; i < data_len; i += 32) {
+	for (i = 0; i < data_len; i += FIFO_DEPTH * sizeof(u32)) {
 		marvell_nfc_end_cmd(mtd, NDSR_RDDREQ,
 				    "RDDREQ while draining FIFO (data)");
-		ioread32_rep(nfc->regs + NDDB, data, 8);
-		data += 32;
+		if (data) {
+			ioread32_rep(nfc->regs + NDDB, data,
+				     FIFO_DEPTH_32 * sizeof(u32));
+			data += FIFO_DEPTH * sizeof(u32);
+		} else {
+			for (j = 0; j < sizeof(u32); j++)
+				ioread32_rep(nfc->regs + NDDB, nfc->buf,
+					     FIFO_DEPTH_32);
+		}
 	}
 
-	for (i = 0; i < oob_len; i += 32) {
+	for (i = 0; i < oob_len; i += FIFO_DEPTH * 4) {
 		marvell_nfc_end_cmd(mtd, NDSR_RDDREQ,
 				    "RDDREQ while draining FIFO (OOB)");
-		ioread32_rep(nfc->regs + NDDB, oob, 8);
-		oob += 32;
+		ioread32_rep(nfc->regs + NDDB, oob, FIFO_DEPTH_32 * 4);
+		oob += FIFO_DEPTH * 4;
 	}
 }
 
@@ -1018,7 +1008,7 @@ static int marvell_nfc_hw_ecc_bch_read_page(struct mtd_info *mtd,
 	struct marvell_hw_ecc_layout *lt = &to_marvell_nand(chip)->layout;
 	int nchunks = lt->full_chunk_cnt + lt->last_chunk_cnt;
 	int max_bitflips = 0;
-	u8 *data, *oob, *const_oob = NULL;
+	u8 *data, *oob;
 	int chunk, data_len, oob_len, ecc_len;
 	/* Following sizes are used to read the ECC bytes after ECC operation */
 	int fixed_oob_size = lt->spare_bytes + lt->ecc_bytes;
@@ -1037,22 +1027,15 @@ static int marvell_nfc_hw_ecc_bch_read_page(struct mtd_info *mtd,
 	for (chunk = 0; chunk < nchunks; chunk++) {
 		if (chunk == 0) {
 			/* Init pointers to iterate through the chunks */
-			data = buf;
-			if (oob_required) {
-				oob = chip->oob_poi;
-			} else {
-				/*
-				 * Justification for this allocation is
-				 * available in ->hmg_read_page().
-				 */
-				const_oob = kmalloc(mtd->oobsize, GFP_KERNEL);
-				oob = const_oob;
-				if (!oob)
-					return -ENOMEM;
-			}
+			if (buf)
+				data = buf;
+			else
+				data = NULL;
+			oob = chip->oob_poi;
 		} else {
 			/* Update pointers */
-			data += lt->data_bytes;
+			if (data)
+				data += lt->data_bytes;
 			oob += (lt->spare_bytes + lt->ecc_bytes + 2);
 		}
 
@@ -1078,10 +1061,8 @@ static int marvell_nfc_hw_ecc_bch_read_page(struct mtd_info *mtd,
 
 	marvell_nfc_hw_ecc_disable(mtd);
 
-	if (!oob_required) {
-		kfree(const_oob);
+	if (!oob_required)
 		return max_bitflips;
-	}
 
 	/* Read ECC bytes without ECC enabled */
 	chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
@@ -1111,17 +1092,7 @@ static int marvell_nfc_hw_ecc_bch_read_page(struct mtd_info *mtd,
 static int marvell_nfc_hw_ecc_read_oob(struct mtd_info *mtd,
 				       struct nand_chip *chip, int page)
 {
-	u8 *dummy_data;
-	int ret;
-
-	dummy_data = kmalloc(mtd->writesize, GFP_KERNEL);
-	if (!dummy_data)
-		return -ENOMEM;
-
-	ret = chip->ecc.read_page(mtd, chip, dummy_data, true, page);
-	kfree(dummy_data);
-
-	return ret;
+	return chip->ecc.read_page(mtd, chip, NULL, true, page);
 }
 
 /* Raw reads with HW ECC */
@@ -1212,9 +1183,8 @@ static int marvell_nfc_hw_ecc_hmg_write_page(struct mtd_info *mtd,
 	struct marvell_nand_chip *marvell_nand = to_marvell_nand(nand);
 	struct marvell_nfc *nfc = to_marvell_nfc(nand->controller);
 	struct marvell_hw_ecc_layout *lt = &to_marvell_nand(nand)->layout;
-	const u8 *data = buf;
-	const u8 *oob = chip->oob_poi;
-	int status, ret;
+	const u8 *data = buf, *oob = chip->oob_poi;
+	int status, ret, i;
 
 	marvell_nfc_hw_ecc_enable(mtd);
 
@@ -1232,8 +1202,18 @@ static int marvell_nfc_hw_ecc_hmg_write_page(struct mtd_info *mtd,
 	marvell_nfc_end_cmd(mtd, NDSR_WRDREQ,
 			    "WRDREQ while loading FIFO (data)");
 
-	iowrite32_rep(nfc->regs + NDDB, data, lt->data_bytes / 4);
-	iowrite32_rep(nfc->regs + NDDB, oob, lt->spare_bytes / 4);
+	/* Write the data. If buf is empty, write empty bytes (0xFF) */
+	if (data) {
+		iowrite32_rep(nfc->regs + NDDB, data, FIFO_REP(lt->data_bytes));
+	} else {
+		data = nfc->buf;
+		memset(nfc->buf, 0xFF, FIFO_DEPTH);
+		for (i = 0; i < FIFO_REP(lt->data_bytes) / FIFO_DEPTH_32; i++)
+			iowrite32_rep(nfc->regs + NDDB, data, FIFO_DEPTH_32);
+	}
+
+	/* Then write the OOB data */
+	iowrite32_rep(nfc->regs + NDDB, oob, FIFO_REP(lt->spare_bytes));
 
 	status = marvell_nfc_waitfunc(mtd, nand);
 
@@ -1253,7 +1233,7 @@ static void marvell_nfc_hw_ecc_bch_write_chunk(struct mtd_info *mtd, int chunk,
 	struct marvell_nand_chip *marvell_nand = to_marvell_nand(nand);
 	struct marvell_nfc *nfc = to_marvell_nfc(nand->controller);
 	struct marvell_hw_ecc_layout *lt = &to_marvell_nand(nand)->layout;
-	int data_len, oob_len, write_len, xtype;
+	int data_len, oob_len, write_len, xtype, i;
 	u32 command_bytes, address_bytes_ndcb1, address_bytes_ndcb2;
 
 	/* OOB area to write is only spare area when using HW ECC */
@@ -1314,8 +1294,15 @@ static void marvell_nfc_hw_ecc_bch_write_chunk(struct mtd_info *mtd, int chunk,
 			    "WRDREQ while loading FIFO (data)");
 
 	/* Effectively write the data to the data buffer */
-	data += chunk * lt->data_bytes;
-	iowrite32_rep(nfc->regs + NDDB, data, data_len / 4);
+	if (data) {
+		data += chunk * lt->data_bytes;
+		iowrite32_rep(nfc->regs + NDDB, data, FIFO_REP(data_len));
+	} else {
+		memset(nfc->buf, 0xFF, FIFO_DEPTH);
+		data = nfc->buf;
+		for (i = 0; i < FIFO_REP(data_len) / FIFO_DEPTH_32; i++)
+			iowrite32_rep(nfc->regs + NDDB, data, FIFO_DEPTH_32);
+	}
 
 	/* Pad user data with 2 bytes when using BCH (30B) */
 	oob += chunk * lt->spare_bytes;
@@ -1364,11 +1351,7 @@ static int marvell_nfc_hw_ecc_bch_write_page(struct mtd_info *mtd,
 static int marvell_nfc_hw_ecc_write_oob(struct mtd_info *mtd,
 					struct nand_chip *chip, int page)
 {
-	u8 data[mtd->writesize];
-
-	chip->ecc.read_page(mtd, chip, data, false, page);
-
-	return chip->ecc.write_page(mtd, chip, data, true, page);
+	return chip->ecc.write_page(mtd, chip, NULL, true, page);
 }
 
 /* Raw writes with HW ECC */

@@ -27,6 +27,8 @@
 /* Polling is done at a pace of POLL_PERIOD us until POLL_TIMEOUT is reached */
 #define POLL_PERIOD		0
 #define POLL_TIMEOUT		1000
+/* Interrupt maximum wait period in ms */
+#define IRQ_TIMEOUT		1000
 /* Latency in clock cycles between SoC pins and NFC logic */
 #define MIN_RD_DEL_CNT		3
 
@@ -485,16 +487,14 @@ static int marvell_nfc_waitfunc(struct mtd_info *mtd, struct nand_chip *nand)
 
 	marvell_nfc_enable_int(nfc, NDCR_RDYM);
 	ret = wait_for_completion_timeout(&nfc->complete,
-					  msecs_to_jiffies(5));
+					  msecs_to_jiffies(IRQ_TIMEOUT));
 	marvell_nfc_disable_int(nfc, NDCR_RDYM);
-	marvell_nfc_clear_int(nfc, NDCR_RDYM);
+	marvell_nfc_clear_int(nfc, NDSR_RDY(0) | NDSR_RDY(1));
 
-	if (ret)
-		return 0;
+	if (!ret)
+		dev_err(nfc->dev, "Timeout waiting for RB signal\n");
 
-	dev_err(nfc->dev, "Timeout waiting for RB signal\n");
-
-	return -ETIMEDOUT;
+	return ret ? 0 : -ETIMEDOUT;
 }
 
 static void marvell_nfc_cmd_ctrl(struct mtd_info *mtd, int data,
@@ -595,6 +595,8 @@ static irqreturn_t marvell_nfc_isr(int irq, void *dev_id)
 
 	if (!(st & ien))
 		return IRQ_NONE;
+
+	marvell_nfc_disable_int(nfc, st & NDCR_ALL_INT);
 
 	complete(&nfc->complete);
 

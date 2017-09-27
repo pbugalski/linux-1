@@ -921,10 +921,8 @@ static int marvell_nfc_hw_ecc_hmg_read_page(struct mtd_info *mtd,
 
 	if (oob_required) {
 		/* Read ECC bytes without ECC enabled */
-		chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
-		chip->cmdfunc(mtd, NAND_CMD_RNDOUT,
-			      lt->data_bytes + lt->spare_bytes, -1);
-		marvell_nfc_read_buf(mtd, oob + lt->spare_bytes, lt->ecc_bytes);
+		nand_read_page_op(nand, page, lt->data_bytes + lt->spare_bytes,
+				  oob + lt->spare_bytes, lt->ecc_bytes);
 	}
 
 	return max_bitflips;
@@ -1072,26 +1070,23 @@ static int marvell_nfc_hw_ecc_bch_read_page(struct mtd_info *mtd,
 		return max_bitflips;
 
 	/* Read ECC bytes without ECC enabled */
-	chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
-	for (chunk = 0; chunk < lt->full_chunk_cnt; chunk++) {
-		chip->cmdfunc(mtd, NAND_CMD_RNDOUT,
-			      ((chunk + 1) * (fixed_chunk_size)) -
-			      lt->ecc_bytes, -1);
-		marvell_nfc_read_buf(mtd, chip->oob_poi +
-				     ((chunk + 1) * (fixed_oob_size + 2) -
-				      (lt->ecc_bytes + 2)),
-				     lt->ecc_bytes);
-	}
+	for (chunk = 0; chunk < lt->full_chunk_cnt; chunk++)
+		nand_read_page_op(chip, page,
+				  ((chunk + 1) * (fixed_chunk_size)) -
+				  lt->ecc_bytes,
+				  chip->oob_poi + ((chunk + 1) *
+						   (fixed_oob_size + 2) -
+						   (lt->ecc_bytes + 2)),
+				  lt->ecc_bytes);
 
-	if (lt->last_chunk_cnt) {
-		chip->cmdfunc(mtd, NAND_CMD_RNDOUT,
-			      (lt->full_chunk_cnt * fixed_chunk_size) +
-			      lt->last_data_bytes + lt->last_spare_bytes, -1);
-		marvell_nfc_read_buf(mtd, chip->oob_poi +
-				     (lt->full_chunk_cnt * (fixed_oob_size + 2))
-				     + lt->last_spare_bytes,
-				     lt->last_ecc_bytes);
-	}
+	if (lt->last_chunk_cnt)
+		nand_read_page_op(chip, page,
+				  (lt->full_chunk_cnt * fixed_chunk_size) +
+				  lt->last_data_bytes + lt->last_spare_bytes,
+				  chip->oob_poi + (lt->full_chunk_cnt *
+						   (fixed_oob_size + 2)) +
+				  lt->last_spare_bytes,
+				  lt->last_ecc_bytes);
 
 	return max_bitflips;
 }
@@ -1112,10 +1107,10 @@ static int marvell_nfc_hw_ecc_read_page_raw(struct mtd_info *mtd,
 	u8 *oob = chip->oob_poi;
 	int chunk;
 
-	chip->cmdfunc(mtd, NAND_CMD_READ0, 0x00, page);
-
 	if (oob_required)
 		memset(chip->oob_poi, 0xFF, mtd->oobsize);
+
+	nand_read_page_op(chip, page, 0, NULL, 0);
 
 	for (chunk = 0; chunk < lt->full_chunk_cnt; chunk++) {
 		marvell_nfc_read_buf(mtd, buf, lt->data_bytes);
@@ -1128,12 +1123,13 @@ static int marvell_nfc_hw_ecc_read_page_raw(struct mtd_info *mtd,
 			oob += lt->spare_bytes + lt->ecc_bytes + 2;
 		} else {
 			/* Move the NAND pointer to the next chunk of data */
-			chip->cmdfunc(mtd, NAND_CMD_RNDOUT,
-				      ((chunk + 1) * chunk_size), -1);
+			nand_change_read_column_op(chip,
+						   ((chunk + 1) * chunk_size),
+						   NULL, 0);
 		}
 	}
 
-	if (lt->last_chunk_cnt == 0)
+	if (!lt->last_chunk_cnt)
 		return 0;
 
 	marvell_nfc_read_buf(mtd, buf, lt->last_data_bytes);
@@ -1153,12 +1149,14 @@ static int marvell_nfc_hw_ecc_read_oob_raw(struct mtd_info *mtd,
 	int chunk_size = lt->data_bytes + lt->spare_bytes + lt->ecc_bytes;
 	int chunk;
 
-	chip->cmdfunc(mtd, NAND_CMD_READ0, 0x00, page);
+	nand_read_page_op(chip, page, 0, NULL, 0);
 
 	for (chunk = 0; chunk < lt->full_chunk_cnt; chunk++) {
 		/* Move NAND pointer to the next chunk of OOB data */
-		chip->cmdfunc(mtd, NAND_CMD_RNDOUT,
-			      chunk * chunk_size + lt->data_bytes, -1);
+		nand_change_read_column_op(chip,
+					   chunk * chunk_size + lt->data_bytes,
+					   0, 0);
+
 		marvell_nfc_read_buf(mtd, oob, lt->spare_bytes + lt->ecc_bytes);
 		/* Pad user data with 2 bytes when using BCH (30B) */
 		oob += lt->spare_bytes + lt->ecc_bytes + 2;
@@ -1364,17 +1362,18 @@ static int marvell_nfc_hw_ecc_write_page_raw(struct mtd_info *mtd,
 	int nchunks = lt->full_chunk_cnt + lt->last_chunk_cnt;
 	int oob_size = lt->spare_bytes + lt->ecc_bytes;
 	int last_oob_size = lt->last_spare_bytes + lt->last_ecc_bytes;
-	int chunk, status;
+	int chunk;
 
-	chip->cmdfunc(mtd, NAND_CMD_SEQIN, 0x00, page);
+	nand_prog_page_begin_op(chip, page, 0, NULL, 0);
 
 	for (chunk = 0; chunk < nchunks; chunk++) {
 		/*
 		 * OOB are not 8-bytes aligned anyway so change the column
 		 * at each cycle
 		 */
-		chip->cmdfunc(mtd, NAND_CMD_RNDIN,
-			      chunk * (lt->data_bytes + oob_size), -1);
+		nand_change_write_column_op(chip, chunk * (lt->data_bytes +
+							   oob_size),
+					    NULL, 0);
 
 		if (chunk < lt->full_chunk_cnt)
 			marvell_nfc_write_buf(mtd, buf +
@@ -1398,13 +1397,7 @@ static int marvell_nfc_hw_ecc_write_page_raw(struct mtd_info *mtd,
 					      last_oob_size);
 	}
 
-	chip->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
-
-	status = marvell_nfc_waitfunc(mtd, nand);
-	if (status & NAND_STATUS_FAIL)
-		return -EIO;
-
-	return 0;
+	return nand_prog_page_end_op(chip);
 }
 
 static int marvell_nfc_hw_ecc_write_oob_raw(struct mtd_info *mtd,
@@ -1416,13 +1409,13 @@ static int marvell_nfc_hw_ecc_write_oob_raw(struct mtd_info *mtd,
 	int nchunks = lt->full_chunk_cnt + lt->last_chunk_cnt;
 	int oob_size = lt->spare_bytes + lt->ecc_bytes;
 	int last_oob_size = lt->last_spare_bytes + lt->last_ecc_bytes;
-	int chunk, status;
+	int chunk;
 
-	chip->cmdfunc(mtd, NAND_CMD_SEQIN, 0x00, page);
+	nand_prog_page_begin_op(chip, page, 0, NULL, 0);
 
 	for (chunk = 0; chunk < nchunks; chunk++) {
-		chip->cmdfunc(mtd, NAND_CMD_RNDIN,
-			      lt->data_bytes + (chunk * chunk_size), -1);
+		nand_change_write_column_op(chip, lt->data_bytes +
+					    (chunk * chunk_size), NULL, 0);
 
 		if (chunk < lt->full_chunk_cnt)
 			marvell_nfc_write_buf(mtd, chip->oob_poi +
@@ -1434,13 +1427,7 @@ static int marvell_nfc_hw_ecc_write_oob_raw(struct mtd_info *mtd,
 					      last_oob_size);
 	}
 
-	chip->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
-
-	status = marvell_nfc_waitfunc(mtd, nand);
-	if (status & NAND_STATUS_FAIL)
-		return -EIO;
-
-	return 0;
+	return nand_prog_page_end_op(chip);
 }
 
 /*

@@ -828,6 +828,10 @@ static void marvell_nfc_hw_ecc_correct(struct mtd_info *mtd,
 		 * ECC enabled, the ECC bytes in the buffer have been set by the
 		 * ECC engine, so they are not 0xFF.
 		 */
+		if (!data)
+			data_len = 0;
+		if (!oob)
+			oob_len = 0;
 		bf = nand_check_erased_ecc_chunk(data, data_len, NULL, 0,
 						 oob, oob_len,
 						 nand->ecc.strength);

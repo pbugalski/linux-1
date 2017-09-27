@@ -510,7 +510,8 @@ static void marvell_nfc_cmd_ctrl(struct mtd_info *mtd, int data,
 		 */
 		nfc->buf_pos = 0;
 
-		marvell_nfc_prepare_cmd(mtd);
+		if (marvell_nfc_prepare_cmd(mtd))
+			return;
 
 		/*
 		 * Marvell NFC may use naked commands and naked addresses.
@@ -605,7 +606,8 @@ static irqreturn_t marvell_nfc_isr(int irq, void *dev_id)
 
 static void marvell_nfc_do_naked_read(struct mtd_info *mtd, int len)
 {
-	marvell_nfc_prepare_cmd(mtd);
+	if (marvell_nfc_prepare_cmd(mtd))
+		return;
 
 	marvell_nfc_send_cmd(mtd, NDCB0_CMD_TYPE(TYPE_READ) |
 			     NDCB0_CMD_XTYPE(XTYPE_LAST_NAKED_READ) |
@@ -691,7 +693,8 @@ static u16 marvell_nfc_read_word(struct mtd_info *mtd)
 
 static void marvell_nfc_do_naked_write(struct mtd_info *mtd, int len)
 {
-	marvell_nfc_prepare_cmd(mtd);
+	if (marvell_nfc_prepare_cmd(mtd))
+		return;
 
 	/* Trigger the naked write operation */
 	marvell_nfc_send_cmd(mtd, NDCB0_CMD_TYPE(TYPE_WRITE) |
@@ -873,13 +876,13 @@ static int marvell_nfc_hw_ecc_hmg_read_page(struct mtd_info *mtd,
 	if (oob_required)
 		memset(chip->oob_poi, 0xFF, mtd->oobsize);
 
+	if ((ret = marvell_nfc_prepare_cmd(mtd)))
+		return ret;
+
 	marvell_nfc_hw_ecc_enable(mtd);
 
 	data = buf;
 	oob = chip->oob_poi;
-
-	if ((ret = marvell_nfc_prepare_cmd(mtd)))
-		return ret;
 
 	/*
 	 * Reading spare area is mandatory when using HW ECC or read operation
@@ -1186,11 +1189,10 @@ static int marvell_nfc_hw_ecc_hmg_write_page(struct mtd_info *mtd,
 	const u8 *data = buf, *oob = chip->oob_poi;
 	int status, ret, i;
 
-	marvell_nfc_hw_ecc_enable(mtd);
-
-	ret = marvell_nfc_prepare_cmd(mtd);
-	if (ret)
+	if ((ret = marvell_nfc_prepare_cmd(mtd)))
 		return ret;
+
+	marvell_nfc_hw_ecc_enable(mtd);
 
 	marvell_nfc_send_cmd(mtd,
 			     NDCB0_CMD_TYPE(TYPE_WRITE) |
@@ -1280,7 +1282,8 @@ static void marvell_nfc_hw_ecc_bch_write_chunk(struct mtd_info *mtd, int chunk,
 	 * If this is the first chunk, the previous command also embedded
 	 * the write operation, no need to repeat it.
 	 */
-	marvell_nfc_prepare_cmd(mtd);
+	if (marvell_nfc_prepare_cmd(mtd))
+		return;
 
 	marvell_nfc_send_cmd(mtd,
 			     NDCB0_CMD_TYPE(TYPE_WRITE) |

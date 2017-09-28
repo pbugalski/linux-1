@@ -321,6 +321,20 @@ struct marvell_nfc_timings {
 #define TO_CYCLES(ps, period_ns) (DIV_ROUND_UP(ps / 1000, period_ns))
 
 /*
+ * Internal hook to mimic core functions whithout having to distinguish if this
+ * is the first read operation on the page or not and hence choose the right
+ * function.
+ */
+int nand_read_page(struct nand_chip *chip, unsigned int page, unsigned int column,
+		   void *buf, unsigned int len)
+{
+	if (!column)
+		return nand_read_page_op(chip, page, column, buf, len);
+	else
+		return nand_change_read_column_op(chip, column, buf, len);
+}
+
+/*
  * The controller has many flags that could generate interrupts, most of them
  * are disabled and polling is used. For the very slow signals, using interrupts
  * may relax the CPU charge.
@@ -921,7 +935,8 @@ static int marvell_nfc_hw_ecc_hmg_read_page(struct mtd_info *mtd,
 
 	if (oob_required) {
 		/* Read ECC bytes without ECC enabled */
-		nand_read_page_op(nand, page, lt->data_bytes + lt->spare_bytes,
+		nand_read_page_op(nand, page,
+				  lt->data_bytes + lt->spare_bytes,
 				  oob + lt->spare_bytes, lt->ecc_bytes);
 	}
 
@@ -1071,22 +1086,22 @@ static int marvell_nfc_hw_ecc_bch_read_page(struct mtd_info *mtd,
 
 	/* Read ECC bytes without ECC enabled */
 	for (chunk = 0; chunk < lt->full_chunk_cnt; chunk++)
-		nand_read_page_op(chip, page,
-				  ((chunk + 1) * (fixed_chunk_size)) -
-				  lt->ecc_bytes,
-				  chip->oob_poi + ((chunk + 1) *
-						   (fixed_oob_size + 2) -
-						   (lt->ecc_bytes + 2)),
-				  lt->ecc_bytes);
+		nand_read_page(chip, page,
+			       ((chunk + 1) * (fixed_chunk_size)) -
+			       lt->ecc_bytes,
+			       chip->oob_poi + ((chunk + 1) *
+						(fixed_oob_size + 2) -
+						(lt->ecc_bytes + 2)),
+			       lt->ecc_bytes);
 
 	if (lt->last_chunk_cnt)
-		nand_read_page_op(chip, page,
-				  (lt->full_chunk_cnt * fixed_chunk_size) +
-				  lt->last_data_bytes + lt->last_spare_bytes,
-				  chip->oob_poi + (lt->full_chunk_cnt *
-						   (fixed_oob_size + 2)) +
-				  lt->last_spare_bytes,
-				  lt->last_ecc_bytes);
+		nand_read_page(chip, page,
+			       (lt->full_chunk_cnt * fixed_chunk_size) +
+			       lt->last_data_bytes + lt->last_spare_bytes,
+			       chip->oob_poi + (lt->full_chunk_cnt *
+						(fixed_oob_size + 2)) +
+			       lt->last_spare_bytes,
+			       lt->last_ecc_bytes);
 
 	return max_bitflips;
 }
@@ -1110,33 +1125,27 @@ static int marvell_nfc_hw_ecc_read_page_raw(struct mtd_info *mtd,
 	if (oob_required)
 		memset(chip->oob_poi, 0xFF, mtd->oobsize);
 
-	nand_read_page_op(chip, page, 0, NULL, 0);
-
 	for (chunk = 0; chunk < lt->full_chunk_cnt; chunk++) {
-		marvell_nfc_read_buf(mtd, buf, lt->data_bytes);
+		nand_read_page(chip, page, chunk * chunk_size, buf,
+			       lt->data_bytes);
 		buf += lt->data_bytes;
 
 		if (oob_required) {
-			marvell_nfc_read_buf(mtd, oob,
-					     lt->spare_bytes + lt->ecc_bytes);
+			nand_read_data_op(chip, oob, lt->spare_bytes +
+					  lt->ecc_bytes, false);
 			/* Pad user data with 2 bytes when using BCH (30B) */
 			oob += lt->spare_bytes + lt->ecc_bytes + 2;
-		} else {
-			/* Move the NAND pointer to the next chunk of data */
-			nand_change_read_column_op(chip,
-						   ((chunk + 1) * chunk_size),
-						   NULL, 0);
 		}
 	}
 
 	if (!lt->last_chunk_cnt)
 		return 0;
 
-	marvell_nfc_read_buf(mtd, buf, lt->last_data_bytes);
-	if (oob_required) {
-		marvell_nfc_read_buf(mtd, oob,
-				     lt->last_spare_bytes + lt->last_ecc_bytes);
-	}
+	nand_read_page(chip, page, chunk * chunk_size, buf,
+		       lt->last_data_bytes);
+	if (oob_required)
+		nand_read_data_op(chip, oob, lt->last_spare_bytes +
+				  lt->last_ecc_bytes, false);
 
 	return 0;
 }
@@ -1149,23 +1158,19 @@ static int marvell_nfc_hw_ecc_read_oob_raw(struct mtd_info *mtd,
 	int chunk_size = lt->data_bytes + lt->spare_bytes + lt->ecc_bytes;
 	int chunk;
 
-	nand_read_page_op(chip, page, 0, NULL, 0);
-
 	for (chunk = 0; chunk < lt->full_chunk_cnt; chunk++) {
 		/* Move NAND pointer to the next chunk of OOB data */
-		nand_change_read_column_op(chip,
-					   chunk * chunk_size + lt->data_bytes,
-					   0, 0);
-
-		marvell_nfc_read_buf(mtd, oob, lt->spare_bytes + lt->ecc_bytes);
+		nand_read_page(chip, page,
+			       chunk * chunk_size + lt->data_bytes,
+			       oob, lt->spare_bytes + lt->ecc_bytes);
 		/* Pad user data with 2 bytes when using BCH (30B) */
 		oob += lt->spare_bytes + lt->ecc_bytes + 2;
 	}
 
-	if (lt->last_chunk_cnt) {
-		marvell_nfc_read_buf(mtd, oob,
-				     lt->last_spare_bytes + lt->last_ecc_bytes);
-	}
+	if (lt->last_chunk_cnt)
+		nand_read_data_op(chip, oob,
+				  lt->last_spare_bytes + lt->last_ecc_bytes,
+				  false);
 
 	return 0;
 }
@@ -1376,25 +1381,23 @@ static int marvell_nfc_hw_ecc_write_page_raw(struct mtd_info *mtd,
 					    NULL, 0);
 
 		if (chunk < lt->full_chunk_cnt)
-			marvell_nfc_write_buf(mtd, buf +
-					      (chunk * lt->data_bytes),
-					      lt->data_bytes);
+			nand_write_data_op(chip, buf + (chunk * lt->data_bytes),
+					   lt->data_bytes, false);
 		else
-			marvell_nfc_write_buf(mtd, buf +
-					      (chunk * lt->data_bytes),
-					      lt->last_data_bytes);
+			nand_write_data_op(chip, buf + (chunk * lt->data_bytes),
+					   lt->last_data_bytes, false);
 
 		if (!oob_required)
 			continue;
 
 		if (chunk < lt->full_chunk_cnt)
-			marvell_nfc_write_buf(mtd, chip->oob_poi +
-					      (chunk * (oob_size + 2)),
-					      oob_size);
+			nand_write_data_op(chip, chip->oob_poi +
+					   (chunk * (oob_size + 2)),
+					   oob_size, false);
 		else
-			marvell_nfc_write_buf(mtd, chip->oob_poi +
-					      (chunk * (oob_size + 2)),
-					      last_oob_size);
+			nand_write_data_op(chip, chip->oob_poi +
+					   (chunk * (oob_size + 2)),
+					   last_oob_size, false);
 	}
 
 	return nand_prog_page_end_op(chip);
@@ -1418,13 +1421,13 @@ static int marvell_nfc_hw_ecc_write_oob_raw(struct mtd_info *mtd,
 					    (chunk * chunk_size), NULL, 0);
 
 		if (chunk < lt->full_chunk_cnt)
-			marvell_nfc_write_buf(mtd, chip->oob_poi +
-					      (chunk * (oob_size + 2)),
-					      oob_size);
+			nand_write_data_op(chip, chip->oob_poi +
+					   (chunk * (oob_size + 2)),
+					   oob_size, false);
 		else
-			marvell_nfc_write_buf(mtd, chip->oob_poi +
-					      (chunk * (oob_size + 2)),
-					      last_oob_size);
+			nand_write_data_op(chip, chip->oob_poi +
+					   (chunk * (oob_size + 2)),
+					   last_oob_size, false);
 	}
 
 	return nand_prog_page_end_op(chip);

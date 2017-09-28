@@ -1721,7 +1721,7 @@ int nand_change_write_column_op(struct nand_chip *chip, unsigned int column,
 EXPORT_SYMBOL_GPL(nand_change_write_column_op);
 
 /**
- * nand_reset_op - Do a READID operation
+ * nand_readid_op - Do a READID operation
  * @chip: The NAND chip
  * @addr: address cycle to pass after the READID command
  * @buf: buffer used to store the ID

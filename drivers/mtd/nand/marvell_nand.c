@@ -1449,6 +1449,353 @@ static int marvell_nfc_hw_ecc_write_oob_raw(struct mtd_info *mtd,
 	return nand_prog_page_end_op(chip);
 }
 
+static int marvell_nfc_exec_naked_instr(struct nand_chip *chip, u32 ndcb0,
+					u32 ndcb1, u32 ndcb2, u32 ndcb3)
+{
+	int ret = marvell_nfc_prepare_cmd(chip);
+	if (ret)
+		return ret;
+
+	marvell_nfc_send_cmd(chip, ndcb0, ndcb1, ndcb2, ndcb3);
+
+	return marvell_nfc_wait_ndrun(chip);
+}
+
+static void marvell_nfc_force_byte_access(struct nand_chip *chip, bool status)
+{
+	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
+	u32 ndcr;
+
+	if (!(chip->options & NAND_BUSWIDTH_16))
+		return;
+
+	ndcr = readl_relaxed(nfc->regs + NDCR);
+
+	if (status)
+		ndcr &= ~(NDCR_DWIDTH_M | NDCR_DWIDTH_C);
+	else
+		ndcr |= NDCR_DWIDTH_M | NDCR_DWIDTH_C;
+
+	writel_relaxed(ndcr, nfc->regs + NDCR);
+}
+
+static int marvell_nfc_drain_fifo(struct nand_chip *chip,
+				  struct nand_op_instr *instr, int len)
+{
+	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
+	int last_len = len % FIFO_DEPTH;
+	int last_full_offset = round_down(len, FIFO_DEPTH);
+	int ret, i;
+
+	/* Handle data in instruction (read) */
+	if (instr->type == NAND_OP_DATA_IN_INSTR) {
+		ret = marvell_nfc_end_cmd(chip, NDSR_RDDREQ,
+					  "RDDREQ while draining raw data");
+		if (ret)
+			return ret;
+
+		/* Drain FIFO */
+		for (i = 0; i < last_full_offset; i += FIFO_DEPTH)
+			ioread32_rep(nfc->regs + NDDB,
+				     &((u32 *)instr->data.in)[i / sizeof(u32)],
+				     FIFO_DEPTH_32);
+
+		if (last_len) {
+			ioread32_rep(nfc->regs + NDDB, nfc->buf, FIFO_DEPTH_32);
+			memcpy(&((u8 *)instr->data.in)[last_full_offset],
+			       nfc->buf, last_len);
+		}
+	}
+
+	/* Handle data out instruction (write) */
+	if (instr->type == NAND_OP_DATA_OUT_INSTR) {
+		ret = marvell_nfc_end_cmd(chip, NDSR_WRDREQ,
+					  "WRDREQ while filling raw data");
+		if (ret)
+			return ret;
+
+		/* Fullfill FIFO */
+		for (i = 0; i < last_full_offset; i += FIFO_DEPTH)
+			iowrite32_rep(nfc->regs + NDDB,
+				      &((u32 *)instr->data.in)[i / sizeof(u32)],
+				      FIFO_DEPTH_32);
+
+		if (last_len) {
+			memcpy(nfc->buf,
+			       &((u8 *)instr->data.out)[last_full_offset],
+			       last_len);
+			iowrite32_rep(nfc->regs + NDDB, nfc->buf,
+				      FIFO_DEPTH_32);
+		}
+	}
+
+	return 0;
+}
+
+static int marvell_nfc_exec_op(struct nand_chip *chip,
+			       struct nand_op_instr *instrs, int ninstrs,
+			       bool check_only)
+{
+	struct nand_op_instr *data_instr = NULL, *instr;
+	u32 ndcb0 = 0, ndcb1 = 0, ndcb2 = 0, ndcb3 = 0;
+	int cmd_instr_count = 0, addr_instr_count = 0, data_instr_count = 0;
+	int ret = 0, op_id, i, len = 0, rdy_timeout = 0;
+	bool first_cmd_instr = true, empty_data_instr = false;
+	bool is_nfc_v1 = to_marvell_nfc(chip->controller)->caps->variant ==
+		MARVELL_NFC_VARIANT_PXA3XX;
+
+	pr_debug("%s (%d instructions)\n", __FUNCTION__, ninstrs);
+
+	if (!ninstrs)
+		return -EINVAL;
+
+	/* Before processing the instructions, check they will be supported */
+	for (op_id = 0; op_id < ninstrs; op_id++) {
+		if (instrs[op_id].type == NAND_OP_CMD_INSTR)
+			cmd_instr_count++;
+
+		if (instrs[op_id].type == NAND_OP_ADDR_INSTR) {
+			addr_instr_count++;
+
+			/* Limit to maximum 5 address cycles */
+			if (instrs[op_id].addr.naddrs > 5)
+				return -ENOTSUPP;
+		}
+
+		if (instrs[op_id].type == NAND_OP_DATA_IN_INSTR ||
+		    instrs[op_id].type == NAND_OP_DATA_OUT_INSTR) {
+			data_instr_count++;
+
+			/*
+			 * If no length is given, cmd and addr cycles must be
+			 * naked and done separetely.
+			 */
+			if (!instrs[op_id].data.len)
+				empty_data_instr = true;
+
+			/*
+			 * NFCv1 on pxa boards do not support naked operations
+			 * that will be used if length is bigger than MAX_CHUNK
+			 * or if the instruction set is reduced to a unique data
+			 * transfer.
+			 */
+			if (is_nfc_v1 && (instrs[op_id].data.len > MAX_CHUNK ||
+					    ninstrs == 1 || empty_data_instr))
+				return -ENOTSUPP;
+		}
+	}
+
+	/*
+	 * Maximum two command instructions, one address instruction, and
+	 * one data transfer instruction per operation
+	 */
+	if (cmd_instr_count > 2 || addr_instr_count > 1 || data_instr_count > 1)
+		return -ENOTSUPP;
+
+	if (check_only)
+		return 0;
+
+	/* Bypass ready wait between commands unless explicitly stated */
+	if (cmd_instr_count == 2)
+		ndcb0 |= NDCB0_RDY_BYP;
+
+	/* Parse instruction set */
+	for (op_id = 0; op_id < ninstrs; op_id++) {
+		instr = &instrs[op_id];
+
+		switch (instr->type) {
+		case NAND_OP_CMD_INSTR:
+			pr_debug("CMD [0x%02x]\n", instr->cmd.opcode);
+
+			if (first_cmd_instr) {
+				ndcb0 |= NDCB0_CMD1(instr->cmd.opcode);
+			} else {
+				ndcb0 |= NDCB0_CMD2(instr->cmd.opcode);
+				ndcb0 |= NDCB0_DBC;
+				break;
+			}
+
+			/*
+			 * Our controller cannot stack naked commands and naked
+			 * addresses, they have to be sent separately. The
+			 * typical situation where both (command and address)
+			 * must be send in the middle of the state machine is
+			 * for an erase operation where the instructions are to
+			 * send 0x60, then the address cycles, then 0xD0. The
+			 * criterium to trigger a naked operation is that there
+			 * is no actual data transfer and after the current
+			 * operation, there will be yet another address or
+			 * command cycle.
+			 */
+			if (!data_instr_count || empty_data_instr) {
+				ndcb0 |= NDCB0_CMD_TYPE(TYPE_NAKED_CMD);
+
+				/*
+				 * As explained above, when there is another
+				 * naked instruction after, trigger the naked
+				 * operation, reset NDCB0 and continue.
+				 */
+				if ((op_id + 1) < ninstrs &&
+				    instrs[op_id + 1].type ==
+				    NAND_OP_ADDR_INSTR) {
+					ret = marvell_nfc_exec_naked_instr(
+						chip, ndcb0, 0, 0, 0);
+					ndcb0 = 0;
+					if (ret)
+						return ret;
+				}
+
+				break;
+			}
+
+			/*
+			 * Next command instruction will be moved to the second
+			 * slot and the double byte command bit set.
+			 */
+			first_cmd_instr = false;
+			break;
+
+		case NAND_OP_ADDR_INSTR:
+			pr_debug("ADDR [%d cycles]\n", instr->addr.naddrs);
+
+			ndcb0 |= NDCB0_ADDR_CYC(instr->addr.naddrs);
+
+			for (i = 0; i < 4; i++)
+				ndcb1 |= instr->addr.addrs[i] << (8 * i);
+
+			if (instr->addr.naddrs == 5)
+				ndcb2 |= instr->addr.addrs[5];
+
+			/*
+			 * Our controller cannot stack naked commands and naked
+			 * addresses, they have to be sent separately. The
+			 * typical situation where both (command and address)
+			 * must be send in the middle of the state machine is
+			 * for an erase operation where the instructions are to
+			 * send 0x60, then the address cycles, then 0xD0. The
+			 * criterium to trigger a naked operation is that there
+			 * is no actual data transfer and after the current
+			 * operation, there will be yet another address or
+			 * command cycle.
+			 */
+			if (!data_instr_count || empty_data_instr) {
+				ndcb0 |= NDCB0_CMD_TYPE(TYPE_NAKED_ADDR);
+
+				/*
+				 * As explained above, when there is another
+				 * naked instruction after, trigger the naked
+				 * operation, reset NDCB* and continue.
+				 */
+				if ((op_id + 1) < ninstrs &&
+				    instrs[op_id + 1].type ==
+				    NAND_OP_CMD_INSTR) {
+					ret = marvell_nfc_exec_naked_instr(
+						chip, ndcb0, ndcb1, ndcb2, 0);
+					ndcb0 = 0;
+					ndcb1 = 0;
+					ndcb2 = 0;
+					if (ret)
+						return ret;
+				}
+
+				break;
+			}
+
+			break;
+
+		case NAND_OP_DATA_IN_INSTR:
+			pr_debug("DATA IN [%d bytes]\n", instr->data.len);
+
+			if (!instr->data.len)
+				break;
+
+			if (instr->data.force_8bit)
+				marvell_nfc_force_byte_access(chip, true);
+
+			data_instr = instr;
+
+			ndcb0 |= NDCB0_CMD_TYPE(TYPE_READ);
+			ndcb0 |= NDCB0_LEN_OVRD;
+
+			/* A single data transfer is a naked read */
+			ndcb0 |= NDCB0_CMD_XTYPE(ninstrs == 1 ?
+						 XTYPE_LAST_NAKED_READ :
+						 XTYPE_MONOLITHIC_READ);
+
+			len = min_t(int, instr->data.len, MAX_CHUNK);
+			ndcb3 |= round_up(len, FIFO_DEPTH);
+			break;
+
+		case NAND_OP_DATA_OUT_INSTR:
+			pr_debug("DATA OUT [%d bytes]\n", instr->data.len);
+
+			if (!instr->data.len)
+				break;
+
+			if (instr->data.force_8bit)
+				marvell_nfc_force_byte_access(chip, true);
+
+			data_instr = instr;
+
+			ndcb0 |= NDCB0_CMD_TYPE(TYPE_WRITE);
+			ndcb0 |= NDCB0_LEN_OVRD;
+
+			/* A single data transfer is a naked write */
+			ndcb0 |= NDCB0_CMD_XTYPE(ninstrs == 1 ?
+						 XTYPE_LAST_NAKED_WRITE :
+						 XTYPE_MONOLITHIC_WRITE);
+
+			len = min_t(int, instr->data.len, MAX_CHUNK);
+			ndcb3 |= round_up(len, FIFO_DEPTH);
+			break;
+
+		case NAND_OP_WAITRDY_INSTR:
+			pr_debug("WAITRDY [timeout %d ms]\n",
+				 instr->waitrdy.timeout_ms);
+
+			/*
+			 * Wait periods are handled by the controller thanks to
+			 * the timings decided during the probe.
+			 */
+			ndcb0 &= ~NDCB0_RDY_BYP;
+			rdy_timeout = 10000; //todo: fill core and use instr->waitrdy.timeout_ms;
+
+			break;
+		}
+	}
+
+	ret = marvell_nfc_prepare_cmd(chip);
+	if (ret)
+		return ret;
+
+	marvell_nfc_send_cmd(chip, ndcb0, ndcb1, ndcb2, ndcb3);
+
+	/* No data instruction means just executing the command */
+	if (!data_instr)
+		return marvell_nfc_wait_ndrun(chip);
+
+	/* Otherwise, drain/fullfill the FIFO */
+	if (rdy_timeout && data_instr->type == NAND_OP_DATA_IN_INSTR)
+		marvell_nfc_wait_op(chip, rdy_timeout);
+
+	ret = marvell_nfc_drain_fifo(chip, data_instr, len);
+
+	if (rdy_timeout && data_instr->type == NAND_OP_DATA_OUT_INSTR)
+		marvell_nfc_wait_op(chip, rdy_timeout);
+
+	if (!ret && data_instr->data.len > MAX_CHUNK) {
+		data_instr->data.len -= len;
+		data_instr->data.in += len;
+		ret = marvell_nfc_exec_op(chip, data_instr, 1, false);
+	}
+
+	/* End of the instruction set, switch back to 16b bus width if needed */
+	if (instr->data.force_8bit)
+		marvell_nfc_force_byte_access(chip, false);
+
+	return ret;
+}
+
 /*
  * HW ECC layouts, identical to old pxa3xx_nand driver,
  * to be fully backward compatible

@@ -1691,8 +1691,15 @@ static int marvell_nfc_setup_data_interface(struct mtd_info *mtd, int chipnr,
 		MIN_RD_DEL_CNT : MIN_RD_DEL_CNT + nfc_tmg.tRH;
 
 	nfc_tmg.tAR = TO_CYCLES(sdr->tAR_min, period_ns);
-	nfc_tmg.tWHR = TO_CYCLES(sdr->tWHR_min, period_ns) - 2;
-	nfc_tmg.tRHW = TO_CYCLES(sdr->tRHW_min, period_ns);
+	/*
+	 * tWHR and tRHW are supposed to be read to write delays (and vice
+	 * versa) but in some cases, ie. when doing a change column, they must
+	 * be greater than that to be sure tCCS delay is respected.
+	 */
+	nfc_tmg.tWHR = TO_CYCLES(max_t(int, sdr->tWHR_min, sdr->tCCS_min),
+				 period_ns) - 2,
+	nfc_tmg.tRHW = TO_CYCLES(max_t(int, sdr->tRHW_min, sdr->tCCS_min),
+				 period_ns);
 
 	/* Use WAIT_MODE (wait for RB line) instead of only relying on delays */
 	nfc_tmg.tR = TO_CYCLES(sdr->tWB_max, period_ns);

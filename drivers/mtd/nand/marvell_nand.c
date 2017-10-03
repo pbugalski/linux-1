@@ -223,15 +223,22 @@ static inline struct marvell_nand_chip_sel *to_nand_sel(struct marvell_nand_chip
 	return &nand->sels[nand->selected];
 }
 
+enum marvell_nfc_variant {
+	MARVELL_NFC_VARIANT_PXA3XX,
+	MARVELL_NFC_VARIANT_ARMADA370,
+};
+
 /*
  * NAND controller capabilities for distinction between compatible strings
  *
+ * @variant:		Board type
  * @max_cs_nb:		Number of Chip Select lines available
  * @max_rb_nb:		Number of Ready/Busy lines available
  * @legacy_of_bindings	Indicates if DT parsing must be done using the old
  *			fashion way
  */
 struct marvell_nfc_caps {
+	enum marvell_nfc_variant variant;
 	unsigned int max_cs_nb;
 	unsigned int max_rb_nb;
 	bool legacy_of_bindings;
@@ -2084,22 +2091,26 @@ static int marvell_nfc_remove(struct platform_device *pdev)
 }
 
 static const struct marvell_nfc_caps marvell_armada370_nfc_caps = {
+	.variant = MARVELL_NFC_VARIANT_ARMADA370,
 	.max_cs_nb = 4,
 	.max_rb_nb = 2,
 };
 
 static const struct marvell_nfc_caps marvell_pxa3xx_nfc_caps = {
+	.variant = MARVELL_NFC_VARIANT_PXA3XX,
 	.max_cs_nb = 2,
 	.max_rb_nb = 1,
 };
 
 static const struct marvell_nfc_caps marvell_armada370_nfc_legacy_caps = {
+	.variant = MARVELL_NFC_VARIANT_ARMADA370,
 	.max_cs_nb = 4,
 	.max_rb_nb = 2,
 	.legacy_of_bindings = true,
 };
 
 static const struct marvell_nfc_caps marvell_pxa3xx_nfc_legacy_caps = {
+	.variant = MARVELL_NFC_VARIANT_PXA3XX,
 	.max_cs_nb = 2,
 	.max_rb_nb = 1,
 	.legacy_of_bindings = true,

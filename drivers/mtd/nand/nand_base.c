@@ -1441,6 +1441,7 @@ int nand_change_read_column_op(struct nand_chip *chip, unsigned int column,
 			NAND_OP_CMD(NAND_CMD_RNDOUT),
 			NAND_OP_ADDR(2, addrs),
 			NAND_OP_DATA_IN(len, buf),
+			NAND_OP_CMD(NAND_CMD_RNDOUTSTART),
 		};
 
 		return nand_exec_op(chip, instrs, ARRAY_SIZE(instrs));

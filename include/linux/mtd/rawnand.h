@@ -762,6 +762,7 @@ struct nand_op_data_instr {
 		void *in;
 		const void *out;
 	};
+	bool force_8bit;
 };
 
 struct nand_op_waitrdy_instr {
@@ -773,8 +774,6 @@ enum nand_op_instr_type {
 	NAND_OP_ADDR_INSTR,
 	NAND_OP_DATA_IN_INSTR,
 	NAND_OP_DATA_OUT_INSTR,
-	NAND_OP_8BIT_DATA_IN_INSTR,
-	NAND_OP_8BIT_DATA_OUT_INSTR,
 	NAND_OP_WAITRDY_INSTR,
 };
 
@@ -809,6 +808,7 @@ struct nand_op_instr {
 		.data = {				\
 			.len = l,			\
 			.in = buf,			\
+			.force_8bit = false,		\
 		},					\
 	}
 
@@ -818,24 +818,27 @@ struct nand_op_instr {
 		.data = {				\
 			.len = l,			\
 			.out = buf,			\
+			.force_8bit = false,		\
 		},					\
 	}
 
 #define NAND_OP_8BIT_DATA_IN(l, buf)			\
 	{						\
-		.type = NAND_OP_8BIT_DATA_IN_INSTR,	\
+		.type = NAND_OP_DATA_IN_INSTR,		\
 		.data = {				\
 			.len = l,			\
 			.in = buf,			\
+			.force_8bit = true,		\
 		},					\
 	}
 
 #define NAND_OP_8BIT_DATA_OUT(l, buf)			\
 	{						\
-		.type = NAND_OP_8BIT_DATA_OUT_INSTR,	\
+		.type = NAND_OP_DATA_OUT_INSTR,		\
 		.data = {				\
 			.len = l,			\
 			.out = buf,			\
+			.force_8bit = true,		\
 		},					\
 	}
 
@@ -1434,9 +1437,9 @@ int nand_prog_page_op(struct nand_chip *chip, unsigned int page,
 int nand_change_write_column_op(struct nand_chip *chip, unsigned int column,
 				const void *buf, unsigned int len);
 int nand_read_data_op(struct nand_chip *chip, void *buf, unsigned int len,
-		      bool force_8bits);
+		      bool force_8bit);
 int nand_write_data_op(struct nand_chip *chip, const void *buf,
-		       unsigned int len, bool force_8bits);
+		       unsigned int len, bool force_8bit);
 
 /* Free resources held by the NAND device */
 void nand_cleanup(struct nand_chip *chip);

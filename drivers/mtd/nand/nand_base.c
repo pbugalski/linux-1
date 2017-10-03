@@ -1964,7 +1964,7 @@ EXPORT_SYMBOL_GPL(nand_reset_op);
  * @chip: The NAND chip
  * @buf: buffer used to store the data
  * @len: length of the buffer
- * @force_8bits: force 8bits bus access
+ * @force_8bit: force 8-bit bus access
  *
  * This function does a raw data read on the bus. Usually used after launching
  * another NAND operation like nand_read_page_op().
@@ -1973,7 +1973,7 @@ EXPORT_SYMBOL_GPL(nand_reset_op);
  * Returns 0 for success or negative error code otherwise
  */
 int nand_read_data_op(struct nand_chip *chip, void *buf, unsigned int len,
-		      bool force_8bits)
+		      bool force_8bit)
 {
 	struct mtd_info *mtd = nand_to_mtd(chip);
 
@@ -1985,13 +1985,12 @@ int nand_read_data_op(struct nand_chip *chip, void *buf, unsigned int len,
 			NAND_OP_DATA_IN(len, buf),
 		};
 
-		if (force_8bits)
-			instrs[0].type = NAND_OP_8BIT_DATA_IN_INSTR;
+		instrs[0].data.force_8bit = force_8bit;
 
 		return nand_exec_op(chip, instrs, ARRAY_SIZE(instrs));
 	}
 
-	if (force_8bits) {
+	if (force_8bit) {
 		u8 *p = buf;
 		unsigned int i;
 
@@ -2010,7 +2009,7 @@ EXPORT_SYMBOL_GPL(nand_read_data_op);
  * @chip: The NAND chip
  * @buf: buffer containing the data to send on the bus
  * @len: length of the buffer
- * @force_8bits: force 8bits bus access
+ * @force_8bit: force 8-bit bus access
  *
  * This function does a raw data write on the bus. Usually used after launching
  * another NAND operation like nand_write_page_begin_op().
@@ -2019,7 +2018,7 @@ EXPORT_SYMBOL_GPL(nand_read_data_op);
  * Returns 0 for success or negative error code otherwise
  */
 int nand_write_data_op(struct nand_chip *chip, const void *buf,
-		       unsigned int len, bool force_8bits)
+		       unsigned int len, bool force_8bit)
 {
 	struct mtd_info *mtd = nand_to_mtd(chip);
 
@@ -2031,13 +2030,12 @@ int nand_write_data_op(struct nand_chip *chip, const void *buf,
 			NAND_OP_DATA_OUT(len, buf),
 		};
 
-		if (force_8bits)
-			instrs[0].type = NAND_OP_8BIT_DATA_OUT_INSTR;
+		instrs[0].data.force_8bit = force_8bit;
 
 		return nand_exec_op(chip, instrs, ARRAY_SIZE(instrs));
 	}
 
-	if (force_8bits) {
+	if (force_8bit) {
 		const u8 *p = buf;
 		unsigned int i;
 

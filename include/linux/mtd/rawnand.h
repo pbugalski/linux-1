@@ -981,8 +981,8 @@ struct nand_chip {
 				    const struct nand_data_interface *conf);
 
 	int (*exec_op)(struct nand_chip *chip,
-		       const struct nand_op_instr *instrs,
-		       int ninstrs);
+		       struct nand_op_instr *instrs,
+		       int ninstrs, bool check_only);
 
 	int chip_delay;
 	unsigned int options;
@@ -1050,7 +1050,7 @@ static inline int nand_exec_op(struct nand_chip *chip,
 	if (!chip->exec_op)
 		return -ENOTSUPP;
 
-	return chip->exec_op(chip, instrs, ninstrs);
+	return chip->exec_op(chip, instrs, ninstrs, false);
 }
 
 extern const struct mtd_ooblayout_ops nand_ooblayout_sp_ops;

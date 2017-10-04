@@ -1056,6 +1056,26 @@ static inline int nand_exec_op(struct nand_chip *chip,
 	return chip->exec_op(chip, instrs, ninstrs, false);
 }
 
+static inline bool nand_instr_is_cmd(struct nand_op_instr *instr)
+{
+	return instr && instr->type == NAND_OP_CMD_INSTR;
+}
+
+static inline bool nand_instr_is_addr(struct nand_op_instr *instr)
+{
+	return instr && instr->type == NAND_OP_ADDR_INSTR;
+}
+
+static inline bool nand_instr_is_data_in(struct nand_op_instr *instr)
+{
+	return instr && instr->type == NAND_OP_DATA_IN_INSTR;
+}
+
+static inline bool nand_instr_is_data_out(struct nand_op_instr *instr)
+{
+	return instr && instr->type == NAND_OP_DATA_OUT_INSTR;
+}
+
 extern const struct mtd_ooblayout_ops nand_ooblayout_sp_ops;
 extern const struct mtd_ooblayout_ops nand_ooblayout_lp_ops;
 

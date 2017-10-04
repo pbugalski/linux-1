@@ -1279,7 +1279,7 @@ static void marvell_nfc_force_byte_access(struct nand_chip *chip, bool status)
 	writel_relaxed(ndcr, nfc->regs + NDCR);
 }
 
-static int marvell_nfc_drain_fifo(struct nand_chip *chip,
+static int marvell_nfc_xfer_data(struct nand_chip *chip,
 				  struct nand_op_instr *instr, int len)
 {
 	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
@@ -1339,7 +1339,7 @@ static int marvell_nfc_exec_op(struct nand_chip *chip,
 			       struct nand_op_instr *instrs, int ninstrs,
 			       bool check_only)
 {
-	struct nand_op_instr *data_instr = NULL, *instr;
+	struct nand_op_instr *data_instr = NULL, *instr = NULL;
 	u32 ndcb0 = 0, ndcb1 = 0, ndcb2 = 0, ndcb3 = 0;
 	int cmd_instr_count = 0, addr_instr_count = 0, data_instr_count = 0;
 	int ret = 0, op_id, i, len = 0, rdy_timeout = 0;
@@ -1574,26 +1574,46 @@ static int marvell_nfc_exec_op(struct nand_chip *chip,
 	marvell_nfc_send_cmd(chip, ndcb0, ndcb1, ndcb2, ndcb3);
 
 	/* No data instruction means just executing the command */
-	if (!data_instr)
-		return marvell_nfc_wait_ndrun(chip);
+	if (!data_instr) {
+		ret = marvell_nfc_wait_ndrun(chip);
+		/*
+		 * The controller cannot handle delays between naked operations,
+		 * so add an extra delay after some naked commands.
+		 */
+		if (nand_instr_is_cmd(&instrs[0])) {
+			if (instrs[0].cmd.opcode == NAND_CMD_RNDIN)
+				ndelay(100); //tCCS
 
-	/* Otherwise, drain/fullfill the FIFO */
-	if (rdy_timeout && data_instr->type == NAND_OP_DATA_IN_INSTR)
+			if (instrs[0].cmd.opcode == NAND_CMD_PAGEPROG)
+				marvell_nfc_wait_op(chip, 600); // tPROG
+
+			if (instrs[0].cmd.opcode == NAND_CMD_ERASE1)
+				marvell_nfc_wait_op(chip, 784); // tBERS
+		}
+
+		return ret;
+	}
+
+	/* Otherwise, move the data; delays are handled by the controller */
+	if (rdy_timeout && nand_instr_is_data_in(data_instr))
 		marvell_nfc_wait_op(chip, rdy_timeout);
 
-	ret = marvell_nfc_drain_fifo(chip, data_instr, len);
+	ret = marvell_nfc_xfer_data(chip, data_instr, len);
 
-	if (rdy_timeout && data_instr->type == NAND_OP_DATA_OUT_INSTR)
+	if (rdy_timeout && nand_instr_is_data_out(data_instr))
 		marvell_nfc_wait_op(chip, rdy_timeout);
 
 	if (!ret && data_instr->data.len > MAX_CHUNK) {
 		data_instr->data.len -= len;
-		data_instr->data.in += len;
+		if (nand_instr_is_data_in(data_instr))
+			data_instr->data.in += len;
+		else
+			data_instr->data.out += len;
 		ret = marvell_nfc_exec_op(chip, data_instr, 1, false);
 	}
 
 	/* End of the instruction set, switch back to 16b bus width if needed */
-	if (instr->data.force_8bit)
+	if (data_instr->data.force_8bit)
 		marvell_nfc_force_byte_access(chip, false);
 
 	return ret;

@@ -536,43 +536,6 @@ static int marvell_nfc_wait_op(struct nand_chip *chip, unsigned int timeout)
 	return ret ? 0 : -ETIMEDOUT;
 }
 
-static void marvell_nfc_cmd_ctrl(struct mtd_info *mtd, int data,
-				 unsigned int ctrl)
-{
-	struct nand_chip *chip = mtd_to_nand(mtd);
-	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
-
-	if (ctrl & (NAND_CLE | NAND_ALE)) {
-		/*
-		 * Reset the position used in the ->read/write{byte,word,buf}()
-		 * helpers to trigger a naked read/write.
-		 */
-		nfc->buf_pos = 0;
-
-		if (marvell_nfc_prepare_cmd(chip))
-			return;
-
-		/*
-		 * Marvell NFC may use naked commands and naked addresses.
-		 *
-		 * NDCB{1-3} registers are RO while NDCB0 is RW.
-		 * NFC waits for all these three registers to be written
-		 * by the use of NDCB0 only (it acts as a FIFO)
-		 */
-		if (ctrl & NAND_CLE)
-			marvell_nfc_send_cmd(chip, data |
-					     NDCB0_CMD_TYPE(TYPE_NAKED_CMD),
-					     0, 0, 0);
-		else if (ctrl & NAND_ALE)
-			marvell_nfc_send_cmd(chip,
-					     NDCB0_CMD_TYPE(TYPE_NAKED_ADDR) |
-					     NDCB0_ADDR_CYC(1),
-					     data, 0, 0);
-
-		marvell_nfc_wait_ndrun(chip);
-	}
-}
-
 static void marvell_nfc_select_chip(struct mtd_info *mtd, int chip)
 {
 	struct nand_chip *nand = mtd_to_nand(mtd);
@@ -641,169 +604,6 @@ static irqreturn_t marvell_nfc_isr(int irq, void *dev_id)
 	complete(&nfc->complete);
 
 	return IRQ_HANDLED;
-}
-
-static void marvell_nfc_do_naked_read(struct nand_chip *chip, int len)
-{
-	if (marvell_nfc_prepare_cmd(chip))
-		return;
-
-	marvell_nfc_send_cmd(chip, NDCB0_CMD_TYPE(TYPE_READ) |
-			     NDCB0_CMD_XTYPE(XTYPE_LAST_NAKED_READ) |
-			     NDCB0_LEN_OVRD, 0, 0, len);
-
-	marvell_nfc_end_cmd(chip, NDSR_RDDREQ, "RDDREQ during naked read");
-}
-
-static void marvell_nfc_read_buf(struct mtd_info *mtd, u8 *buf, int len)
-{
-	struct nand_chip *chip = mtd_to_nand(mtd);
-	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
-	int rounded_len, i = 0, boundary = 0, step_len = 0;
-	bool wait_cmdd = false;
-
-	/* If there are valid bytes in the local buffer, copy them */
-	if (nfc->buf_pos) {
-		i = min_t(int, len, FIFO_DEPTH - nfc->buf_pos);
-		memcpy(buf, &nfc->buf[nfc->buf_pos], i);
-		nfc->buf_pos = (nfc->buf_pos + i) % FIFO_DEPTH;
-		/* If there is no more data to read, operation is finished */
-		if (i == len)
-			return;
-	}
-
-	/* Drain FIFO */
-	while (i < len) {
-		/* Do a naked read any time boundary is reached */
-		if (i >= boundary) {
-			if (len - i > MAX_CHUNK)
-				rounded_len = MAX_CHUNK;
-			else
-				rounded_len = round_up(len - i, FIFO_DEPTH);
-
-			/* Wait for CMDD signal between operations */
-			if (wait_cmdd) {
-				wait_cmdd = false;
-				marvell_nfc_wait_cmdd(chip);
-			}
-
-			marvell_nfc_do_naked_read(chip, rounded_len);
-			wait_cmdd = true;
-			boundary += rounded_len;
-		}
-
-		/*
-		 * Cannot ioread32 directly into &buf[i] (might be unaligned) so
-		 * always write to nfc->buf (which is aligned) and copy the
-		 * right number of bytes to ->buf and move forward accordingly.
-		 */
-		step_len = min_t(int, len - i, FIFO_DEPTH);
-
-		ioread32_rep(nfc->regs + NDDB, (u32 *)&nfc->buf, FIFO_DEPTH_32);
-
-		memcpy(buf + i, nfc->buf, step_len);
-		i += step_len;
-	}
-
-	if (wait_cmdd)
-		marvell_nfc_wait_cmdd(chip);
-
-	if (step_len < FIFO_DEPTH)
-		nfc->buf_pos = step_len;
-}
-
-static u8 marvell_nfc_read_byte(struct mtd_info *mtd)
-{
-	u8 data;
-
-	marvell_nfc_read_buf(mtd, &data, 1);
-
-	return data;
-}
-
-static u16 marvell_nfc_read_word(struct mtd_info *mtd)
-{
-	u8 data[2];
-
-	marvell_nfc_read_buf(mtd, data, 2);
-
-	return data[0] + (data[1] << 8);
-}
-
-static void marvell_nfc_do_naked_write(struct nand_chip *chip, int len)
-{
-	if (marvell_nfc_prepare_cmd(chip))
-		return;
-
-	/* Trigger the naked write operation */
-	marvell_nfc_send_cmd(chip, NDCB0_CMD_TYPE(TYPE_WRITE) |
-			     NDCB0_CMD_XTYPE(XTYPE_NAKED_WRITE) |
-			     NDCB0_LEN_OVRD, 0, 0, len);
-
-	marvell_nfc_end_cmd(chip, NDSR_WRDREQ, "WRDREQ during naked write");
-}
-
-static void marvell_nfc_write_buf(struct mtd_info *mtd, const u8 *buf,
-				  int len)
-{
-	struct nand_chip *chip = mtd_to_nand(mtd);
-	struct marvell_nfc *nfc = to_marvell_nfc(chip->controller);
-	int remaining_bytes = 0, i = 0, j;
-	int rounded_len, distance, write_length;
-	u8 fifo[FIFO_DEPTH] __aligned(sizeof(u32));
-
-	/* While there are remaining bytes to write */
-	while (i < len) {
-		/*
-		 * Derive the number of remaining bytes, with respect to the
-		 * following boundaries:
-		 * - The chunk to write cannot be larger than MAX_CHUNK
-		 * - The chunk to write cannot be smaller than FIFO_DEPTH
-		 * Remaining bytes indicates the number of bytes that will
-		 * remain in the last uncomplete write (less than
-		 * FIFO_DEPTH bytes to write). They will then be copied in
-		 * the fifo array (padded with 0xFF).
-		 */
-		distance = len - i;
-		if (distance >= MAX_CHUNK) {
-			rounded_len = MAX_CHUNK;
-		} else {
-			rounded_len = round_down(distance, FIFO_DEPTH);
-			remaining_bytes = distance - rounded_len;
-		}
-
-		/* write_length matches the number of data cycles */
-		if (remaining_bytes)
-			write_length = rounded_len + FIFO_DEPTH;
-		else
-			write_length = rounded_len;
-
-		/* Trigger the naked wrrite operation */
-		marvell_nfc_do_naked_write(chip, write_length);
-
-		/*
-		 * Effectively write the data to the FIFO. Take some extra
-		 * precautions in case buf[] would not be aligned.
-		 */
-		for (j = 0; j < rounded_len / FIFO_DEPTH; j++) {
-			memcpy(fifo, &buf[i + (j * FIFO_DEPTH)], FIFO_DEPTH);
-			iowrite32_rep(nfc->regs + NDDB, fifo, FIFO_DEPTH_32);
-		}
-
-		if (remaining_bytes) {
-			/*
-			 * If the write operation is not aligned on
-			 * FIFO_DEPTH, pad with empty bytes: 0xFF.
-			 */
-			memset(fifo, 0xFF, FIFO_DEPTH);
-			memcpy(fifo, &buf[i + rounded_len], remaining_bytes);
-			iowrite32_rep(nfc->regs + NDDB, fifo, FIFO_DEPTH_32);
-		}
-
-		i += write_length;
-
-		marvell_nfc_wait_cmdd(chip);
-	}
 }
 
 /* HW ECC related functions */
@@ -2213,13 +2013,8 @@ static int marvell_nand_chip_init(struct device *dev, struct marvell_nfc *nfc,
 
 	chip->exec_op = marvell_nfc_exec_op;
 	chip->select_chip = marvell_nfc_select_chip;
-	chip->cmd_ctrl = marvell_nfc_cmd_ctrl;
 	chip->dev_ready = marvell_nfc_dev_ready;
 	chip->waitfunc = marvell_nfc_waitfunc;
-	chip->read_byte = marvell_nfc_read_byte;
-	chip->read_word = marvell_nfc_read_word;
-	chip->read_buf = marvell_nfc_read_buf;
-	chip->write_buf = marvell_nfc_write_buf;
 	if (!of_get_property(np, "marvell,nand-keep-config", NULL))
 		chip->setup_data_interface = marvell_nfc_setup_data_interface;
 

@@ -26,7 +26,7 @@
 #define MAX_CHUNK		2048
 /* Polling is done at a pace of POLL_PERIOD us until POLL_TIMEOUT is reached */
 #define POLL_PERIOD		0
-#define POLL_TIMEOUT		1000
+#define POLL_TIMEOUT		100000
 /* Interrupt maximum wait period in ms */
 #define IRQ_TIMEOUT		1000
 /* Latency in clock cycles between SoC pins and NFC logic */
@@ -1558,7 +1558,7 @@ static int marvell_nfc_exec_op(struct nand_chip *chip,
 			 * the timings decided during the probe.
 			 */
 			ndcb0 &= ~NDCB0_RDY_BYP;
-			rdy_timeout = 10000; //todo: fill core and use instr->waitrdy.timeout_ms;
+			rdy_timeout = 1000; //todo: fill core and use instr->waitrdy.timeout_ms;
 
 			break;
 		}

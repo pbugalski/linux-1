@@ -1288,7 +1288,7 @@ static int marvell_nfc_drain_fifo(struct nand_chip *chip,
 	int ret, i;
 
 	/* Handle data in instruction (read) */
-	if (instr->type == NAND_OP_DATA_IN_INSTR) {
+	if (nand_instr_is_data_in(instr)) {
 		ret = marvell_nfc_end_cmd(chip, NDSR_RDDREQ,
 					  "RDDREQ while draining raw data");
 		if (ret)
@@ -1308,7 +1308,7 @@ static int marvell_nfc_drain_fifo(struct nand_chip *chip,
 	}
 
 	/* Handle data out instruction (write) */
-	if (instr->type == NAND_OP_DATA_OUT_INSTR) {
+	if (nand_instr_is_data_out(instr)) {
 		ret = marvell_nfc_end_cmd(chip, NDSR_WRDREQ,
 					  "WRDREQ while filling raw data");
 		if (ret)
@@ -1351,10 +1351,10 @@ static int marvell_nfc_exec_op(struct nand_chip *chip,
 
 	/* Before processing the instructions, check they will be supported */
 	for (op_id = 0; op_id < ninstrs; op_id++) {
-		if (instrs[op_id].type == NAND_OP_CMD_INSTR)
+		if (nand_instr_is_cmd(&instrs[op_id]))
 			cmd_instr_count++;
 
-		if (instrs[op_id].type == NAND_OP_ADDR_INSTR) {
+		if (nand_instr_is_addr(&instrs[op_id])) {
 			addr_instr_count++;
 
 			/* Limit to maximum 5 address cycles */
@@ -1362,8 +1362,8 @@ static int marvell_nfc_exec_op(struct nand_chip *chip,
 				return -ENOTSUPP;
 		}
 
-		if (instrs[op_id].type == NAND_OP_DATA_IN_INSTR ||
-		    instrs[op_id].type == NAND_OP_DATA_OUT_INSTR) {
+		if (nand_instr_is_data_in(&instrs[op_id]) ||
+		    nand_instr_is_data_out(&instrs[op_id])) {
 			data_instr_count++;
 
 			/*

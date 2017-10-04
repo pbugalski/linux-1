@@ -1419,7 +1419,7 @@ static int marvell_nfc_exec_op(struct nand_chip *chip,
 			}
 
 			/*
-			 * Our controller cannot stack naked commands and naked
+			 * This controller cannot stack naked commands and naked
 			 * addresses, they have to be sent separately. The
 			 * typical situation where both (command and address)
 			 * must be send in the middle of the state machine is
@@ -1470,7 +1470,7 @@ static int marvell_nfc_exec_op(struct nand_chip *chip,
 				ndcb2 |= instr->addr.addrs[5];
 
 			/*
-			 * Our controller cannot stack naked commands and naked
+			 * This controller cannot stack naked commands and naked
 			 * addresses, they have to be sent separately. The
 			 * typical situation where both (command and address)
 			 * must be send in the middle of the state machine is
@@ -1601,7 +1601,7 @@ static int marvell_nfc_exec_op(struct nand_chip *chip,
 
 /*
  * HW ECC layouts, identical to old pxa3xx_nand driver,
- * to be fully backward compatible
+ * to be fully backward compatible.
  */
 static int marvell_nand_ooblayout_ecc(struct mtd_info *mtd, int section,
 				      struct mtd_oob_region *oobregion)

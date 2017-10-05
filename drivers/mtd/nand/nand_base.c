@@ -2049,6 +2049,148 @@ int nand_write_data_op(struct nand_chip *chip, const void *buf,
 }
 EXPORT_SYMBOL_GPL(nand_write_data_op);
 
+static bool
+nand_op_parser_split_instr(const struct nand_op_parser_pattern_elem *pat,
+			   const struct nand_op_instr *instr,
+			   unsigned int *ctxoffs)
+{
+	switch (pat->type) {
+	case NAND_OP_ADDR_INSTR:
+		if (!pat->addr.maxcycles)
+			break;
+
+		if (instr->addr.naddrs - *ctxoffs > pat->addr.maxcycles) {
+			*ctxoffs += pat->addr.maxcycles;
+			return true;
+		}
+		break;
+
+	case NAND_OP_DATA_IN_INSTR:
+	case NAND_OP_DATA_OUT_INSTR:
+		if (!pat->data.maxlen)
+			break;
+
+		if (instr->data.len - *ctxoffs > pat->data.maxlen) {
+			*ctxoffs += pat->data.maxlen;
+			return true;
+		}
+		break;
+
+	default:
+		break;
+	}
+
+	return false;
+}
+
+static bool
+nand_op_parser_match(const struct nand_op_parser_pattern *pat,
+		     struct nand_op_parser_ctx *ctx)
+{
+	unsigned int i, j, newinstrctxptr = ctx->instrctxptr;
+
+	for (i = ctx->instrptr, j = 0; i < ctx->ninstrs && j < pat->nelems;) {
+		const struct nand_op_instr *instr = &ctx->instrs[i];
+
+		/*
+		 * The pattern matches but is not handling the whole
+		 * instruction sequence. That's fine, we'll break down the
+		 * NAND operation in several NFC ops.
+		 */
+		if (j >= pat->nelems)
+			break;
+
+		/*
+		 * The pattern instruction does not match the operation
+		 * instruction. If the instruction is marked optional in the
+		 * pattern definition, we skip the pattern element and continue
+		 * to the next one. If the element is mandatory, there's no
+		 * match and we can return false directly.
+		 */
+		if (instr->type != pat->elems[j].type) {
+			if (!pat->elems[j].optional)
+				return false;
+
+			j++;
+			continue;
+		}
+
+		/*
+		 * Now check the pattern element contraints. If the pattern is
+		 * not able to handle the whole instruction in a single step,
+		 * we'll to break it down into several instructions.
+		 */
+		if (nand_op_parser_split_instr(&pat->elems[j], instr,
+					       &newinstrctxptr)) {
+			j++;
+			break;
+		}
+
+		i++;
+		j++;
+		newinstrctxptr = 0;
+	}
+
+	/*
+	 * We had a match on the pattern head, but the pattern may be longer
+	 * than the instructions we're asked to execute. We need to make sure
+	 * there's no mandatory elements in the pattern tail.
+	 */
+	for (; j < pat->nelems; j++) {
+		if (!pat->elems[j].optional)
+			return false;
+	}
+
+	/* We have a match: update the ctx and return true. */
+	ctx->subop.instrs = &ctx->instrs[ctx->instrptr];
+	ctx->subop.ninstrs = i - ctx->instrptr;
+	if (newinstrctxptr)
+		ctx->subop.ninstrs++;
+	ctx->subop.instrctxptr.start = ctx->instrctxptr;
+	ctx->subop.instrctxptr.end = newinstrctxptr - 1;
+	ctx->instrptr = i;
+	ctx->instrctxptr = newinstrctxptr;
+
+	return true;
+}
+
+int nand_op_parser_exec_op(struct nand_chip *chip,
+			   const struct nand_op_parser *parser,
+			   const struct nand_op_instr *instrs,
+			   unsigned int ninstrs, bool check_only)
+{
+	struct nand_op_parser_ctx ctx = {
+		.instrs = instrs,
+		.ninstrs = ninstrs,
+	};
+
+	while (ctx.instrptr < ninstrs) {
+		unsigned int i;
+		int ret;
+
+		for (i = 0; i < parser->npatterns; i++) {
+			const struct nand_op_parser_pattern *pattern;
+
+			pattern = &parser->patterns[i];
+			if (!nand_op_parser_match(pattern, &ctx))
+				continue;
+
+			if (check_only)
+				break;
+
+			ret = pattern->exec(chip, &ctx.subop);
+			if (ret)
+				return ret;
+		}
+
+		if (i >= parser->npatterns)
+			return -ENOTSUPP;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(nand_op_parser_exec_op);
+
 /**
  * nand_reset - Reset and initialize a NAND device
  * @chip: The NAND chip

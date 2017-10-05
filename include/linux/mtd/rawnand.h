@@ -848,6 +848,89 @@ struct nand_op_instr {
 		.waitrdy.timeout_ms = tout,		\
 	}
 
+struct nand_subop {
+	const struct nand_op_instr *instrs;
+	unsigned int ninstrs;
+	struct {
+		unsigned int start;
+		unsigned int end;
+	} instrctxptr;
+};
+
+struct nand_op_parser_ctx {
+	const struct nand_op_instr *instrs;
+	unsigned int ninstrs;
+	unsigned int instrptr;
+	unsigned int instrctxptr;
+	struct nand_subop subop;
+};
+
+struct nand_op_parser_addr_constraints {
+	unsigned int maxcycles;
+};
+
+struct nand_op_parser_data_constraints {
+	unsigned int maxlen;
+};
+
+struct nand_op_parser_pattern_elem {
+	enum nand_op_instr_type type;
+	bool optional;
+	union {
+		struct nand_op_parser_addr_constraints addr;
+		struct nand_op_parser_data_constraints data;
+	};
+};
+
+#define NAND_OP_PARSER_PAT_CMD_ELEM(_opt)			\
+	{							\
+		.type = NAND_OP_CMD_INSTR,			\
+		.optional = _opt,				\
+	}
+
+#define NAND_OP_PARSER_PAT_ADDR_ELEM(_opt, _maxcycles)		\
+	{							\
+		.type = NAND_OP_CMD_INSTR,			\
+		.optional = _opt,				\
+		.addr.maxcycles = _maxcycles,			\
+	}
+
+#define NAND_OP_PARSER_PAT_DATA_IN_ELEM(_opt, _maxlen)		\
+	{							\
+		.type = NAND_OP_DATA_IN_INSTR,			\
+		.optional = _opt,				\
+		.data.maxlen = _maxlen,				\
+	}
+
+#define NAND_OP_PARSER_PAT_DATA_OUT_ELEM(_opt, _maxlen)		\
+	{							\
+		.type = NAND_OP_DATA_OUT_INSTR,			\
+		.optional = _opt,				\
+		.data.maxlen = _maxlen,				\
+	}
+
+#define NAND_OP_PARSER_PAT_WAITRDY_ELEM(_opt)			\
+	{							\
+		.type = NAND_OP_WAITRDY_INSTR,			\
+		.optional = _opt,				\
+	}
+
+struct nand_op_parser_pattern {
+	const struct nand_op_parser_pattern_elem *elems;
+	unsigned int nelems;
+	int (*exec)(struct nand_chip *chip, struct nand_subop *subop);
+};
+
+struct nand_op_parser {
+	const struct nand_op_parser_pattern *patterns;
+	unsigned int npatterns;
+};
+
+int nand_op_parser_exec_op(struct nand_chip *chip,
+			   const struct nand_op_parser *parser,
+			   const struct nand_op_instr *instrs,
+			   unsigned int ninstrs, bool check_only);
+
 /**
  * struct nand_chip - NAND Private Flash Chip Data
  * @mtd:		MTD device registered to the MTD framework

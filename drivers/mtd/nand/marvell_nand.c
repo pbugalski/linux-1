@@ -1335,6 +1335,123 @@ static int marvell_nfc_xfer_data(struct nand_chip *chip,
 	return 0;
 }
 
+static const struct nand_op_parser_pattern_elem naked_waitrdy_elems[] = {
+	NAND_OP_PARSER_PAT_WAITRDY_ELEM(false),
+};
+
+static int naked_waitrdy_exec(struct nand_chip *chip,
+			      struct nand_subop *subop)
+{
+	/* TODO: Wait for the RDY bit to be set here. */
+	return 0;
+}
+
+static const struct nand_op_parser_pattern_elem naked_cmd_elems[] = {
+	NAND_OP_PARSER_PAT_CMD_ELEM(false),
+};
+
+static int naked_cmd_exec(struct nand_chip *chip,
+			  struct nand_subop *subop)
+{
+	/*
+	 * TODO: Do a naked CMD here. CMD opcode is in
+	 * subop->instrs[0].cmd.op.
+	 */
+	return 0;
+}
+
+static const struct nand_op_parser_pattern_elem naked_addr_elems[] = {
+	NAND_OP_PARSER_PAT_ADDR_ELEM(false, 5),
+};
+
+static int naked_addr_exec(struct nand_chip *chip,
+			   struct nand_subop *subop)
+{
+	/*
+	 * TODO: Do a naked ADDR here. ADDR info are in
+	 * subop->instrs[0].addr.xxx. You have to use
+	 * subop->instrctxptr.start to determine which ADDR cycles you should
+	 * start at:
+	 *   subop->instrs[0].addr.addrs[subop->instrctxptr.start] ->
+	 *   subop->instrs[0].addr.addrs[subop->instrctxptr.start +
+	 *				 subop->instrctxptr.end]
+	 */
+	return 0;
+}
+
+static const struct nand_op_parser_pattern_elem naked_data_in_elems[] = {
+	NAND_OP_PARSER_PAT_DATA_IN_ELEM(false, 2048),
+};
+
+static const struct nand_op_parser_pattern_elem naked_data_out_elems[] = {
+	NAND_OP_PARSER_PAT_DATA_OUT_ELEM(false, 2048),
+};
+
+static int naked_data_exec(struct nand_chip *chip,
+			   struct nand_subop *subop)
+{
+	/*
+	 * TODO: Do a naked DATA read/write here. DATA info are in
+	 * subop->instrs[0].data.xxx. You have to use
+	 * subop->instrctxptr.start to determine the data offset you should
+	 * start at:
+	 *   subop->instrs[0].data.in/out + subop->instrctxptr.start ->
+	 *   subop->instrs[0].data.in/out + subop->instrctxptr.start +
+	 *				    subop->instrctxptr.end
+	 */
+	return 0;
+}
+
+static const struct nand_op_parser_pattern marvell_nfc_op_patterns[] = {
+	/*
+	 * TODO: Put advanced/complex op here in descending complexity
+	 * order.
+	 */
+	{
+		/* Naked WAITRDY */
+		.elems = naked_waitrdy_elems,
+		.nelems = ARRAY_SIZE(naked_waitrdy_elems),
+		.exec = naked_waitrdy_exec,
+	},
+	{
+		/* Naked CMD */
+		.elems = naked_cmd_elems,
+		.nelems = ARRAY_SIZE(naked_cmd_elems),
+		.exec = naked_cmd_exec,
+	},
+	{
+		/* Naked ADDR */
+		.elems = naked_addr_elems,
+		.nelems = ARRAY_SIZE(naked_addr_elems),
+		.exec = naked_addr_exec,
+	},
+	{
+		/* Naked DATA IN */
+		.elems = naked_data_in_elems,
+		.nelems = ARRAY_SIZE(naked_data_in_elems),
+		.exec = naked_data_exec,
+	},
+	{
+		/* Naked DATA OUT */
+		.elems = naked_data_out_elems,
+		.nelems = ARRAY_SIZE(naked_data_out_elems),
+		.exec = naked_data_exec,
+	},
+};
+
+static const struct nand_op_parser marvell_nfc_op_parser = {
+	.patterns = marvell_nfc_op_patterns,
+	.npatterns = ARRAY_SIZE(marvell_nfc_op_patterns),
+};
+
+static int marvell_nfc_new_exec_op(struct nand_chip *chip,
+				   struct nand_op_instr *instrs, int ninstrs,
+				   bool check_only)
+{
+	return nand_op_parser_exec_op(chip, &marvell_nfc_op_parser, instrs,
+				      ninstrs, check_only);
+}
+
 static int marvell_nfc_exec_op(struct nand_chip *chip,
 			       struct nand_op_instr *instrs, int ninstrs,
 			       bool check_only)

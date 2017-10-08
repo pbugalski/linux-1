@@ -1340,7 +1340,7 @@ static const struct nand_op_parser_pattern_elem naked_waitrdy_elems[] = {
 };
 
 static int naked_waitrdy_exec(struct nand_chip *chip,
-			      struct nand_subop *subop)
+			      const struct nand_subop *subop)
 {
 	/* TODO: Wait for the RDY bit to be set here. */
 	return 0;
@@ -1351,7 +1351,7 @@ static const struct nand_op_parser_pattern_elem naked_cmd_elems[] = {
 };
 
 static int naked_cmd_exec(struct nand_chip *chip,
-			  struct nand_subop *subop)
+			  const struct nand_subop *subop)
 {
 	/*
 	 * TODO: Do a naked CMD here. CMD opcode is in
@@ -1365,7 +1365,7 @@ static const struct nand_op_parser_pattern_elem naked_addr_elems[] = {
 };
 
 static int naked_addr_exec(struct nand_chip *chip,
-			   struct nand_subop *subop)
+			   const struct nand_subop *subop)
 {
 	/*
 	 * TODO: Do a naked ADDR here. ADDR info are in
@@ -1388,7 +1388,7 @@ static const struct nand_op_parser_pattern_elem naked_data_out_elems[] = {
 };
 
 static int naked_data_exec(struct nand_chip *chip,
-			   struct nand_subop *subop)
+			   const struct nand_subop *subop)
 {
 	/*
 	 * TODO: Do a naked DATA read/write here. DATA info are in
@@ -1407,6 +1407,7 @@ static const struct nand_op_parser_pattern marvell_nfc_op_patterns[] = {
 	 * TODO: Put advanced/complex op here in descending complexity
 	 * order.
 	 */
+	NAND_OP_PARSER_PATTERN(naked_waitrdy_exec, NAND_OP_PARSER_PAT_WAITRDY_ELEM(false)),
 	{
 		/* Naked WAITRDY */
 		.elems = naked_waitrdy_elems,

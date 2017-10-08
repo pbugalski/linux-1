@@ -513,144 +513,142 @@ static void sunxi_nfc_select_chip(struct mtd_info *mtd, int chip)
 
 static void sunxi_nfc_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
 {
-	struct nand_chip *nand = mtd_to_nand(mtd);
-	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
-	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
-	int ret;
-	int cnt;
-	int offs = 0;
-	u32 tmp;
-
-	while (len > offs) {
-		bool poll = false;
-
-		cnt = min(len - offs, NFC_SRAM_SIZE);
-
-		ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
-		if (ret)
-			break;
-
-		writel(cnt, nfc->regs + NFC_REG_CNT);
-		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD;
-		writel(tmp, nfc->regs + NFC_REG_CMD);
-
-		/* Arbitrary limit for polling mode */
-		if (cnt < 64)
-			poll = true;
-
-		ret = sunxi_nfc_wait_events(nfc, NFC_CMD_INT_FLAG, poll, 0);
-		if (ret)
-			break;
-
-		if (buf)
-			memcpy_fromio(buf + offs, nfc->regs + NFC_RAM0_BASE,
-				      cnt);
-		offs += cnt;
-	}
+	nand_read_data_op(mtd_to_nand(mtd), buf, len, false);
 }
 
 static void sunxi_nfc_write_buf(struct mtd_info *mtd, const uint8_t *buf,
 				int len)
 {
-	struct nand_chip *nand = mtd_to_nand(mtd);
-	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
-	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
-	int ret;
-	int cnt;
-	int offs = 0;
-	u32 tmp;
-
-	while (len > offs) {
-		bool poll = false;
-
-		cnt = min(len - offs, NFC_SRAM_SIZE);
-
-		ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
-		if (ret)
-			break;
-
-		writel(cnt, nfc->regs + NFC_REG_CNT);
-		memcpy_toio(nfc->regs + NFC_RAM0_BASE, buf + offs, cnt);
-		tmp = NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD |
-		      NFC_ACCESS_DIR;
-		writel(tmp, nfc->regs + NFC_REG_CMD);
-
-		/* Arbitrary limit for polling mode */
-		if (cnt < 64)
-			poll = true;
-
-		ret = sunxi_nfc_wait_events(nfc, NFC_CMD_INT_FLAG, poll, 0);
-		if (ret)
-			break;
-
-		offs += cnt;
-	}
+	nand_write_data_op(mtd_to_nand(mtd), buf, len, false);
 }
 
-static uint8_t sunxi_nfc_read_byte(struct mtd_info *mtd)
+static int sunxi_nfc_exec_subop(struct nand_chip *chip, const struct nand_subop *subop)
 {
-	uint8_t ret;
-
-	sunxi_nfc_read_buf(mtd, &ret, 1);
-
-	return ret;
-}
-
-static void sunxi_nfc_cmd_ctrl(struct mtd_info *mtd, int dat,
-			       unsigned int ctrl)
-{
-	struct nand_chip *nand = mtd_to_nand(mtd);
-	struct sunxi_nand_chip *sunxi_nand = to_sunxi_nand(nand);
-	struct sunxi_nfc *nfc = to_sunxi_nfc(sunxi_nand->nand.controller);
+	struct sunxi_nfc *nfc = to_sunxi_nfc(chip->controller);
+	unsigned int i, rdcnt = 0;
+	u32 cmd = 0, addrs[2] = { };
+	void *inbuf = NULL;
 	int ret;
 
-	if (dat == NAND_CMD_NONE && (ctrl & NAND_NCE) &&
-	    !(ctrl & (NAND_CLE | NAND_ALE))) {
-		u32 cmd = 0;
+	for (i = 0; i < subop->ninstrs; i++) {
+		const struct nand_op_instr *instr = &subop->instrs[i];
+		unsigned int j, k, start, stop;
 
-		if (!sunxi_nand->addr_cycles && !sunxi_nand->cmd_cycles)
-			return;
+		switch(instr->type) {
+		case NAND_OP_CMD_INSTR:
+			if (!(cmd & NFC_SEND_CMD1)) {
+				cmd |= NFC_SEND_CMD1 | instr->cmd.opcode;
+			} else if (WARN_ON(cmd & NFC_SEND_CMD2)) {
+				/*
+				 * This should never happen. If it does, we
+				 * have a serious in the OP parser logic.
+				 */
+				return -EINVAL;
+			} else {
+				cmd |= NFC_SEND_CMD2;
+				writel(instr->cmd.opcode,
+				       nfc->regs + NFC_REG_RCMD_SET);
+			}
+			break;
 
-		if (sunxi_nand->cmd_cycles--)
-			cmd |= NFC_SEND_CMD1 | sunxi_nand->cmd[0];
+		case NAND_OP_ADDR_INSTR:
+			start = !i ? subop->instrctxptr.start : 0;
+			stop = (i == subop->ninstrs - 1 && subop->instrctxptr.end) ?
+			       subop->instrctxptr.end : instr->addr.naddrs;
 
-		if (sunxi_nand->cmd_cycles--) {
-			cmd |= NFC_SEND_CMD2;
-			writel(sunxi_nand->cmd[1],
-			       nfc->regs + NFC_REG_RCMD_SET);
+			if (WARN_ON(stop - start > 8 || (cmd & NFC_SEND_ADR)))
+				return -EINVAL;
+
+			for (k = 0, j = start; j < stop; j++, k++)
+				addrs[k / 4] |= instr->addr.addrs[j] <<
+						(8 * (k % 4));
+
+			cmd |= NFC_SEND_ADR | NFC_ADR_NUM(k);
+			writel(addrs[0], nfc->regs + NFC_REG_ADDR_LOW);
+
+			if (k > 4)
+				writel(addrs[1],
+				       nfc->regs + NFC_REG_ADDR_HIGH);
+
+			break;
+
+		case NAND_OP_DATA_OUT_INSTR:
+		case NAND_OP_DATA_IN_INSTR:
+			start = !i ? subop->instrctxptr.start : 0;
+			stop = (i == subop->ninstrs - 1 && subop->instrctxptr.end) ?
+			       subop->instrctxptr.end : instr->data.len;
+
+			if (WARN_ON(stop - start > NFC_SRAM_SIZE ||
+				    (cmd & NFC_DATA_TRANS)))
+				return -EINVAL;
+
+			cmd |= NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD;
+			writel(stop - start, nfc->regs + NFC_REG_CNT);
+
+			if (instr->type == NAND_OP_DATA_IN_INSTR) {
+				inbuf = instr->data.in + start;
+				rdcnt = stop - start;
+				break;
+			}
+
+			/*
+			 * Set the NFC_ACCESS_DIR flag and fill the SRAM with
+			 * output when this is a DATA_OUT operation, for the
+			 * rest, DATA_IN and DATA_OUT are done the same way.
+			 */
+			cmd |= NFC_ACCESS_DIR;
+			memcpy_toio(nfc->regs + NFC_RAM0_BASE,
+				    instr->data.out + start, stop - start);
+			break;
+
+		case NAND_OP_WAITRDY_INSTR:
+			/*
+			 * TODO: Handle things differently for non-native R/B
+			 * handling.
+			 */
+			cmd |= NFC_WAIT_FLAG;
+			break;
+
+		default:
+			WARN_ON(1);
+			return -EINVAL;
 		}
-
-		sunxi_nand->cmd_cycles = 0;
-
-		if (sunxi_nand->addr_cycles) {
-			cmd |= NFC_SEND_ADR |
-			       NFC_ADR_NUM(sunxi_nand->addr_cycles);
-			writel(sunxi_nand->addr[0],
-			       nfc->regs + NFC_REG_ADDR_LOW);
-		}
-
-		if (sunxi_nand->addr_cycles > 4)
-			writel(sunxi_nand->addr[1],
-			       nfc->regs + NFC_REG_ADDR_HIGH);
-
-		ret = sunxi_nfc_wait_cmd_fifo_empty(nfc);
-		if (ret)
-			return;
-
-		writel(cmd, nfc->regs + NFC_REG_CMD);
-		sunxi_nand->addr[0] = 0;
-		sunxi_nand->addr[1] = 0;
-		sunxi_nand->addr_cycles = 0;
-		sunxi_nfc_wait_events(nfc, NFC_CMD_INT_FLAG, true, 0);
 	}
 
-	if (ctrl & NAND_CLE) {
-		sunxi_nand->cmd[sunxi_nand->cmd_cycles++] = dat;
-	} else if (ctrl & NAND_ALE) {
-		sunxi_nand->addr[sunxi_nand->addr_cycles / 4] |=
-				dat << ((sunxi_nand->addr_cycles % 4) * 8);
-		sunxi_nand->addr_cycles++;
-	}
+	writel(cmd, nfc->regs + NFC_REG_CMD);
+	ret = sunxi_nfc_wait_events(nfc, NFC_CMD_INT_FLAG,
+				    cmd & NFC_WAIT_FLAG, 0);
+	if (ret)
+		return ret;
+
+	if (rdcnt)
+		memcpy_fromio(inbuf, nfc->regs + NFC_RAM0_BASE, rdcnt);
+
+	return 0;
+}
+
+static NAND_OP_PARSER(sunxi_nfc_op_parser,
+		      NAND_OP_PARSER_PATTERN(sunxi_nfc_exec_subop,
+					     NAND_OP_PARSER_PAT_CMD_ELEM(true),
+					     NAND_OP_PARSER_PAT_ADDR_ELEM(true, 8),
+					     NAND_OP_PARSER_PAT_DATA_OUT_ELEM(false,
+									      NFC_SRAM_SIZE),
+					     NAND_OP_PARSER_PAT_CMD_ELEM(true),
+					     NAND_OP_PARSER_PAT_WAITRDY_ELEM(true)),
+		      NAND_OP_PARSER_PATTERN(sunxi_nfc_exec_subop,
+					     NAND_OP_PARSER_PAT_CMD_ELEM(true),
+					     NAND_OP_PARSER_PAT_ADDR_ELEM(true, 8),
+					     NAND_OP_PARSER_PAT_CMD_ELEM(true),
+					     NAND_OP_PARSER_PAT_WAITRDY_ELEM(true),
+					     NAND_OP_PARSER_PAT_DATA_IN_ELEM(true,
+									     NFC_SRAM_SIZE)));
+
+static int sunxi_nfc_exec_op(struct nand_chip *chip,
+			     const struct nand_op_instr *instrs,
+			     unsigned int ninstrs, bool check_only)
+{
+	return nand_op_parser_exec_op(chip, &sunxi_nfc_op_parser, instrs,
+				      ninstrs, check_only);
 }
 
 /* These seed values have been extracted from Allwinner's BSP */
@@ -2083,11 +2081,8 @@ static int sunxi_nand_chip_init(struct device *dev, struct sunxi_nfc *nfc,
 	 */
 	nand->ecc.mode = NAND_ECC_HW;
 	nand_set_flash_node(nand, np);
+	nand->exec_op = sunxi_nfc_exec_op;
 	nand->select_chip = sunxi_nfc_select_chip;
-	nand->cmd_ctrl = sunxi_nfc_cmd_ctrl;
-	nand->read_buf = sunxi_nfc_read_buf;
-	nand->write_buf = sunxi_nfc_write_buf;
-	nand->read_byte = sunxi_nfc_read_byte;
 	nand->setup_data_interface = sunxi_nfc_setup_data_interface;
 
 	mtd = nand_to_mtd(nand);

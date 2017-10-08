@@ -2093,14 +2093,6 @@ nand_op_parser_match(const struct nand_op_parser_pattern *pat,
 		const struct nand_op_instr *instr = &ctx->instrs[i];
 
 		/*
-		 * The pattern matches but is not handling the whole
-		 * instruction sequence. That's fine, we'll break down the
-		 * NAND operation in several NFC ops.
-		 */
-		if (j >= pat->nelems)
-			break;
-
-		/*
 		 * The pattern instruction does not match the operation
 		 * instruction. If the instruction is marked optional in the
 		 * pattern definition, we skip the pattern element and continue
@@ -2132,6 +2124,15 @@ nand_op_parser_match(const struct nand_op_parser_pattern *pat,
 	}
 
 	/*
+	 * This can happen if all instructions of a pattern are optional.
+	 * Still, if there's not at least one instruction handled by this
+	 * pattern, this is not a match, and we should try the next one (if
+	 * any).
+	 */
+	if (!i)
+		return false;
+
+	/*
 	 * We had a match on the pattern head, but the pattern may be longer
 	 * than the instructions we're asked to execute. We need to make sure
 	 * there's no mandatory elements in the pattern tail.
@@ -2147,7 +2148,7 @@ nand_op_parser_match(const struct nand_op_parser_pattern *pat,
 	if (newinstrctxptr)
 		ctx->subop.ninstrs++;
 	ctx->subop.instrctxptr.start = ctx->instrctxptr;
-	ctx->subop.instrctxptr.end = newinstrctxptr - 1;
+	ctx->subop.instrctxptr.end = newinstrctxptr;
 	ctx->instrptr = i;
 	ctx->instrctxptr = newinstrctxptr;
 

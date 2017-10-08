@@ -918,13 +918,28 @@ struct nand_op_parser_pattern_elem {
 struct nand_op_parser_pattern {
 	const struct nand_op_parser_pattern_elem *elems;
 	unsigned int nelems;
-	int (*exec)(struct nand_chip *chip, struct nand_subop *subop);
+	int (*exec)(struct nand_chip *chip, const struct nand_subop *subop);
 };
+
+#define NAND_OP_PARSER_PATTERN(_exec, ...)							\
+	{											\
+		.exec = _exec,									\
+		.elems = (struct nand_op_parser_pattern_elem[]) { __VA_ARGS__ },		\
+		.nelems = sizeof((struct nand_op_parser_pattern_elem[]) { __VA_ARGS__ }) /	\
+			  sizeof(struct nand_op_parser_pattern_elem),				\
+	}
 
 struct nand_op_parser {
 	const struct nand_op_parser_pattern *patterns;
 	unsigned int npatterns;
 };
+
+#define NAND_OP_PARSER(_name, ...)								\
+	const struct nand_op_parser _name = {							\
+		.patterns = (struct nand_op_parser_pattern[]) { __VA_ARGS__ },			\
+		.npatterns = sizeof((struct nand_op_parser_pattern[]) { __VA_ARGS__ }) /	\
+			     sizeof(struct nand_op_parser_pattern),				\
+	}
 
 int nand_op_parser_exec_op(struct nand_chip *chip,
 			   const struct nand_op_parser *parser,
@@ -1067,8 +1082,8 @@ struct nand_chip {
 				    const struct nand_data_interface *conf);
 
 	int (*exec_op)(struct nand_chip *chip,
-		       struct nand_op_instr *instrs,
-		       int ninstrs, bool check_only);
+		       const struct nand_op_instr *instrs,
+		       unsigned int ninstrs, bool check_only);
 
 	int chip_delay;
 	unsigned int options;
@@ -1130,7 +1145,7 @@ struct nand_chip {
 };
 
 static inline int nand_exec_op(struct nand_chip *chip,
-			       struct nand_op_instr *instrs,
+			       const struct nand_op_instr *instrs,
 			       unsigned int ninstrs)
 {
 	if (!chip->exec_op)
@@ -1139,22 +1154,22 @@ static inline int nand_exec_op(struct nand_chip *chip,
 	return chip->exec_op(chip, instrs, ninstrs, false);
 }
 
-static inline bool nand_instr_is_cmd(struct nand_op_instr *instr)
+static inline bool nand_instr_is_cmd(const struct nand_op_instr *instr)
 {
 	return instr && instr->type == NAND_OP_CMD_INSTR;
 }
 
-static inline bool nand_instr_is_addr(struct nand_op_instr *instr)
+static inline bool nand_instr_is_addr(const struct nand_op_instr *instr)
 {
 	return instr && instr->type == NAND_OP_ADDR_INSTR;
 }
 
-static inline bool nand_instr_is_data_in(struct nand_op_instr *instr)
+static inline bool nand_instr_is_data_in(const struct nand_op_instr *instr)
 {
 	return instr && instr->type == NAND_OP_DATA_IN_INSTR;
 }
 
-static inline bool nand_instr_is_data_out(struct nand_op_instr *instr)
+static inline bool nand_instr_is_data_out(const struct nand_op_instr *instr)
 {
 	return instr && instr->type == NAND_OP_DATA_OUT_INSTR;
 }

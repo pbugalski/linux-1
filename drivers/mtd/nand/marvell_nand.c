@@ -1315,7 +1315,7 @@ static int marvell_nfc_xfer_data(struct nand_chip *chip,
 			return ret;
 
 		/* Fullfill FIFO */
-		for (i = 0; i < last_full_offset; i += FIFO_DEPTH)
+		for (i = 0; i < last_full_offset; i += FIFO_DEPTH) {
 			iowrite32_rep(nfc->regs + NDDB,
 				      &((u32 *)instr->data.out)[i / sizeof(u32)],
 				      FIFO_DEPTH_32);

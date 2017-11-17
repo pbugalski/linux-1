@@ -43,8 +43,12 @@ void vc4_perfmon_start(struct vc4_dev *vc4, struct vc4_perfmon *perfmon)
 	if (!perfmon || WARN_ON(vc4->perfmon_active))
 		return;
 
-	for (i = 0; i < perfmon->ncounters; i++)
+	for (i = 0; i < perfmon->ncounters; i++) {
 		V3D_WRITE(V3D_PCTRS(i), perfmon->events[i]);
+		V3D_WRITE(V3D_PCTR(i), 0x1000+i);
+		pr_info("%s:%i enable counter %d (init val = %08x)\n", __func__, __LINE__,
+			V3D_READ(V3D_PCTRS(i)), V3D_READ(V3D_PCTR(i)));
+	}
 
 	mask = GENMASK(perfmon->ncounters - 1, 0);
 	V3D_WRITE(V3D_PCTRE, V3D_PCTRE_EN | mask);
@@ -60,9 +64,14 @@ void vc4_perfmon_stop(struct vc4_dev *vc4, struct vc4_perfmon *perfmon,
 	if (!perfmon || WARN_ON(!vc4->perfmon_active))
 		return;
 
+	pr_info("%s:%i PCTRE = %08x\n", __func__, __LINE__,
+		V3D_READ(V3D_PCTRE));
 	if (capture) {
-		for (i = 0; i < perfmon->ncounters; i++)
+		for (i = 0; i < perfmon->ncounters; i++) {
+			pr_info("%s:%i capture counter %d = %08x\n", __func__, __LINE__,
+				V3D_READ(V3D_PCTRS(i)), V3D_READ(V3D_PCTR(i)));
 			perfmon->counters[i] += V3D_READ(V3D_PCTR(i));
+		}
 	}
 
 	V3D_WRITE(V3D_PCTRE, 0);

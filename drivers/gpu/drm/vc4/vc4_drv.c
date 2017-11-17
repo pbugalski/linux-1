@@ -52,6 +52,7 @@ void __iomem *vc4_ioremap_regs(struct platform_device *dev, int index)
 	void __iomem *map;
 
 	res = platform_get_resource(dev, IORESOURCE_MEM, index);
+	pr_info("res %08x\n", res->start);
 	map = devm_ioremap_resource(&dev->dev, res);
 	if (IS_ERR(map)) {
 		DRM_ERROR("Failed to map registers: %ld\n", PTR_ERR(map));

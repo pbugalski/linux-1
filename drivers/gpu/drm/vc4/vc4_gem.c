@@ -619,8 +619,7 @@ retry:
  * though.
  */
 static int
-vc4_queue_submit(struct drm_device *dev, struct vc4_exec_info *exec,
-		 struct ww_acquire_ctx *acquire_ctx)
+vc4_queue_submit(struct drm_device *dev, struct vc4_exec_info *exec)
 {
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 	uint64_t seqno;
@@ -643,8 +642,6 @@ vc4_queue_submit(struct drm_device *dev, struct vc4_exec_info *exec,
 	exec->fence = &fence->base;
 
 	vc4_update_bo_seqnos(exec, seqno);
-
-	vc4_unlock_bo_reservations(dev, exec, acquire_ctx);
 
 	list_add_tail(&exec->head, &vc4->bin_job_list);
 
@@ -1204,7 +1201,8 @@ vc4_submit_cl_ioctl(struct drm_device *dev, void *data,
 	 */
 	exec->args = NULL;
 
-	ret = vc4_queue_submit(dev, exec, &acquire_ctx);
+	ret = vc4_queue_submit(dev, exec);
+	vc4_unlock_bo_reservations(dev, exec, &acquire_ctx);
 	if (ret)
 		goto fail;
 

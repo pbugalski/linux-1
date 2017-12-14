@@ -22,21 +22,19 @@ These properties may not be supported by all I3C master drivers. Each I3C
 master bindings should specify which of them are supported.
 
 - i3c-scl-frequency: frequency (in Hz) of the SCL signal used for I3C
-		     transfers. When undefined the core set it to 12.5MHz.
+		     transfers. When undefined the core sets it to 12.5MHz.
 
 - i2c-scl-frequency: frequency (in Hz) of the SCL signal used for I2C
-		     transfers. When undefined, the core looks at LVR values
-		     of I2C devices described in the device tree to determine
-		     the maximum I2C frequency.
+		     transfers. When undefined, the core looks at LVR
+		     (Legacy Virtual Register) values of I2C devices described
+		     in the device tree to determine the maximum I2C frequency.
 
 I2C devices
 ===========
 
-Each I2C device connected to the bus should be described in a subnode with
-the following properties:
-
-All properties described in Documentation/devicetree/bindings/i2c/i2c.txt are
-valid here.
+Each I2C device connected to the bus should be described in a subnode. All
+properties described in Documentation/devicetree/bindings/i2c/i2c.txt are
+valid here, but several new properties have been added.
 
 New required properties:
 ------------------------
@@ -47,13 +45,14 @@ New required properties:
 	   bit[31:8]: unused
 	   bit[7:5]: I2C device index. Possible values
 	    * 0: I2C device has a 50 ns spike filter
-	    * 1: I2C device does not have a 50 ns spike filter but supports high
-		 frequency on SCL
+	    * 1: I2C device does not have a 50 ns spike filter but supports
+		 high frequency on SCL
 	    * 2: I2C device does not have a 50 ns spike filter and is not
 		 tolerant to high frequencies
 	    * 3-7: reserved
 
-	   bit[4]: tell whether the device operates in FM or FM+ mode
+	   bit[4]: tell whether the device operates in FM (Fast Mode) or FM+
+		   mode
 	    * 0: FM+ mode
 	    * 1: FM mode
 
@@ -85,7 +84,7 @@ Required properties
 
 Optional properties
 -------------------
-- reg: static address. Only valid is the device has a static address.
+- reg: static address. Only valid if the device has a static address.
 - i3c-dynamic-address: dynamic address to be assigned to this device. This
 		       property depends on the reg property.
 

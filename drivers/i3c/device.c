@@ -221,7 +221,6 @@ int i3c_device_request_ibi(struct i3c_device *dev,
 	return 0;
 
 err_free_ibi:
-	mutex_unlock(&dev->ibi_lock);
 	kfree(ibi);
 	dev->ibi = NULL;
 

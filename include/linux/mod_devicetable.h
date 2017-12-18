@@ -450,10 +450,10 @@ struct pci_epf_device_id {
 
 /* i3c */
 
-#define I3C_MATCH_DCR			BIT(0)
-#define I3C_MATCH_MANUF			BIT(1)
-#define I3C_MATCH_PART			BIT(2)
-#define I3C_MATCH_EXTRA_INFO		BIT(3)
+#define I3C_MATCH_DCR			0x1
+#define I3C_MATCH_MANUF			0x2
+#define I3C_MATCH_PART			0x4
+#define I3C_MATCH_EXTRA_INFO		0x8
 
 struct i3c_device_id {
 	__u8 match_flags;

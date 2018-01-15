@@ -5,7 +5,9 @@
  * Author: Boris Brezillon <boris.brezillon@free-electrons.com>
  */
 
+#include <linux/bitops.h>
 #include <linux/clk.h>
+#include <linux/err.h>
 #include <linux/i3c/master.h>
 #include <linux/interrupt.h>
 #include <linux/iopoll.h>

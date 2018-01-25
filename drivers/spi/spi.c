@@ -2057,6 +2057,20 @@ static int of_spi_register_master(struct spi_controller *ctlr)
 }
 #endif
 
+static int spi_controller_check_ops(struct spi_controller *ctlr)
+{
+	if (ctlr->mem_ops) {
+		if (!ctlr->mem_ops->supports_op ||
+		    !ctlr->mem_ops->exec_op)
+			return -EINVAL;
+	} else if (!ctlr->transfer && !ctlr->transfer_one &&
+		   !ctlr->transfer_one_message) {
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 /**
  * spi_register_controller - register SPI master or slave controller
  * @ctlr: initialized master, originally from spi_alloc_master() or
@@ -2089,6 +2103,10 @@ int spi_register_controller(struct spi_controller *ctlr)
 
 	if (!dev)
 		return -ENODEV;
+
+	status = spi_controller_check_ops(ctlr);
+	if (status)
+		return status;
 
 	if (!spi_controller_is_slave(ctlr)) {
 		status = of_spi_register_master(ctlr);
@@ -2156,9 +2174,9 @@ int spi_register_controller(struct spi_controller *ctlr)
 			dev_name(&ctlr->dev));
 
 	/* If we're using a queued driver, start the queue */
-	if (ctlr->transfer)
+	if (ctlr->transfer) {
 		dev_info(dev, "controller is unqueued, this is deprecated\n");
-	else {
+	} else if (ctlr->transfer_one || ctlr->transfer_one_message) {
 		status = spi_controller_initialize_queue(ctlr);
 		if (status) {
 			device_del(&ctlr->dev);
@@ -2893,6 +2911,9 @@ static int __spi_async(struct spi_device *spi, struct spi_message *message)
 {
 	struct spi_controller *ctlr = spi->controller;
 
+	if (!ctlr->transfer)
+		return -ENOTSUPP;
+
 	message->spi = spi;
 
 	SPI_STATISTICS_INCREMENT_FIELD(&ctlr->statistics, spi_async);
@@ -3320,6 +3341,293 @@ int spi_write_then_read(struct spi_device *spi,
 	return status;
 }
 EXPORT_SYMBOL_GPL(spi_write_then_read);
+
+int spi_controller_dma_map_mem_op_data(struct spi_controller *ctlr,
+				       const struct spi_mem_op *op,
+				       struct sg_table *sgt)
+{
+	struct device *dmadev;
+
+	if (!op->data.nbytes)
+		return -EINVAL;
+
+	if (op->data.dir == SPI_MEM_DATA_OUT)
+		dmadev = ctlr->dma_tx ?
+			 ctlr->dma_tx->device->dev : ctlr->dev.parent;
+	else
+		dmadev = ctlr->dma_rx ?
+			 ctlr->dma_rx->device->dev : ctlr->dev.parent;
+
+	if (!dmadev)
+		return -EINVAL;
+
+	return spi_map_buf(ctlr, dmadev, sgt, op->data.buf.in, op->data.nbytes,
+			   op->data.dir == SPI_MEM_DATA_IN ?
+			   DMA_FROM_DEVICE : DMA_TO_DEVICE);
+}
+EXPORT_SYMBOL_GPL(spi_controller_dma_map_mem_op_data);
+
+void spi_controller_dma_unmap_mem_op_data(struct spi_controller *ctlr,
+					  const struct spi_mem_op *op,
+					  struct sg_table *sgt)
+{
+	struct device *dmadev;
+
+	if (!op->data.nbytes)
+		return;
+
+	if (op->data.dir == SPI_MEM_DATA_OUT)
+		dmadev = ctlr->dma_tx ?
+			 ctlr->dma_tx->device->dev : ctlr->dev.parent;
+	else
+		dmadev = ctlr->dma_rx ?
+			 ctlr->dma_rx->device->dev : ctlr->dev.parent;
+
+	spi_unmap_buf(ctlr, dmadev, sgt,
+		      op->data.dir == SPI_MEM_DATA_IN ?
+		      DMA_FROM_DEVICE : DMA_TO_DEVICE);
+}
+EXPORT_SYMBOL_GPL(spi_controller_dma_unmap_mem_op_data);
+
+static int spi_check_buswidth_req(struct spi_mem *mem, u8 buswidth, bool tx)
+{
+	u32 mode = mem->spi->mode;
+
+	switch(buswidth) {
+	case 1:
+		return 0;
+
+	case 2:
+		if ((tx && (mode & (SPI_TX_DUAL | SPI_TX_QUAD))) ||
+		    (!tx && (mode & (SPI_RX_DUAL | SPI_RX_QUAD))))
+			return 0;
+
+		break;
+
+	case 4:
+		if ((tx && (mode & SPI_TX_QUAD)) ||
+		    (!tx && (mode & SPI_RX_QUAD)))
+			return 0;
+
+		break;
+
+	default:
+		break;
+	}
+
+	return -ENOTSUPP;
+}
+
+bool spi_mem_supports_op(struct spi_mem *mem, const struct spi_mem_op *op)
+{
+	struct spi_controller *ctlr = mem->spi->controller;
+
+
+	if (spi_check_buswidth_req(mem, op->cmd.buswidth, true))
+		return false;
+
+	if (op->addr.nbytes &&
+	    spi_check_buswidth_req(mem, op->addr.buswidth, true))
+		return false;
+
+	if (op->dummy.nbytes &&
+	    spi_check_buswidth_req(mem, op->dummy.buswidth, true))
+		return false;
+
+	if (op->data.nbytes &&
+	    spi_check_buswidth_req(mem, op->data.buswidth,
+				   op->data.dir == SPI_MEM_DATA_IN ?
+				   false : true))
+		return false;
+
+	if (ctlr->mem_ops)
+		return ctlr->mem_ops->supports_op(mem, op);
+
+	return true;
+}
+EXPORT_SYMBOL_GPL(spi_mem_supports_op);
+
+int spi_mem_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
+{
+	unsigned int tmpbufsize, xferpos = 0, totalxferlen = 0;
+	struct spi_controller *ctlr = mem->spi->controller;
+	struct spi_transfer xfers[4] = { };
+	struct spi_message msg;
+	u8 *tmpbuf;
+	int ret;
+
+	if (!spi_mem_supports_op(mem, op))
+		return -ENOTSUPP;
+
+	if (ctlr->mem_ops) {
+		if (ctlr->auto_runtime_pm) {
+			ret = pm_runtime_get_sync(ctlr->dev.parent);
+			if (ret < 0) {
+				dev_err(&ctlr->dev,
+					"Failed to power device: %d\n",
+					ret);
+				return ret;
+			}
+		}
+
+		mutex_lock(&ctlr->bus_lock_mutex);
+		mutex_lock(&ctlr->io_mutex);
+		ret = ctlr->mem_ops->exec_op(mem, op);
+		mutex_unlock(&ctlr->io_mutex);
+		mutex_unlock(&ctlr->bus_lock_mutex);
+
+		if (ctlr->auto_runtime_pm)
+			pm_runtime_put(ctlr->dev.parent);
+
+		/*
+		 * Some controllers only optimize specific paths (typicaly the
+		 * read path) and expect the core to use the regular SPI
+		 * interface in these cases.
+		 */
+		if (!ret || ret != -ENOTSUPP)
+			return ret;
+	}
+
+	tmpbufsize = sizeof(op->cmd.opcode) + op->addr.nbytes +
+		     op->dummy.nbytes;
+
+	/*
+	 * Allocate a buffer to transmit the CMD, ADDR cycles with kmalloc() so
+	 * we're guaranteed that this buffer is DMA-able, as required by the
+	 * SPI layer.
+	 */
+	tmpbuf = kzalloc(tmpbufsize, GFP_KERNEL | GFP_DMA);
+	if (!tmpbuf)
+		return -ENOMEM;
+
+	spi_message_init(&msg);
+
+	tmpbuf[0] = op->cmd.opcode;
+	xfers[xferpos].tx_buf = tmpbuf;
+	xfers[xferpos].len = sizeof(op->cmd.opcode);
+	xfers[xferpos].tx_nbits = op->cmd.buswidth;
+	spi_message_add_tail(&xfers[xferpos], &msg);
+	xferpos++;
+	totalxferlen++;
+
+	if (op->addr.nbytes) {
+		memcpy(tmpbuf + 1, op->addr.buf, op->addr.nbytes);
+		xfers[xferpos].tx_buf = tmpbuf + 1;
+		xfers[xferpos].len = op->addr.nbytes;
+		xfers[xferpos].tx_nbits = op->addr.buswidth;
+		spi_message_add_tail(&xfers[xferpos], &msg);
+		xferpos++;
+		totalxferlen += op->addr.nbytes;
+	}
+
+	if (op->dummy.nbytes) {
+		memset(tmpbuf + op->addr.nbytes + 1, 0xff, op->dummy.nbytes);
+		xfers[xferpos].tx_buf = tmpbuf + op->addr.nbytes + 1;
+		xfers[xferpos].len = op->dummy.nbytes;
+		xfers[xferpos].tx_nbits = op->dummy.buswidth;
+		spi_message_add_tail(&xfers[xferpos], &msg);
+		xferpos++;
+		totalxferlen += op->dummy.nbytes;
+	}
+
+	if (op->data.nbytes) {
+		if (op->data.dir == SPI_MEM_DATA_IN) {
+			xfers[xferpos].rx_buf = op->data.buf.in;
+			xfers[xferpos].rx_nbits = op->data.buswidth;
+		} else {
+			xfers[xferpos].tx_buf = op->data.buf.out;
+			xfers[xferpos].tx_nbits = op->data.buswidth;
+		}
+
+		xfers[xferpos].len = op->data.nbytes;
+		spi_message_add_tail(&xfers[xferpos], &msg);
+		xferpos++;
+		totalxferlen += op->data.nbytes;
+	}
+
+	ret = spi_sync(mem->spi, &msg);
+
+	kfree(tmpbuf);
+
+	if (ret)
+		return ret;
+
+	if (msg.actual_length != totalxferlen)
+		return -EIO;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(spi_mem_exec_op);
+
+unsigned int spi_mem_max_data_bytes(struct spi_mem *mem,
+				    enum spi_mem_data_dir dir)
+{
+	struct spi_controller *ctlr = mem->spi->controller;
+
+	if (!ctlr->mem_ops || !ctlr->mem_ops->max_data_bytes)
+		return UINT_MAX;
+
+	return ctlr->mem_ops->max_data_bytes(mem, dir);
+}
+EXPORT_SYMBOL_GPL(spi_mem_max_data_bytes);
+
+static inline struct spi_mem_driver *to_spi_mem_drv(struct device_driver *drv)
+{
+	return container_of(drv, struct spi_mem_driver, spidrv.driver);
+}
+
+static int spi_mem_probe(struct spi_device *spi)
+{
+	struct spi_mem_driver *memdrv = to_spi_mem_drv(spi->dev.driver);
+	struct spi_mem *mem;
+
+	mem = devm_kzalloc(&spi->dev, sizeof(*mem), GFP_KERNEL);
+	if (!mem)
+		return -ENOMEM;
+
+	mem->spi = spi;
+	spi_set_drvdata(spi, mem);
+
+	return memdrv->probe(mem);
+}
+
+static int spi_mem_remove(struct spi_device *spi)
+{
+	struct spi_mem_driver *memdrv = to_spi_mem_drv(spi->dev.driver);
+	struct spi_mem *mem = spi_get_drvdata(spi);
+
+	if (memdrv->remove)
+		return memdrv->remove(mem);
+
+	return 0;
+}
+
+static void spi_mem_shutdown(struct spi_device *spi)
+{
+	struct spi_mem_driver *memdrv = to_spi_mem_drv(spi->dev.driver);
+	struct spi_mem *mem = spi_get_drvdata(spi);
+
+	if (memdrv->shutdown)
+		memdrv->shutdown(mem);
+}
+
+int spi_mem_driver_register_with_owner(struct spi_mem_driver *memdrv,
+				       struct module *owner)
+{
+
+	memdrv->spidrv.probe = spi_mem_probe;
+	memdrv->spidrv.remove = spi_mem_remove;
+	memdrv->spidrv.shutdown = spi_mem_shutdown;
+
+	return __spi_register_driver(owner, &memdrv->spidrv);
+}
+EXPORT_SYMBOL_GPL(spi_mem_driver_register_with_owner);
+
+void spi_mem_driver_unregister(struct spi_mem_driver *memdrv)
+{
+	spi_unregister_driver(&memdrv->spidrv);
+}
+EXPORT_SYMBOL_GPL(spi_mem_driver_unregister);
 
 /*-------------------------------------------------------------------------*/
 

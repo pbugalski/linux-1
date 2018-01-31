@@ -37,6 +37,7 @@
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
 #include <linux/spi/spi.h>
+#include <linux/spi/spi-mem.h>
 
 /* SPI register offsets */
 #define BCM2835_SPI_CS			0x00

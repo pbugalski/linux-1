@@ -53,6 +53,7 @@ static int winbond_spinand_detect(struct spinand_device *spinand)
 	u8 *id = spinand->id.data;
 	int ret;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	/*
 	 * Winbond SPI NAND read ID need a dummy byte,
 	 * so the first byte in raw_id is dummy.
@@ -60,11 +61,14 @@ static int winbond_spinand_detect(struct spinand_device *spinand)
 	if (id[1] != SPINAND_MFR_WINBOND)
 		return 0;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	ret = spinand_match_and_init(spinand, winbond_spinand_table,
 				     ARRAY_SIZE(winbond_spinand_table), id[2]);
+	pr_info("%s:%i\n", __func__, __LINE__);
 	if (ret)
 		return ret;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	return 1;
 }
 

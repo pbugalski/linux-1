@@ -3360,11 +3360,14 @@ static int spi_check_buswidth_req(struct spi_mem *mem, u8 buswidth, bool tx)
 {
 	u32 mode = mem->spi->mode;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	switch(buswidth) {
 	case 1:
+		pr_info("%s:%i\n", __func__, __LINE__);
 		return 0;
 
 	case 2:
+		pr_info("%s:%i\n", __func__, __LINE__);
 		if ((tx && (mode & (SPI_TX_DUAL | SPI_TX_QUAD))) ||
 		    (!tx && (mode & (SPI_RX_DUAL | SPI_RX_QUAD))))
 			return 0;
@@ -3372,6 +3375,7 @@ static int spi_check_buswidth_req(struct spi_mem *mem, u8 buswidth, bool tx)
 		break;
 
 	case 4:
+		pr_info("%s:%i\n", __func__, __LINE__);
 		if ((tx && (mode & SPI_TX_QUAD)) ||
 		    (!tx && (mode & SPI_RX_QUAD)))
 			return 0;
@@ -3379,9 +3383,11 @@ static int spi_check_buswidth_req(struct spi_mem *mem, u8 buswidth, bool tx)
 		break;
 
 	default:
+		pr_info("%s:%i width = %d\n", __func__, __LINE__, buswidth);
 		break;
 	}
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	return -ENOTSUPP;
 }
 
@@ -3389,26 +3395,31 @@ bool spi_mem_supports_op(struct spi_mem *mem, const struct spi_mem_op *op)
 {
 	struct spi_controller *ctlr = mem->spi->controller;
 
-
+	pr_info("%s:%i\n", __func__, __LINE__);
 	if (spi_check_buswidth_req(mem, op->cmd.buswidth, true))
 		return false;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	if (op->addr.nbytes &&
 	    spi_check_buswidth_req(mem, op->addr.buswidth, true))
 		return false;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	if (op->dummy.nbytes &&
 	    spi_check_buswidth_req(mem, op->dummy.buswidth, true))
 		return false;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	if (op->data.nbytes &&
 	    spi_check_buswidth_req(mem, op->data.buswidth,
 				   op->data.dir == SPI_MEM_DATA_IN ?
 				   false : true))
 		return false;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	if (ctlr->mem_ops)
 		return ctlr->mem_ops->supports_op(mem, op);
+	pr_info("%s:%i\n", __func__, __LINE__);
 
 	return true;
 }
@@ -3423,10 +3434,13 @@ int spi_mem_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 	u8 *tmpbuf;
 	int ret;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	if (!spi_mem_supports_op(mem, op))
 		return -ENOTSUPP;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	if (ctlr->mem_ops) {
+		pr_info("%s:%i\n", __func__, __LINE__);
 		if (ctlr->auto_runtime_pm) {
 			ret = pm_runtime_get_sync(ctlr->dev.parent);
 			if (ret < 0) {
@@ -3439,7 +3453,9 @@ int spi_mem_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 
 		mutex_lock(&ctlr->bus_lock_mutex);
 		mutex_lock(&ctlr->io_mutex);
+		pr_info("%s:%i\n", __func__, __LINE__);
 		ret = ctlr->mem_ops->exec_op(mem, op);
+		pr_info("%s:%i\n", __func__, __LINE__);
 		mutex_unlock(&ctlr->io_mutex);
 		mutex_unlock(&ctlr->bus_lock_mutex);
 

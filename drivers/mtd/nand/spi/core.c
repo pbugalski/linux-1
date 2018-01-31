@@ -747,11 +747,13 @@ static int spinand_probe(struct spi_mem *mem)
 	struct mtd_info *mtd;
 	int ret;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	spinand = devm_kzalloc(&mem->spi->dev, sizeof(*spinand),
 			       GFP_KERNEL);
 	if (!spinand)
 		return -ENOMEM;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	spinand->spimem = mem;
 	spi_mem_set_drvdata(mem, spinand);
 	spinand_set_of_node(spinand, mem->spi->dev.of_node);
@@ -759,13 +761,16 @@ static int spinand_probe(struct spi_mem *mem)
 	mtd = spinand_to_mtd(spinand);
 	mtd->dev.parent = &mem->spi->dev;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	ret = spinand_init(spinand);
 	if (ret)
 		return ret;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	ret = mtd_device_register(mtd, NULL, 0);
 	if (ret)
 		goto err_spinand_cleanup;
+	pr_info("%s:%i\n", __func__, __LINE__);
 
 	return 0;
 
@@ -781,7 +786,9 @@ static int spinand_remove(struct spi_mem *mem)
 	struct mtd_info *mtd;
 	int ret;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	spinand = spi_mem_get_drvdata(mem);
+	pr_info("%s:%i\n", __func__, __LINE__);
 	mtd = spinand_to_mtd(spinand);
 
 	ret = mtd_device_unregister(mtd);

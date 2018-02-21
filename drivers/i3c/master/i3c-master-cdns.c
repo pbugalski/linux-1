@@ -49,6 +49,8 @@
 #define CTRL				0x10
 #define CTRL_DEV_EN			BIT(31)
 #define CTRL_HALT_EN			BIT(30)
+#define CTRL_MCS			BIT(29)
+#define CTRL_MCS_EN			BIT(28)
 #define CTRL_HJ_DISEC			BIT(8)
 #define CTRL_MST_ACK			BIT(7)
 #define CTRL_HJ_ACK			BIT(6)
@@ -76,51 +78,70 @@
 #define MST_IMR				0x28
 #define MST_ICR				0x2c
 #define MST_ISR				0x30
-#define MST_INT_M0_ERR			BIT(28)
-#define MST_INT_RX_THR			BIT(24)
-#define MST_INT_TX_THR			BIT(23)
-#define MST_INT_IBI_THR			BIT(22)
-#define MST_INT_CMD_THR			BIT(21)
-#define MST_INT_RX_UNF			BIT(20)
-#define MST_INT_TX_OVF			BIT(19)
-#define MST_INT_IBI_UNF			BIT(18)
-#define MST_INT_CMD_OVF			BIT(17)
-#define MST_INT_CMD_EMPTY		BIT(16)
-#define MST_INT_MR_DONE			BIT(11)
-#define MST_INT_IBI_FAIL		BIT(10)
-#define MST_INT_SDR_FAIL		BIT(9)
-#define MST_INT_DDR_FAIL		BIT(8)
-#define MST_INT_HJ_REQ			BIT(7)
-#define MST_INT_MR_REQ			BIT(6)
-#define MST_INT_IBI_REQ			BIT(5)
-#define MST_INT_BUS_DISCR		BIT(4)
-#define MST_INT_INVALID_DA		BIT(3)
-#define MST_INT_RD_ABORT		BIT(2)
-#define MST_INT_NACK			BIT(1)
-#define MST_INT_COMP			BIT(0)
-
-#define MST_INT_XFER_STATUS		(MST_INT_M0_ERR |	\
-					 MST_INT_SDR_FAIL |	\
-					 MST_INT_DDR_FAIL |	\
-					 MST_INT_INVALID_DA |	\
-					 MST_INT_RD_ABORT |	\
-					 MST_INT_NACK |		\
-					 MST_INT_COMP)
+#define MST_INT_HALTED			BIT(18)
+#define MST_INT_MR_DONE			BIT(17)
+#define MST_INT_IMM_COMP		BIT(16)
+#define MST_INT_TX_THR			BIT(15)
+#define MST_INT_TX_OVF			BIT(14)
+#define MST_INT_IBID_THR		BIT(12)
+#define MST_INT_IBID_UNF		BIT(11)
+#define MST_INT_IBIR_THR		BIT(10)
+#define MST_INT_IBIR_UNF		BIT(9)
+#define MST_INT_IBIR_OVF		BIT(8)
+#define MST_INT_RX_THR			BIT(7)
+#define MST_INT_RX_UNF			BIT(6)
+#define MST_INT_CMDD_EMP		BIT(5)
+#define MST_INT_CMDD_THR		BIT(4)
+#define MST_INT_CMDD_OVF		BIT(3)
+#define MST_INT_CMDR_THR		BIT(2)
+#define MST_INT_CMDR_UNF		BIT(1)
+#define MST_INT_CMDR_OVF		BIT(0)
 
 #define MST_STATUS0			0x34
-#define MST_STATUS0_IDLE		BIT(31)
-#define MST_STATUS0_HALTED		BIT(30)
-#define MST_STATUS0_MASTER_MODE		BIT(29)
-#define MST_STATUS0_IMM_COMP		BIT(28)
-#define MST_STATUS0_DDR_ERR_ID(s)	((s) & GENMASK(27, 25) >> 25)
-#define MST_STATUS0_DAA_COMP		BIT(24)
-#define MST_STATUS0_IBI_FIFO_FULL	BIT(23)
-#define MST_STATUS0_RX_FIFO_FULL	BIT(22)
-#define MST_STATUS0_XFER_BYTES(s)	(((s) & GENMASK(21, 10)) >> 10)
-#define MST_STATUS0_DEV_ADDR(s)		((s) & GENMASK(9, 0))
+#define MST_STATUS0_IDLE		BIT(18)
+#define MST_STATUS0_HALTED		BIT(17)
+#define MST_STATUS0_MASTER_MODE		BIT(16)
+#define MST_STATUS0_TX_FULL		BIT(13)
+#define MST_STATUS0_IBID_FULL		BIT(12)
+#define MST_STATUS0_IBIR_FULL		BIT(11)
+#define MST_STATUS0_RX_FULL		BIT(10)
+#define MST_STATUS0_CMDD_FULL		BIT(9)
+#define MST_STATUS0_CMDR_FULL		BIT(8)
+#define MST_STATUS0_TX_EMP		BIT(5)
+#define MST_STATUS0_IBID_EMP		BIT(4)
+#define MST_STATUS0_IBIR_EMP		BIT(3)
+#define MST_STATUS0_RX_EMP		BIT(2)
+#define MST_STATUS0_CMDD_EMP		BIT(1)
+#define MST_STATUS0_CMDR_EMP		BIT(0)
 
-#define SIR_STATUS			0x3c
-#define SIR_STATUS_DEV(d)		BIT(d)
+#define CMDR				0x38
+#define CMDR_NO_ERROR			0
+#define CMDR_DDR_PREAMBLE_ERROR		1
+#define CMDR_DDR_PARITY_ERROR		2
+#define CMDR_DDR_RX_FIFO_OVF		3
+#define CMDR_DDR_TX_FIFO_UNF		4
+#define CMDR_M0_ERROR			5
+#define CMDR_M1_ERROR			6
+#define CMDR_M2_ERROR			7
+#define CMDR_MST_ABORT			8
+#define CMDR_NACK_RESP			9
+#define CMDR_INVALID_DA			10
+#define CMDR_DDR_DROPPED		11
+#define CMDR_ERROR(x)			(((x) & GENMASK(27, 24)) >> 24)
+#define CMDR_XFER_BYTES(x)		(((x) & GENMASK(19, 8)) >> 8)
+#define CMDR_CMDID_HJACK_DISEC		0xfe
+#define CMDR_CMDID_HJACK_ENTDAA		0xff
+#define CMDR_CMDID(x)			((x) & GENMASK(7, 0))
+
+#define IBIR				0x3c
+#define IBIR_ACKED			BIT(12)
+#define IBIR_SLVID(x)			(((x) & GENMASK(11, 8)) >> 8)
+#define IBIR_ERROR			BIT(7)
+#define IBIR_XFER_BYTES(x)		(((x) & GENMASK(6, 2)) >> 2)
+#define IBIR_TYPE_IBI			0
+#define IBIR_TYPE_HJ			1
+#define IBIR_TYPE_MR			2
+#define IBIR_TYPE(x)			((x) & GENMASK(1, 0))
 
 #define SLV_IER				0x40
 #define SLV_IDR				0x44
@@ -132,6 +153,7 @@
 #define SLV_INT_EVENT_UP		BIT(18)
 #define SLV_INT_HJ_DONE			BIT(17)
 #define SLV_INT_MR_DONE			BIT(16)
+#define SLV_INT_DA_UPD			BIT(15)
 #define SLV_INT_SDR_FAIL		BIT(14)
 #define SLV_INT_DDR_FAIL		BIT(13)
 #define SLV_INT_M_RD_ABORT		BIT(12)
@@ -158,6 +180,8 @@
 #define SLV_STATUS1_HJ_DIS		BIT(18)
 #define SLV_STATUS1_MR_DIS		BIT(17)
 #define SLV_STATUS1_PROT_ERR		BIT(16)
+#define SLV_STATUS1_DA(x)		(((s) & GENMASK(15, 9)) >> 9)
+#define SLV_STATUS1_HAS_DA		BIT(8)
 #define SLV_STATUS1_DDR_RX_FULL		BIT(7)
 #define SLV_STATUS1_DDR_TX_FULL		BIT(6)
 #define SLV_STATUS1_DDR_RX_EMPTY	BIT(5)
@@ -185,6 +209,7 @@
 #define CMD0_FIFO_RNW			BIT(0)
 
 #define CMD1_FIFO			0x64
+#define CMD1_FIFO_CMDID(id)		((id) << 24)
 #define CMD1_FIFO_CSRADDR(a)		(a)
 #define CMD1_FIFO_CCC(id)		(id)
 
@@ -205,6 +230,8 @@
 #define SLV_DDR_RX_FIFO			0x8c
 
 #define CMD_IBI_THR_CTRL		0x90
+#define IBIR_THR(t)			((t) << 24)
+#define CMDR_THR(t)			((t) << 16)
 #define IBI_THR(t)			((t) << 8)
 #define CMD_THR(t)			(t)
 
@@ -217,6 +244,8 @@
 #define SLV_DDR_TX_THR(t)		(t)
 
 #define FLUSH_CTRL			0x9c
+#define FLUSH_IBI_RESP			BIT(23)
+#define FLUSH_CMD_RESP			BIT(22)
 #define FLUSH_SLV_DDR_RX_FIFO		BIT(22)
 #define FLUSH_SLV_DDR_TX_FIFO		BIT(21)
 #define FLUSH_IMM_FIFO			BIT(20)
@@ -322,8 +351,10 @@
 
 struct cdns_i3c_master_caps {
 	u32 cmdfifodepth;
+	u32 cmdrfifodepth;
 	u32 txfifodepth;
 	u32 rxfifodepth;
+	u32 ibirfifodepth;
 };
 
 struct cdns_i3c_cmd {
@@ -333,12 +364,13 @@ struct cdns_i3c_cmd {
 	const void *tx_buf;
 	u32 rx_len;
 	void *rx_buf;
+	u32 error;
 };
 
 struct cdns_i3c_xfer {
 	struct list_head node;
 	struct completion comp;
-	u32 isr;
+	int ret;
 	unsigned int ncmds;
 	struct cdns_i3c_cmd cmds[0];
 };
@@ -385,29 +417,10 @@ static void cdns_i3c_master_wr_to_tx_fifo(struct cdns_i3c_master *master,
 	}
 }
 
-static void cdns_i3c_master_drain_rx_fifo(struct cdns_i3c_master *master)
-{
-	int i;
-
-	for (i = 0; i < master->caps.rxfifodepth; i++) {
-		readl(master->regs + RX_FIFO);
-		if (readl(master->regs + MST_ISR) & MST_INT_RX_UNF) {
-			writel(MST_INT_RX_UNF, master->regs + MST_ICR);
-			break;
-		}
-	}
-}
-
 static void cdns_i3c_master_rd_from_rx_fifo(struct cdns_i3c_master *master,
 					    u8 *bytes, int nbytes)
 {
-	u32 status0;
 	int i, j;
-
-	status0 = readl(master->regs + MST_STATUS0);
-
-	if (nbytes > MST_STATUS0_XFER_BYTES(status0))
-		nbytes = MST_STATUS0_XFER_BYTES(status0);
 
 	for (i = 0; i < nbytes; i += 4) {
 		u32 data;
@@ -487,6 +500,7 @@ cdns_i3c_master_alloc_xfer(struct cdns_i3c_master *master, unsigned int ncmds)
 
 	INIT_LIST_HEAD(&xfer->node);
 	xfer->ncmds = ncmds;
+	xfer->ret = -ETIMEDOUT;
 
 	return xfer;
 }
@@ -504,8 +518,7 @@ static void cdns_i3c_master_start_xfer_locked(struct cdns_i3c_master *master)
 	if (!xfer)
 		return;
 
-	writel(MST_INT_XFER_STATUS | MST_INT_CMD_EMPTY,
-	       master->regs + MST_ICR);
+	writel(MST_INT_CMDD_EMP, master->regs + MST_ICR);
 	for (i = 0; i < xfer->ncmds; i++) {
 		struct cdns_i3c_cmd *cmd = &xfer->cmds[i];
 
@@ -516,46 +529,79 @@ static void cdns_i3c_master_start_xfer_locked(struct cdns_i3c_master *master)
 	for (i = 0; i < xfer->ncmds; i++) {
 		struct cdns_i3c_cmd *cmd = &xfer->cmds[i];
 
-		writel(cmd->cmd1, master->regs + CMD1_FIFO);
+		writel(cmd->cmd1 | CMD1_FIFO_CMDID(i),
+		       master->regs + CMD1_FIFO);
 		writel(cmd->cmd0, master->regs + CMD0_FIFO);
 	}
 
-	writel(MST_INT_CMD_EMPTY | MST_INT_RD_ABORT, master->regs + MST_IER);
+	writel(readl(master->regs + CTRL) | CTRL_MCS,
+	       master->regs + CTRL);
+	writel(MST_INT_CMDD_EMP, master->regs + MST_IER);
 }
 
 static void cdns_i3c_master_end_xfer_locked(struct cdns_i3c_master *master,
 					    u32 isr)
 {
 	struct cdns_i3c_xfer *xfer = master->xferqueue.cur;
+	int i, ret = 0;
+	u32 status0;
 
 	if (!xfer)
 		return;
 
-	isr &= MST_INT_XFER_STATUS | MST_INT_CMD_EMPTY;
-	if (!isr)
+	if (!(isr & MST_INT_CMDD_EMP))
 		return;
 
-	writel(MST_INT_CMD_EMPTY | MST_INT_RD_ABORT, master->regs + MST_IDR);
-	xfer->isr = isr & ~MST_INT_CMD_EMPTY;
+	writel(MST_INT_CMDD_EMP, master->regs + MST_IDR);
 
-	if (xfer->isr & MST_INT_RD_ABORT) {
-		writel(FLUSH_RX_FIFO | FLUSH_TX_FIFO | FLUSH_CMD_FIFO,
-		       master->regs + FLUSH_CTRL);
-		writel(readl(master->regs + CTRL) | CTRL_DEV_EN,
-		       master->regs + CTRL);
-	} else if (xfer->isr != MST_INT_COMP) {
-		cdns_i3c_master_drain_rx_fifo(master);
-	} else {
-		unsigned int i;
+	for (status0 = readl(master->regs + MST_STATUS0);
+	     !(status0 & MST_STATUS0_CMDR_EMP);
+	     status0 = readl(master->regs + MST_STATUS0)) {
+		struct cdns_i3c_cmd *cmd;
+		u32 cmdr, rx_len, id;
 
-		for (i = 0; i < xfer->ncmds; i++) {
-			struct cdns_i3c_cmd *cmd = &xfer->cmds[i];
+		cmdr = readl(master->regs + CMDR);
+		id = CMDR_CMDID(cmdr);
+		if (id == CMDR_CMDID_HJACK_DISEC ||
+		    id == CMDR_CMDID_HJACK_ENTDAA ||
+		    WARN_ON(id >= xfer->ncmds))
+			continue;
 
-			cdns_i3c_master_rd_from_rx_fifo(master, cmd->rx_buf,
-							cmd->rx_len);
+		cmd = &xfer->cmds[CMDR_CMDID(cmdr)];
+		rx_len = min_t(u32, CMDR_XFER_BYTES(cmdr), cmd->rx_len);
+		cdns_i3c_master_rd_from_rx_fifo(master, cmd->rx_buf, rx_len);
+		cmd->error = CMDR_ERROR(cmdr);
+	}
+
+	for (i = 0; i < xfer->ncmds; i++) {
+		switch (xfer->cmds[i].error) {
+		case CMDR_NO_ERROR:
+			break;
+
+		case CMDR_DDR_PREAMBLE_ERROR:
+		case CMDR_DDR_PARITY_ERROR:
+		case CMDR_M0_ERROR:
+		case CMDR_M1_ERROR:
+		case CMDR_M2_ERROR:
+		case CMDR_MST_ABORT:
+		case CMDR_NACK_RESP:
+		case CMDR_DDR_DROPPED:
+			ret = -EIO;
+			break;
+
+		case CMDR_DDR_RX_FIFO_OVF:
+		case CMDR_DDR_TX_FIFO_UNF:
+			ret = -ENOSPC;
+			break;
+
+		case CMDR_INVALID_DA:
+		default:
+			ret = -EINVAL;
+			break;
 		}
 	}
 
+	xfer->ret = ret;
 	complete(&xfer->comp);
 
 	xfer = list_first_entry_or_null(&master->xferqueue.list,
@@ -598,10 +644,10 @@ static void cdns_i3c_master_unqueue_xfer(struct cdns_i3c_master *master,
 					  status & MST_STATUS0_IDLE, 10,
 					  1000000);
 		master->xferqueue.cur = NULL;
-		writel(FLUSH_RX_FIFO | FLUSH_TX_FIFO | FLUSH_CMD_FIFO,
+		writel(FLUSH_RX_FIFO | FLUSH_TX_FIFO | FLUSH_CMD_FIFO |
+		       FLUSH_CMD_RESP,
 		       master->regs + FLUSH_CTRL);
-		writel(MST_INT_CMD_EMPTY | MST_INT_RD_ABORT,
-		       master->regs + MST_IDR);
+		writel(MST_INT_CMDD_EMP, master->regs + MST_IDR);
 		writel(readl(master->regs + CTRL) | CTRL_DEV_EN,
 		       master->regs + CTRL);
 	} else {
@@ -643,17 +689,7 @@ static int cdns_i3c_master_send_ccc_cmd(struct i3c_master_controller *m,
 	if (!wait_for_completion_timeout(&xfer->comp, msecs_to_jiffies(1000)))
 		cdns_i3c_master_unqueue_xfer(master, xfer);
 
-	/*
-	 * MST_INT_NACK is not an error when doing DAA, it just means "no i3c
-	 * devices on the bus".
-	 */
-	if (xfer->isr == MST_INT_COMP)
-		ret = 0;
-	else if (xfer->isr)
-		ret = -EIO;
-	else
-		ret = -ETIMEDOUT;
-
+	ret = xfer->ret;
 	cdns_i3c_master_free_xfer(xfer);
 
 	return ret;
@@ -701,14 +737,7 @@ static int cdns_i3c_master_contig_priv_xfers(struct cdns_i3c_master *master,
 	if (!wait_for_completion_timeout(&xfer->comp, msecs_to_jiffies(1000)))
 		cdns_i3c_master_unqueue_xfer(master, xfer);
 
-	if (!xfer->isr)
-		ret = -ETIMEDOUT;
-	else if (xfer->isr &
-		 (MST_INT_NACK | MST_INT_RD_ABORT | MST_INT_INVALID_DA))
-		ret = -EIO;
-	else
-		ret = 0;
-
+	ret = xfer->ret;
 	cdns_i3c_master_free_xfer(xfer);
 
 	return ret;
@@ -746,6 +775,7 @@ static int cdns_i3c_master_priv_xfers(struct i3c_master_controller *m,
 			continue;
 
 		if (tnxfers > master->caps.cmdfifodepth ||
+		    tnxfers > master->caps.cmdrfifodepth ||
 		    tnrx > master->caps.rxfifodepth ||
 		    tntx > master->caps.txfifodepth)
 			return -ENOTSUPP;
@@ -909,7 +939,7 @@ static int cdns_i3c_master_send_hdr_cmd(struct i3c_master_controller *m,
 	if (!wait_for_completion_timeout(&xfer->comp, msecs_to_jiffies(1000)))
 		cdns_i3c_master_unqueue_xfer(master, xfer);
 
-	if (xfer->isr == MST_INT_COMP) {
+	if (!xfer->ret) {
 		ret = 0;
 		for (i = 0; i < nrxwords; i++) {
 			word = ((u32 *)ccmd->rx_buf)[i];
@@ -932,12 +962,9 @@ static int cdns_i3c_master_send_hdr_cmd(struct i3c_master_controller *m,
 				cmds[0].data.in[i] = datain;
 			}
 		}
-	} else if (!xfer->isr) {
-		ret = -ETIMEDOUT;
-	} else {
-		ret = -EIO;
 	}
 
+	ret = xfer->ret;
 	cdns_i3c_master_free_xfer(xfer);
 
 out_free_buf:
@@ -999,11 +1026,7 @@ static int cdns_i3c_master_i2c_xfers(struct i3c_master_controller *m,
 	if (!wait_for_completion_timeout(&xfer->comp, msecs_to_jiffies(1000)))
 		cdns_i3c_master_unqueue_xfer(master, xfer);
 
-	if (xfer->isr & MST_INT_NACK)
-		ret = -EIO;
-	else if (!(xfer->isr & MST_INT_COMP))
-		ret = -ETIMEDOUT;
-
+	ret = xfer->ret;
 	cdns_i3c_master_free_xfer(xfer);
 
 	return ret;
@@ -1371,12 +1394,12 @@ static int cdns_i3c_master_bus_init(struct i3c_master_controller *m)
 	}
 
 	/*
-	 * Enable Hot-Join and when a Hot-Join request happen, disable all
+	 * Enable Hot-Join, and, when a Hot-Join request happens, disable all
 	 * events coming from this device.
 	 *
 	 * We will issue ENTDAA afterwards from the threaded IRQ handler.
 	 */
-	ctrl |= CTRL_HJ_ACK | CTRL_HJ_DISEC | CTRL_HALT_EN;
+	ctrl |= CTRL_HJ_ACK | CTRL_HJ_DISEC | CTRL_HALT_EN | CTRL_MCS_EN;
 	writel(ctrl, master->regs + CTRL);
 
 	cdns_i3c_master_enable(master);
@@ -1407,7 +1430,6 @@ static int cdns_i3c_master_bus_init(struct i3c_master_controller *m)
 	if (ret)
 		pr_info("Failed to re-enable H-J");
 
-	writel(MST_INT_HJ_REQ, master->regs + MST_IER);
 	return 0;
 
 err_disable_master:
@@ -1419,66 +1441,85 @@ err_detach_devs:
 	return ret;
 }
 
-static void cnds_i3c_master_demux_ibis(struct cdns_i3c_master *master)
+static void cdns_i3c_master_handle_ibi(struct cdns_i3c_master *master,
+				       u32 ibir)
 {
-	unsigned int i, sirstatus;
-
-	writel(MST_INT_IBI_REQ, master->regs + MST_ICR);
-	sirstatus = readl(master->regs + SIR_STATUS);
+	struct cdns_i3c_i2c_dev_data *data;
+	bool data_consumed = false;
+	struct i3c_ibi_slot *slot;
+	u32 id = IBIR_SLVID(ibir);
+	struct i3c_device *dev;
+	int len, i, j;
+	u8 *buf;
 
 	/*
-	 * The IBI logic is broken, and if more than one device sent an
-	 * IBI, there's simply no way we can determine which one came in first.
-	 * In this case, drop all IBIs and flush the FIFO.
+	 * FIXME: maybe we should report the FIFO OVF errors to the upper
+	 * layer.
 	 */
-	if (hweight32(sirstatus) > 1) {
-		writel(readl(master->regs + CTRL) & ~CTRL_DEV_EN,
-		       master->regs + CTRL);
-		writel(FLUSH_IBI_FIFO, master->regs + FLUSH_CTRL);
-		writel(sirstatus, master->regs + SIR_STATUS);
-		writel(readl(master->regs + CTRL) | CTRL_DEV_EN,
-		       master->regs + CTRL);
-		return;
-	}
+	if (id >= master->ibi.num_slots || (ibir & IBIR_ERROR))
+		goto out;
 
+	dev = master->ibi.slots[id];
 	spin_lock(&master->ibi.lock);
-	for (i = 0; i < master->ibi.num_slots; i++) {
-		struct i3c_device *dev = master->ibi.slots[i];
-		struct cdns_i3c_i2c_dev_data *data;
-		struct i3c_ibi_slot *slot;
-		unsigned int len, j;
-		u8 *buf;
-		u32 tmp;
 
-		if (!(sirstatus & BIT(i)) || !dev)
-			continue;
+	data = i3c_device_get_master_data(dev);
+	slot = i3c_generic_ibi_get_free_slot(data->ibi_pool);
+	if (!slot)
+		goto out_unlock;
 
-		data = i3c_device_get_master_data(dev);
-		slot = i3c_generic_ibi_get_free_slot(data->ibi_pool);
-		if (!slot)
-			continue;
+	buf = slot->data;
 
-		buf = slot->data;
-		for (len = 0; len < dev->ibi->max_payload_len;) {
-			tmp = readl(master->regs + IBI_DATA_FIFO);
-			if (readl(master->regs + MST_ISR) & MST_INT_IBI_UNF) {
-				writel(MST_INT_IBI_UNF, master->regs + MST_ICR);
-				break;
-			}
+	len = IBIR_XFER_BYTES(ibir);
+	for (i = 0; i < IBIR_XFER_BYTES(ibir); i += 4) {
+		u32 tmp = readl(master->regs + IBI_DATA_FIFO);
 
-			for (j = 0; j < 4 && len < dev->ibi->max_payload_len;
-			     j++, len++)
-				buf[len] = tmp >> (j * 8);
-		}
+		for (j = 0; j < 4 && i + j < dev->ibi->max_payload_len; j++)
+			buf[i + j] = tmp >> (j * 8);
 
-		slot->len = len;
-		i3c_device_queue_ibi(dev, slot);
 	}
+	slot->len = min_t(unsigned int, IBIR_XFER_BYTES(ibir),
+			  dev->ibi->max_payload_len);
+	i3c_device_queue_ibi(dev, slot);
+	data_consumed = true;
 
+out_unlock:
 	spin_unlock(&master->ibi.lock);
 
-	writel(FLUSH_IBI_FIFO, master->regs + FLUSH_CTRL);
-	writel(sirstatus, master->regs + SIR_STATUS);
+out:
+	/* Consume data from the FIFO if it's not been done already. */
+	if (!data_consumed) {
+		for (i = 0; i < IBIR_XFER_BYTES(ibir); i += 4)
+			readl(master->regs + IBI_DATA_FIFO);
+	}
+}
+
+static void cnds_i3c_master_demux_ibis(struct cdns_i3c_master *master)
+{
+	u32 status0;
+
+	writel(MST_INT_IBIR_THR, master->regs + MST_ICR);
+
+	for (status0 = readl(master->regs + MST_STATUS0);
+	     !(status0 & MST_STATUS0_IBIR_EMP);
+	     status0 = readl(master->regs + MST_STATUS0)) {
+		u32 ibir = readl(master->regs + IBIR);
+
+		switch (IBIR_TYPE(ibir)) {
+		case IBIR_TYPE_IBI:
+			cdns_i3c_master_handle_ibi(master, ibir);
+			break;
+
+		case IBIR_TYPE_HJ:
+			WARN_ON(IBIR_XFER_BYTES(ibir) || (ibir & IBIR_ERROR));
+			queue_work(master->base.wq, &master->hj_work);
+			break;
+
+		case IBIR_TYPE_MR:
+			WARN_ON(IBIR_XFER_BYTES(ibir) || (ibir & IBIR_ERROR));
+		default:
+			break;
+		}
+	}
 }
 
 static irqreturn_t cdns_i3c_master_interrupt(int irq, void *data)
@@ -1494,12 +1535,7 @@ static irqreturn_t cdns_i3c_master_interrupt(int irq, void *data)
 	cdns_i3c_master_end_xfer_locked(master, status);
 	spin_unlock(&master->xferqueue.lock);
 
-	if (status & MST_INT_HJ_REQ) {
-		writel(MST_INT_HJ_REQ, master->regs + MST_IDR);
-		queue_work(master->base.wq, &master->hj_work);
-	}
-
-	if (status & MST_INT_IBI_REQ)
+	if (status & MST_INT_IBIR_THR)
 		cnds_i3c_master_demux_ibis(master);
 
 	return IRQ_HANDLED;
@@ -1659,14 +1695,8 @@ static void cdns_i3c_master_hj(struct work_struct *work)
 						      struct cdns_i3c_master,
 						      hj_work);
 	struct i3c_bus *bus = i3c_master_get_bus(&master->base);
-	u32 status;
-
-	status = readl(master->regs + MST_ISR);
-	if (!(status & MST_INT_HJ_REQ))
-		return;
 
 	i3c_bus_maintenance_lock(bus);
-	writel(MST_INT_HJ_REQ, master->regs + MST_ICR);
 	cdns_i3c_master_do_daa_locked(master);
 	i3c_master_register_new_i3c_devs(&master->base);
 	i3c_bus_maintenance_unlock(bus);
@@ -1735,6 +1765,8 @@ static int cdns_i3c_master_probe(struct platform_device *pdev)
 	master->caps.cmdfifodepth = CONF_STATUS1_CMD_DEPTH(val);
 	master->caps.rxfifodepth = CONF_STATUS1_RX_DEPTH(val);
 	master->caps.txfifodepth = CONF_STATUS1_TX_DEPTH(val);
+	master->caps.ibirfifodepth = 16;
+	master->caps.cmdrfifodepth = 16;
 
 	spin_lock_init(&master->ibi.lock);
 	master->ibi.num_slots = CONF_STATUS1_IBI_HW_RES(val);
@@ -1745,7 +1777,8 @@ static int cdns_i3c_master_probe(struct platform_device *pdev)
 	if (!master->ibi.slots)
 		goto err_disable_sysclk;
 
-	writel(MST_INT_IBI_REQ, master->regs + MST_IER);
+	writel(IBIR_THR(1), master->regs + CMD_IBI_THR_CTRL);
+	writel(MST_INT_IBIR_THR, master->regs + MST_IER);
 
 	ret = i3c_master_register(&master->base, &pdev->dev,
 				  &cdns_i3c_master_ops, false);

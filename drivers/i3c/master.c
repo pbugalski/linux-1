@@ -947,10 +947,10 @@ static int of_populate_i3c_bus(struct i3c_master_controller *master)
 	 * on the bus are not supporting typical rates, or if the bus topology
 	 * prevents it from using max possible rate.
 	 */
-	if (!of_property_read_u32(i3cbus_np, "i2c-scl-frequency", &val))
+	if (!of_property_read_u32(i3cbus_np, "i2c-scl-hz", &val))
 		master->bus->scl_rate.i2c = val;
 
-	if (!of_property_read_u32(i3cbus_np, "i3c-scl-frequency", &val))
+	if (!of_property_read_u32(i3cbus_np, "i3c-scl-hz", &val))
 		master->bus->scl_rate.i3c = val;
 
 	return 0;

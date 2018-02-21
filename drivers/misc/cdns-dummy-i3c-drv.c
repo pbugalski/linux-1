@@ -150,7 +150,7 @@ static int dummy_i3c_probe(struct i3c_device *dev)
 	pr_info("%s:%i part = %08x\n", __func__, __LINE__, (u32)I3C_PID_PART_ID(devinfo.pid));
 	ibireq.handler = ibi_handler;
 	ibireq.max_payload_len = 2;
-	ibireq.num_slots = 1;
+	ibireq.num_slots = 10;
 	ret = i3c_device_request_ibi(dev, &ibireq);
 	if (ret)
 		return ret;

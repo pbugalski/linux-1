@@ -8,13 +8,20 @@
 #include <linux/bitops.h>
 #include <linux/clk.h>
 #include <linux/err.h>
+#include <linux/errno.h>
 #include <linux/i3c/master.h>
 #include <linux/interrupt.h>
+#include <linux/io.h>
 #include <linux/iopoll.h>
+#include <linux/ioport.h>
+#include <linux/kernel.h>
+#include <linux/list.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
+#include <linux/spinlock.h>
+#include <linux/workqueue.h>
 
 #define DEV_ID				0x0
 #define DEV_ID_I3C_MASTER		0x5034
@@ -827,7 +834,10 @@ static u32 prepare_ddr_word(u16 payload)
 
 static u32 prepare_ddr_data_word(u16 data, bool first)
 {
-	return prepare_ddr_word(data) | I3C_DDR_PREAMBLE(first ? 2 : 3);
+	return prepare_ddr_word(data) |
+	       I3C_DDR_PREAMBLE(first ?
+			        I3C_DDR_FIRST_DATA_WORD_PREAMBLE :
+				I3C_DDR_DATA_WORD_PREAMBLE);
 }
 
 #define I3C_DDR_READ_CMD	BIT(15)
@@ -1254,7 +1264,7 @@ static int cdns_i3c_master_do_daa_locked(struct cdns_i3c_master *master)
 
 	i3c_master_defslvs_locked(&master->base);
 
-	pres_step = 1000000000 / (master->base.bus->scl_rate.i3c * 4);
+	pres_step = 1000000000UL / (master->base.bus->scl_rate.i3c * 4);
 
 	/* No bus limitation to apply, bail out. */
 	if (!i3c_scl_lim ||
@@ -1377,7 +1387,7 @@ static int cdns_i3c_master_bus_init(struct i3c_master_controller *m)
 	if (ret)
 		goto err_detach_devs;
 
-	/* Prepare RR slots before lauching DAA. */
+	/* Prepare RR slots before launching DAA. */
 	for (slot = find_next_bit(&master->free_dev_slots, BITS_PER_LONG, 1);
 	     slot < BITS_PER_LONG;
 	     slot = find_next_bit(&master->free_dev_slots,
@@ -1424,11 +1434,11 @@ static int cdns_i3c_master_bus_init(struct i3c_master_controller *m)
 	if (ret < 0)
 		goto err_disable_master;
 
-	/* Unmask Hot-Join and Marstership request interrupts. */
+	/* Unmask Hot-Join and Mastership request interrupts. */
 	events.events = I3C_CCC_EVENT_HJ | I3C_CCC_EVENT_MR;
 	ret = i3c_master_enec_locked(m, I3C_BROADCAST_ADDR, &events);
 	if (ret)
-		pr_info("Failed to re-enable H-J");
+		dev_err(m->parent, "Failed to re-enable Hot-Join");
 
 	return 0;
 

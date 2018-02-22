@@ -9,11 +9,11 @@ Required properties
 
 - #address-cells  - should be <1>. Read more about addresses below.
 - #size-cells     - should be <0>.
-- compatible      - name of I3C bus controller following generic names
-		    recommended practice.
+- compatible      - name of the I3C master controller driving the I3C bus
 
 For other required properties e.g. to describe register sets,
 clocks, etc. check the binding documentation of the specific driver.
+The node describing an I3C bus should be named i3c-master.
 
 Optional properties
 -------------------
@@ -21,13 +21,13 @@ Optional properties
 These properties may not be supported by all I3C master drivers. Each I3C
 master bindings should specify which of them are supported.
 
-- i3c-scl-frequency: frequency (in Hz) of the SCL signal used for I3C
-		     transfers. When undefined the core sets it to 12.5MHz.
+- i3c-scl-hz: frequency of the SCL signal used for I3C transfers.
+	      When undefined the core sets it to 12.5MHz.
 
-- i2c-scl-frequency: frequency (in Hz) of the SCL signal used for I2C
-		     transfers. When undefined, the core looks at LVR
-		     (Legacy Virtual Register) values of I2C devices described
-		     in the device tree to determine the maximum I2C frequency.
+- i2c-scl-hz: frequency of the SCL signal used for I2C transfers.
+	      When undefined, the core looks at LVR (Legacy Virtual Register)
+	      values of I2C devices described in the device tree to determine
+	      the maximum I2C frequency.
 
 I2C devices
 ===========
@@ -74,6 +74,10 @@ I3C device has a static address and we want to assign it a specific dynamic
 address before the DAA takes place (so that other devices on the bus can't
 take this dynamic address).
 
+The I3C device should be names <device-type>.<i3c-pid>[@<static-address>],
+where device-type is describing the type of device connected on the bus
+(gpio-controller, sensor, ...).
+
 Required properties
 -------------------
 - i3c-pid: PID (Provisional ID). 64-bit property which is used to match a
@@ -110,8 +114,9 @@ Example:
 		};
 
 		/* I3C device with a static address. */
-		thermal_sensor: sensor@68 {
+		thermal_sensor: sensor.39200144004@68 {
 			reg = <0x68>;
+			i3c-pid = /bits/ 64 <0x39200144004>;
 			i3c-dynamic-address = <0xa>;
 		};
 
@@ -119,8 +124,8 @@ Example:
 		 * I3C device without a static address but requiring resources
 		 * described in the DT.
 		 */
-		sensor2 {
-			i3c-pid = /bits/ 64 <0x39200144004>;
+		sensor.39200154004 {
+			i3c-pid = /bits/ 64 <0x39200154004>;
 			clocks = <&clock_provider 0>;
 		};
 	};

@@ -158,12 +158,12 @@ struct i3c_ccc_enttm {
 } __packed;
 
 /**
- * struct i3c_ccc_setda - payload passed to ENTTM CCC
+ * struct i3c_ccc_setda - payload passed to SETNEWDA and SETDASA CCCs
  *
- * @mode: one of the &enum i3c_ccc_test_mode modes
+ * @addr: dynamic address to assign to an I3C device
  *
- * Information passed to the ENTTM CCC to instruct an I3C device to enter a
- * specific test mode.
+ * Information passed to the SETNEWDA and SETDASA CCCs to assign/change the
+ * dynamic address of an I3C device.
  */
 struct i3c_ccc_setda {
 	u8 addr;

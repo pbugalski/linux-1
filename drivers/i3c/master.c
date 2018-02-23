@@ -5,6 +5,15 @@
  * Author: Boris Brezillon <boris.brezillon@free-electrons.com>
  */
 
+#include <asm/bitsperlong.h>
+
+#include <linux/atomic.h>
+#include <linux/device.h>
+#include <linux/err.h>
+#include <linux/export.h>
+#include <linux/kernel.h>
+#include <linux/list.h>
+#include <linux/of.h>
 #include <linux/slab.h>
 
 #include "internals.h"

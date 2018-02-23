@@ -5,9 +5,14 @@
  * Author: Boris Brezillon <boris.brezillon@free-electrons.com>
  */
 
+#include <linux/device.h>
 #include <linux/idr.h>
+#include <linux/init.h>
+#include <linux/list.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <linux/of_device.h>
+#include <linux/rwsem.h>
 #include <linux/slab.h>
 
 #include "internals.h"
@@ -38,7 +43,7 @@ void i3c_bus_maintenance_lock(struct i3c_bus *bus)
 EXPORT_SYMBOL_GPL(i3c_bus_maintenance_lock);
 
 /**
- * i3c_bus_maintenance_lock - Release the bus lock after a maintenance
+ * i3c_bus_maintenance_unlock - Release the bus lock after a maintenance
  *			      operation
  * @bus: I3C bus to release the lock on
  *
@@ -75,7 +80,7 @@ void i3c_bus_normaluse_lock(struct i3c_bus *bus)
 EXPORT_SYMBOL_GPL(i3c_bus_normaluse_lock);
 
 /**
- * i3c_bus_normaluse_lock - Release the bus lock after a normal operation
+ * i3c_bus_normaluse_unlock - Release the bus lock after a normal operation
  * @bus: I3C bus to release the lock on
  *
  * Should be called when a normal operation is done. See

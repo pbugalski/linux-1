@@ -5,6 +5,11 @@
  * Author: Boris Brezillon <boris.brezillon@free-electrons.com>
  */
 
+#include <linux/atomic.h>
+#include <linux/bug.h>
+#include <linux/completion.h>
+#include <linux/device.h>
+#include <linux/mutex.h>
 #include <linux/slab.h>
 
 #include "internals.h"

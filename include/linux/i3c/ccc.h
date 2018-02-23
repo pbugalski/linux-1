@@ -8,6 +8,8 @@
 #ifndef I3C_CCC_H
 #define I3C_CCC_H
 
+#include <linux/bitops.h>
+
 /* I3C CCC (Common Command Codes) related definitions */
 #define I3C_CCC_DIRECT			BIT(7)
 
@@ -91,7 +93,7 @@ struct i3c_ccc_mrl {
 } __packed;
 
 /**
- * struct i3c_ccc_dev_desc - I3C/I3C device descriptor used for DEFSLVS
+ * struct i3c_ccc_dev_desc - I3C/I2C device descriptor used for DEFSLVS
  *
  * @dyn_addr: dynamic address assigned to the I3C slave or 0 if the entry is
  *	      describing an I2C slave.

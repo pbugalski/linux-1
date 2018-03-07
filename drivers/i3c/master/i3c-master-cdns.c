@@ -702,26 +702,54 @@ static int cdns_i3c_master_send_ccc_cmd(struct i3c_master_controller *m,
 	return ret;
 }
 
-static int cdns_i3c_master_contig_priv_xfers(struct cdns_i3c_master *master,
-					     const struct i3c_priv_xfer *xfers,
-					     int nxfers)
+static int cdns_i3c_master_priv_xfers(struct i3c_device *dev,
+				      const struct i3c_priv_xfer *xfers,
+				      int nxfers)
 {
-	struct cdns_i3c_xfer *xfer;
-	unsigned int i;
-	int ret;
+	struct i3c_master_controller *m = i3c_device_get_master(dev);
+	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
+	int txslots = 0, rxslots = 0, i, ret;
+	struct cdns_i3c_xfer *cdns_xfer;
 
-	xfer = cdns_i3c_master_alloc_xfer(master, nxfers);
-	if (!xfer)
+	for (i = 0; i < nxfers; i++) {
+		if (xfers[i].len > CMD0_FIFO_PL_LEN_MAX)
+			return -ENOTSUPP;
+	}
+
+	if (!nxfers)
+		return 0;
+
+	if (nxfers > master->caps.cmdfifodepth ||
+	    nxfers > master->caps.cmdrfifodepth)
+		return -ENOTSUPP;
+
+	/*
+	 * First make sure that all transactions (block of transfers separated
+	 * by a STOP marker) fit in the FIFOs.
+	 */
+	for (i = 0; i < nxfers; i++) {
+		if (xfers[i].rnw)
+			rxslots += DIV_ROUND_UP(xfers[i].len, 4);
+		else
+			txslots += DIV_ROUND_UP(xfers[i].len, 4);
+	}
+
+	if (rxslots > master->caps.rxfifodepth ||
+	    txslots > master->caps.txfifodepth)
+		return -ENOTSUPP;
+
+	cdns_xfer = cdns_i3c_master_alloc_xfer(master, nxfers);
+	if (!cdns_xfer)
 		return -ENOMEM;
 
 	for (i = 0; i < nxfers; i++) {
-		struct cdns_i3c_cmd *ccmd = &xfer->cmds[i];
+		struct cdns_i3c_cmd *ccmd = &cdns_xfer->cmds[i];
 		u32 pl_len = xfers[i].len;
 
-		ccmd->cmd0 = CMD0_FIFO_DEV_ADDR(xfers[i].addr) |
+		ccmd->cmd0 = CMD0_FIFO_DEV_ADDR(dev->info.dyn_addr) |
 			CMD0_FIFO_PRIV_XMIT_MODE(XMIT_BURST_WITHOUT_SUBADDR);
 
-		if (xfers[i].flags & I3C_PRIV_XFER_READ) {
+		if (xfers[i].rnw) {
 			ccmd->cmd0 |= CMD0_FIFO_RNW;
 			ccmd->rx_buf = xfers[i].data.in;
 			ccmd->rx_len = xfers[i].len;
@@ -740,71 +768,15 @@ static int cdns_i3c_master_contig_priv_xfers(struct cdns_i3c_master *master,
 			ccmd->cmd0 |= CMD0_FIFO_BCH;
 	}
 
-	cdns_i3c_master_queue_xfer(master, xfer);
-	if (!wait_for_completion_timeout(&xfer->comp, msecs_to_jiffies(1000)))
-		cdns_i3c_master_unqueue_xfer(master, xfer);
+	cdns_i3c_master_queue_xfer(master, cdns_xfer);
+	if (!wait_for_completion_timeout(&cdns_xfer->comp,
+					 msecs_to_jiffies(1000)))
+		cdns_i3c_master_unqueue_xfer(master, cdns_xfer);
 
-	ret = xfer->ret;
-	cdns_i3c_master_free_xfer(xfer);
+	ret = cdns_xfer->ret;
+	cdns_i3c_master_free_xfer(cdns_xfer);
 
 	return ret;
-}
-
-static int cdns_i3c_master_priv_xfers(struct i3c_master_controller *m,
-				      const struct i3c_priv_xfer *xfers,
-				      int nxfers)
-{
-	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
-	int tnxfers = 0, tntx = 0, tnrx = 0, j = 0, i, ret = 0;
-
-	for (i = 0; i < nxfers; i++) {
-		if (xfers[i].len > CMD0_FIFO_PL_LEN_MAX)
-			return -ENOTSUPP;
-	}
-
-	if (!nxfers)
-		return 0;
-
-	/*
-	 * First make sure that all transactions (block of transfers separated
-	 * by a STOP marker) fit in the FIFOs.
-	 */
-	for (i = 0; i < nxfers; i++) {
-		tnxfers++;
-
-		if (xfers[i].flags & I3C_PRIV_XFER_READ)
-			tnrx += DIV_ROUND_UP(xfers[i].len, 4);
-		else
-			tntx += DIV_ROUND_UP(xfers[i].len, 4);
-
-		if (!(xfers[i].flags & I3C_PRIV_XFER_STOP) &&
-		    i < nxfers - 1)
-			continue;
-
-		if (tnxfers > master->caps.cmdfifodepth ||
-		    tnxfers > master->caps.cmdrfifodepth ||
-		    tnrx > master->caps.rxfifodepth ||
-		    tntx > master->caps.txfifodepth)
-			return -ENOTSUPP;
-
-		tnxfers = 0;
-		tntx = 0;
-		tnrx = 0;
-	}
-
-	for (i = 0, j = 0; i < nxfers; i++) {
-		if (!(xfers[i].flags & I3C_PRIV_XFER_STOP) && i < nxfers - 1)
-			continue;
-
-		ret = cdns_i3c_master_contig_priv_xfers(master, xfers + j,
-							i + 1 - j);
-		if (ret)
-			return ret;
-
-		j = i;
-	}
-
-	return 0;
 }
 
 #define I3C_DDR_FIRST_DATA_WORD_PREAMBLE	0x2
@@ -872,10 +844,11 @@ static u8 update_crc5(u8 crc5, u16 word)
 	return crc5 & 0x1F;
 }
 
-static int cdns_i3c_master_send_hdr_cmd(struct i3c_master_controller *m,
+static int cdns_i3c_master_send_hdr_cmd(struct i3c_device *dev,
 					const struct i3c_hdr_cmd *cmds,
 					int ncmds)
 {
+	struct i3c_master_controller *m = i3c_device_get_master(dev);
 	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
 	int ret, i, ntxwords = 1, nrxwords = 0;
 	struct cdns_i3c_xfer *xfer;
@@ -894,7 +867,7 @@ static int cdns_i3c_master_send_hdr_cmd(struct i3c_master_controller *m,
 	if (cmds[0].mode != I3C_HDR_DDR)
 		return -ENOTSUPP;
 
-	cmdword = ((u16)cmds[0].code << 8) | (cmds[0].addr << 1);
+	cmdword = ((u16)cmds[0].code << 8) | (dev->info.dyn_addr << 1);
 	if (cmdword & I3C_DDR_READ_CMD)
 		nrxwords += cmds[0].ndatawords + 1;
 	else
@@ -1551,22 +1524,19 @@ static irqreturn_t cdns_i3c_master_interrupt(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-int cdns_i3c_master_disable_ibi(struct i3c_master_controller *m,
-				struct i3c_device *dev)
+int cdns_i3c_master_disable_ibi(struct i3c_device *dev)
 {
 	struct i3c_ccc_events events = { .events = I3C_CCC_EVENT_SIR };
+	struct i3c_master_controller *m = i3c_device_get_master(dev);
 	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
 	struct cdns_i3c_i2c_dev_data *data = i3c_device_get_master_data(dev);
-	struct i3c_device_info devinfo;
 	unsigned long flags;
 	u32 sirmap;
 	int ret;
 
-	i3c_bus_normaluse_lock(m->bus);
-	i3c_device_get_info(dev, &devinfo);
-	ret = i3c_master_disec_locked(m, devinfo.dyn_addr, &events);
+	ret = i3c_master_disec_locked(m, dev->info.dyn_addr, &events);
 	if (ret)
-		goto out;
+		return ret;
 
 	spin_lock_irqsave(&master->ibi.lock, flags);
 	sirmap = readl(master->regs + SIR_MAP_DEV_REG(data->ibi));
@@ -1576,62 +1546,52 @@ int cdns_i3c_master_disable_ibi(struct i3c_master_controller *m,
 	writel(sirmap, master->regs + SIR_MAP_DEV_REG(data->ibi));
 	spin_unlock_irqrestore(&master->ibi.lock, flags);
 
-out:
-	i3c_bus_normaluse_unlock(m->bus);
-
 	return ret;
 }
 
-int cdns_i3c_master_enable_ibi(struct i3c_master_controller *m,
-			       struct i3c_device *dev)
+int cdns_i3c_master_enable_ibi(struct i3c_device *dev)
 {
+	struct i3c_master_controller *m = i3c_device_get_master(dev);
 	struct i3c_ccc_events events = { .events = I3C_CCC_EVENT_SIR };
 	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
 	struct cdns_i3c_i2c_dev_data *data = i3c_device_get_master_data(dev);
-	struct i3c_device_info devinfo;
 	unsigned long flags;
 	u32 sircfg, sirmap;
 	int ret;
 
-	i3c_bus_normaluse_lock(m->bus);
-	i3c_device_get_info(dev, &devinfo);
 	spin_lock_irqsave(&master->ibi.lock, flags);
 	sirmap = readl(master->regs + SIR_MAP_DEV_REG(data->ibi));
 	sirmap &= ~SIR_MAP_DEV_CONF_MASK(data->ibi);
-	sircfg = SIR_MAP_DEV_ROLE(devinfo.bcr >> 6) |
-		 SIR_MAP_DEV_DA(devinfo.dyn_addr) |
-		 SIR_MAP_DEV_PL(devinfo.max_ibi_len) |
+	sircfg = SIR_MAP_DEV_ROLE(dev->info.bcr >> 6) |
+		 SIR_MAP_DEV_DA(dev->info.dyn_addr) |
+		 SIR_MAP_DEV_PL(dev->info.max_ibi_len) |
 		 SIR_MAP_DEV_ACK;
-	if (devinfo.bcr & I3C_BCR_MAX_DATA_SPEED_LIM)
+
+	if (dev->info.bcr & I3C_BCR_MAX_DATA_SPEED_LIM)
 		sircfg |= SIR_MAP_DEV_SLOW;
+
 	sirmap |= SIR_MAP_DEV_CONF(data->ibi, sircfg);
 	writel(sirmap, master->regs + SIR_MAP_DEV_REG(data->ibi));
 	spin_unlock_irqrestore(&master->ibi.lock, flags);
 
-	ret = i3c_master_enec_locked(m, devinfo.dyn_addr, &events);
-	if (ret)
-		goto err_reset_sircfg;
-	i3c_bus_normaluse_unlock(m->bus);
-
-	return 0;
-
-err_reset_sircfg:
-	spin_lock_irqsave(&master->ibi.lock, flags);
-	sirmap = readl(master->regs + SIR_MAP_DEV_REG(data->ibi));
-	sirmap &= ~SIR_MAP_DEV_CONF_MASK(data->ibi);
-	sirmap |= SIR_MAP_DEV_CONF(data->ibi,
-				   SIR_MAP_DEV_DA(I3C_BROADCAST_ADDR));
-	writel(sirmap, master->regs + SIR_MAP_DEV_REG(data->ibi));
-	spin_unlock_irqrestore(&master->ibi.lock, flags);
-	i3c_bus_normaluse_unlock(m->bus);
+	ret = i3c_master_enec_locked(m, dev->info.dyn_addr, &events);
+	if (ret) {
+		spin_lock_irqsave(&master->ibi.lock, flags);
+		sirmap = readl(master->regs + SIR_MAP_DEV_REG(data->ibi));
+		sirmap &= ~SIR_MAP_DEV_CONF_MASK(data->ibi);
+		sirmap |= SIR_MAP_DEV_CONF(data->ibi,
+					   SIR_MAP_DEV_DA(I3C_BROADCAST_ADDR));
+		writel(sirmap, master->regs + SIR_MAP_DEV_REG(data->ibi));
+		spin_unlock_irqrestore(&master->ibi.lock, flags);
+	}
 
 	return ret;
 }
 
-int cdns_i3c_master_request_ibi(struct i3c_master_controller *m,
-				struct i3c_device *dev,
+int cdns_i3c_master_request_ibi(struct i3c_device *dev,
 				const struct i3c_ibi_setup *req)
 {
+	struct i3c_master_controller *m = i3c_device_get_master(dev);
 	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
 	struct cdns_i3c_i2c_dev_data *data = i3c_device_get_master_data(dev);
 	unsigned long flags;
@@ -1660,9 +1620,9 @@ int cdns_i3c_master_request_ibi(struct i3c_master_controller *m,
 	return -ENOSPC;
 }
 
-static void cdns_i3c_master_free_ibi(struct i3c_master_controller *m,
-				     struct i3c_device *dev)
+static void cdns_i3c_master_free_ibi(struct i3c_device *dev)
 {
+	struct i3c_master_controller *m = i3c_device_get_master(dev);
 	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
 	struct cdns_i3c_i2c_dev_data *data = i3c_device_get_master_data(dev);
 	unsigned long flags;
@@ -1675,8 +1635,7 @@ static void cdns_i3c_master_free_ibi(struct i3c_master_controller *m,
 	i3c_generic_ibi_free_pool(data->ibi_pool);
 }
 
-static void cdns_i3c_master_recycle_ibi_slot(struct i3c_master_controller *m,
-					     struct i3c_device *dev,
+static void cdns_i3c_master_recycle_ibi_slot(struct i3c_device *dev,
 					     struct i3c_ibi_slot *slot)
 {
 	struct cdns_i3c_i2c_dev_data *data = i3c_device_get_master_data(dev);

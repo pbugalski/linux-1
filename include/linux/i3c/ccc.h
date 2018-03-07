@@ -246,11 +246,11 @@ struct i3c_ccc_setbrgtgt {
  * enum i3c_sdr_max_data_rate - max data rate values for private SDR transfers
  */
 enum i3c_sdr_max_data_rate {
-	I3C_SDR_DR_FSCL_MAX,
-	I3C_SDR_DR_FSCL_8MHZ,
-	I3C_SDR_DR_FSCL_6MHZ,
-	I3C_SDR_DR_FSCL_4MHZ,
-	I3C_SDR_DR_FSCL_2MHZ,
+	I3C_SDR0_FSCL_MAX,
+	I3C_SDR1_FSCL_8MHZ,
+	I3C_SDR2_FSCL_6MHZ,
+	I3C_SDR3_FSCL_4MHZ,
+	I3C_SDR4_FSCL_2MHZ,
 };
 
 /**

@@ -26,12 +26,11 @@ static ssize_t gpo_show(struct device *dev, struct device_attribute *attr,
 	int ret;
 	struct i3c_priv_xfer xfers[] = {
 		{
-			.flags = 0,
 			.len = 1,
 			.data.out = &reg,
 		},
 		{
-			.flags = I3C_PRIV_XFER_READ | I3C_PRIV_XFER_STOP,
+			.rnw = true,
 			.len = 1,
 			.data.in = gpo,
 		},
@@ -54,12 +53,10 @@ static ssize_t gpo_store(struct device *dev, struct device_attribute *attr,
 	u8 reg = 5, gpo = 0;
 	struct i3c_priv_xfer xfers[] = {
 		{
-			.flags = 0,
 			.len = 1,
 			.data.out = &reg,
 		},
 		{
-			.flags = I3C_PRIV_XFER_STOP,
 			.len = 1,
 			.data.out = &gpo,
 		}
@@ -165,8 +162,6 @@ static int dummy_i3c_remove(struct i3c_device *dev)
 {
 	pr_info("%s:%i\n", __func__, __LINE__);
 	device_remove_file(&dev->dev, &dev_attr_ddr_msg);
-	pr_info("%s:%i\n", __func__, __LINE__);
-	device_remove_file(&dev->dev, &dev_attr_perf);
 	pr_info("%s:%i\n", __func__, __LINE__);
 	device_remove_file(&dev->dev, &dev_attr_gpo);
 	pr_info("%s:%i\n", __func__, __LINE__);

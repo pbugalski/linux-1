@@ -335,25 +335,20 @@ struct i3c_master_controller_ops {
 				 const struct i3c_ccc_cmd *cmd);
 	int (*send_ccc_cmd)(struct i3c_master_controller *master,
 			    struct i3c_ccc_cmd *cmd);
-	int (*send_hdr_cmds)(struct i3c_master_controller *master,
+	int (*send_hdr_cmds)(struct i3c_device *dev,
 			     const struct i3c_hdr_cmd *cmds,
 			     int ncmds);
-	int (*priv_xfers)(struct i3c_master_controller *master,
+	int (*priv_xfers)(struct i3c_device *dev,
 			  const struct i3c_priv_xfer *xfers,
 			  int nxfers);
 	int (*i2c_xfers)(struct i3c_master_controller *master,
 			 const struct i2c_msg *xfers, int nxfers);
-	int (*request_ibi)(struct i3c_master_controller *master,
-			   struct i3c_device *dev,
+	int (*request_ibi)(struct i3c_device *dev,
 			   const struct i3c_ibi_setup *req);
-	void (*free_ibi)(struct i3c_master_controller *master,
-			 struct i3c_device *dev);
-	int (*enable_ibi)(struct i3c_master_controller *master,
-			  struct i3c_device *dev);
-	int (*disable_ibi)(struct i3c_master_controller *master,
-			   struct i3c_device *dev);
-	void (*recycle_ibi_slot)(struct i3c_master_controller *master,
-				 struct i3c_device *dev,
+	void (*free_ibi)(struct i3c_device *dev);
+	int (*enable_ibi)(struct i3c_device *dev);
+	int (*disable_ibi)(struct i3c_device *dev);
+	void (*recycle_ibi_slot)(struct i3c_device *dev,
 				 struct i3c_ibi_slot *slot);
 };
 
@@ -416,12 +411,6 @@ void i3c_bus_maintenance_unlock(struct i3c_bus *bus);
 void i3c_bus_normaluse_lock(struct i3c_bus *bus);
 void i3c_bus_normaluse_unlock(struct i3c_bus *bus);
 
-int i3c_master_send_hdr_cmds(struct i3c_master_controller *master,
-			     const struct i3c_hdr_cmd *cmds,
-			     int ncmds);
-int i3c_master_do_priv_xfers(struct i3c_master_controller *master,
-			     const struct i3c_priv_xfer *xfers,
-			     int nxfers);
 int i3c_master_do_i2c_xfers(struct i3c_master_controller *master,
 			    const struct i2c_msg *xfers,
 			    int nxfers);

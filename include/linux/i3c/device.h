@@ -31,14 +31,12 @@ enum i3c_hdr_mode {
  * struct i3c_hdr_cmd - I3C HDR command
  * @mode: HDR mode selected for this command
  * @code: command opcode
- * @addr: I3C dynamic address
  * @ndatawords: number of data words (a word is 16bits wide)
  * @data: input/output buffer
  */
 struct i3c_hdr_cmd {
 	enum i3c_hdr_mode mode;
 	u8 code;
-	u8 addr;
 	int ndatawords;
 	union {
 		u16 *in;
@@ -46,25 +44,15 @@ struct i3c_hdr_cmd {
 	} data;
 };
 
-/* Private SDR read transfer */
-#define I3C_PRIV_XFER_READ		BIT(0)
-/*
- * Instruct the controller to issue a STOP after a specific transfer instead
- * of a REPEATED START.
- */
-#define I3C_PRIV_XFER_STOP		BIT(1)
-
 /**
  * struct i3c_priv_xfer - I3C SDR private transfer
- * @addr: I3C dynamic address
+ * @rnw: encodes the transfer direction. true for a read, false for a write
  * @len: transfer length in bytes of the transfer
- * @flags: combination of I3C_PRIV_XFER_xxx flags
  * @data: input/output buffer
  */
 struct i3c_priv_xfer {
-	u8 addr;
+	bool rnw;
 	u16 len;
-	u32 flags;
 	struct {
 		void *in;
 		const void *out;

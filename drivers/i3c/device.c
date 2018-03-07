@@ -33,17 +33,14 @@ int i3c_device_do_priv_xfers(struct i3c_device *dev,
 			     int nxfers)
 {
 	struct i3c_master_controller *master;
-	int i, ret;
+	int ret;
 
 	master = i3c_device_get_master(dev);
 	if (!master)
 		return -EINVAL;
 
 	i3c_bus_normaluse_lock(master->bus);
-	for (i = 0; i < nxfers; i++)
-		xfers[i].addr = dev->info.dyn_addr;
-
-	ret = i3c_master_do_priv_xfers_locked(master, xfers, nxfers);
+	ret = i3c_master_do_priv_xfers_locked(dev, xfers, nxfers);
 	i3c_bus_normaluse_unlock(master->bus);
 
 	return ret;
@@ -85,10 +82,7 @@ int i3c_device_send_hdr_cmds(struct i3c_device *dev,
 		return -EINVAL;
 
 	i3c_bus_normaluse_lock(master->bus);
-	for (i = 0; i < ncmds; i++)
-		cmds[i].addr = dev->info.dyn_addr;
-
-	ret = i3c_master_send_hdr_cmds_locked(master, cmds, ncmds);
+	ret = i3c_master_send_hdr_cmds_locked(dev, cmds, ncmds);
 	i3c_bus_normaluse_unlock(master->bus);
 
 	return ret;
@@ -123,7 +117,9 @@ int i3c_device_disable_ibi(struct i3c_device *dev)
 		goto out;
 	}
 
-	ret = master->ops->disable_ibi(master, dev);
+	i3c_bus_normaluse_lock(master->bus);
+	ret = master->ops->disable_ibi(dev);
+	i3c_bus_normaluse_unlock(master->bus);
 	if (ret)
 		goto out;
 
@@ -164,7 +160,9 @@ int i3c_device_enable_ibi(struct i3c_device *dev)
 		goto out;
 	}
 
-	ret = master->ops->enable_ibi(master, dev);
+	i3c_bus_normaluse_lock(master->bus);
+	ret = master->ops->enable_ibi(dev);
+	i3c_bus_normaluse_unlock(master->bus);
 	if (!ret)
 		dev->ibi->enabled = true;
 
@@ -189,7 +187,7 @@ EXPORT_SYMBOL_GPL(i3c_device_enable_ibi);
 int i3c_device_request_ibi(struct i3c_device *dev,
 			   const struct i3c_ibi_setup *req)
 {
-	struct i3c_master_controller *master = dev->common.master;
+	struct i3c_master_controller *master = i3c_device_get_master(dev);
 	struct i3c_device_ibi_info *ibi;
 	int ret;
 
@@ -217,7 +215,9 @@ int i3c_device_request_ibi(struct i3c_device *dev,
 	ibi->max_payload_len = req->max_payload_len;
 
 	dev->ibi = ibi;
-	ret = master->ops->request_ibi(master, dev, req);
+	i3c_bus_normaluse_lock(master->bus);
+	ret = master->ops->request_ibi(dev, req);
+	i3c_bus_normaluse_unlock(master->bus);
 	if (ret)
 		goto err_free_ibi;
 
@@ -246,7 +246,7 @@ EXPORT_SYMBOL_GPL(i3c_device_request_ibi);
  */
 void i3c_device_free_ibi(struct i3c_device *dev)
 {
-	struct i3c_master_controller *master = dev->common.master;
+	struct i3c_master_controller *master = i3c_device_get_master(dev);
 
 	mutex_lock(&dev->ibi_lock);
 	if (!dev->ibi)
@@ -255,7 +255,9 @@ void i3c_device_free_ibi(struct i3c_device *dev)
 	if (WARN_ON(dev->ibi->enabled))
 		BUG_ON(i3c_device_disable_ibi(dev));
 
-	master->ops->free_ibi(master, dev);
+	i3c_bus_normaluse_lock(master->bus);
+	master->ops->free_ibi(dev);
+	i3c_bus_normaluse_unlock(master->bus);
 	kfree(dev->ibi);
 	dev->ibi = NULL;
 

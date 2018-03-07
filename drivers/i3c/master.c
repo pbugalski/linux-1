@@ -92,9 +92,10 @@ static int i3c_master_send_ccc_cmd_locked(struct i3c_master_controller *master,
 	return master->ops->send_ccc_cmd(master, cmd);
 }
 
-int i3c_master_send_hdr_cmds_locked(struct i3c_master_controller *master,
+int i3c_master_send_hdr_cmds_locked(struct i3c_device *dev,
 				    const struct i3c_hdr_cmd *cmds, int ncmds)
 {
+	struct i3c_master_controller *master = i3c_device_get_master(dev);
 	int i;
 
 	if (!cmds || !master || ncmds <= 0)
@@ -108,39 +109,14 @@ int i3c_master_send_hdr_cmds_locked(struct i3c_master_controller *master,
 			return -ENOTSUPP;
 	}
 
-	return master->ops->send_hdr_cmds(master, cmds, ncmds);
+	return master->ops->send_hdr_cmds(dev, cmds, ncmds);
 }
 
-/**
- * i3c_master_send_hdr_cmds() - send HDR commands on the I3C bus
- * @master: master used to send frames on the bus
- * @cmds: array of HDR commands
- * @ncmds: number of commands to send
- *
- * Send one or several HDR commands.
- *
- * This function can sleep and thus cannot be called in atomic context.
- *
- * Return: 0 in case of success, a negative error code otherwise.
- */
-int i3c_master_send_hdr_cmds(struct i3c_master_controller *master,
-			     const struct i3c_hdr_cmd *cmds, int ncmds)
-{
-	int ret;
-
-	i3c_bus_normaluse_lock(master->bus);
-	ret = i3c_master_send_hdr_cmds_locked(master, cmds, ncmds);
-	i3c_bus_normaluse_unlock(master->bus);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(i3c_master_send_hdr_cmds);
-
-int i3c_master_do_priv_xfers_locked(struct i3c_master_controller *master,
+int i3c_master_do_priv_xfers_locked(struct i3c_device *dev,
 				    const struct i3c_priv_xfer *xfers,
 				    int nxfers)
 {
-	int i;
+	struct i3c_master_controller *master = i3c_device_get_master(dev);
 
 	if (!xfers || !master || nxfers <= 0)
 		return -EINVAL;
@@ -148,43 +124,8 @@ int i3c_master_do_priv_xfers_locked(struct i3c_master_controller *master,
 	if (!master->ops->priv_xfers)
 		return -ENOTSUPP;
 
-	for (i = 0; i < nxfers; i++) {
-		enum i3c_addr_slot_status status;
-
-		status = i3c_bus_get_addr_slot_status(master->bus,
-						      xfers[i].addr);
-		if (status != I3C_ADDR_SLOT_I3C_DEV)
-			return -EINVAL;
-	}
-
-	return master->ops->priv_xfers(master, xfers, nxfers);
+	return master->ops->priv_xfers(dev, xfers, nxfers);
 }
-
-/**
- * i3c_master_do_priv_xfers() - do SDR private transfers on the I3C bus
- * @master: master used to send frames on the bus
- * @xfers: array of SDR private transfers
- * @nxfers: number of transfers
- *
- * Do one or several private SDR I3C transfers.
- *
- * This function can sleep and thus cannot be called in atomic context.
- *
- * Return: 0 in case of success, a negative error code otherwise.
- */
-int i3c_master_do_priv_xfers(struct i3c_master_controller *master,
-			     const struct i3c_priv_xfer *xfers,
-			     int nxfers)
-{
-	int ret;
-
-	i3c_bus_normaluse_lock(master->bus);
-	ret = i3c_master_do_priv_xfers_locked(master, xfers, nxfers);
-	i3c_bus_normaluse_unlock(master->bus);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(i3c_master_do_priv_xfers);
 
 /**
  * i3c_master_do_i2c_xfers() - do I2C transfers on the I3C bus
@@ -1069,7 +1010,7 @@ static void i3c_device_handle_ibi(struct work_struct *work)
 	payload.len = slot->len;
 
 	dev->ibi->handler(dev, &payload);
-	master->ops->recycle_ibi_slot(master, dev, slot);
+	master->ops->recycle_ibi_slot(dev, slot);
 	if (atomic_dec_and_test(&dev->ibi->pending_ibis))
 		complete(&dev->ibi->all_ibis_handled);
 }

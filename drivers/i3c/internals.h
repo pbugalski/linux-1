@@ -25,10 +25,10 @@ void i3c_bus_set_addr_slot_status(struct i3c_bus *bus, u16 addr,
 enum i3c_addr_slot_status i3c_bus_get_addr_slot_status(struct i3c_bus *bus,
 						       u16 addr);
 
-int i3c_master_do_priv_xfers_locked(struct i3c_master_controller *master,
+int i3c_master_do_priv_xfers_locked(struct i3c_device *dev,
 				    const struct i3c_priv_xfer *xfers,
 				    int nxfers);
-int i3c_master_send_hdr_cmds_locked(struct i3c_master_controller *master,
+int i3c_master_send_hdr_cmds_locked(struct i3c_device *dev,
 				    const struct i3c_hdr_cmd *cmds, int ncmds);
 
 #endif /* I3C_INTERNAL_H */

@@ -257,11 +257,11 @@ enum i3c_sdr_max_data_rate {
  * enum i3c_tsco - clock to data turn-around
  */
 enum i3c_tsco {
-	I3C_TSCO_LT_8NS,
-	I3C_TSCO_LT_9NS,
-	I3C_TSCO_LT_10NS,
-	I3C_TSCO_LT_11NS,
-	I3C_TSCO_LT_12NS,
+	I3C_TSCO_8NS,
+	I3C_TSCO_9NS,
+	I3C_TSCO_10NS,
+	I3C_TSCO_11NS,
+	I3C_TSCO_12NS,
 };
 
 #define I3C_CCC_MAX_SDR_FSCL_MASK	GENMASK(2, 0)

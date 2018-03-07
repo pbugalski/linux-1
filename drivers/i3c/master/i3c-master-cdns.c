@@ -1240,19 +1240,19 @@ static int cdns_i3c_master_do_daa_locked(struct cdns_i3c_master *master)
 		max_fscl = max(I3C_CCC_MAX_SDR_FSCL(devinfo.max_read_ds),
 			       I3C_CCC_MAX_SDR_FSCL(devinfo.max_write_ds));
 		switch (max_fscl) {
-		case I3C_SDR_DR_FSCL_8MHZ:
+		case I3C_SDR1_FSCL_8MHZ:
 			max_fscl = 8000000;
 			break;
-		case I3C_SDR_DR_FSCL_6MHZ:
+		case I3C_SDR2_FSCL_6MHZ:
 			max_fscl = 6000000;
 			break;
-		case I3C_SDR_DR_FSCL_4MHZ:
+		case I3C_SDR3_FSCL_4MHZ:
 			max_fscl = 4000000;
 			break;
-		case I3C_SDR_DR_FSCL_2MHZ:
+		case I3C_SDR4_FSCL_2MHZ:
 			max_fscl = 2000000;
 			break;
-		case I3C_SDR_DR_FSCL_MAX:
+		case I3C_SDR0_FSCL_MAX:
 		default:
 			max_fscl = 0;
 			break;

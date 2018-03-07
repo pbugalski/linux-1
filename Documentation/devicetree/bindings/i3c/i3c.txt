@@ -7,7 +7,7 @@ busses in a device tree.
 Required properties
 -------------------
 
-- #address-cells  - should be <1>. Read more about addresses below.
+- #address-cells  - should be <3>. Read more about addresses below.
 - #size-cells     - should be <0>.
 - compatible      - name of the I3C master controller driving the I3C bus
 
@@ -36,28 +36,31 @@ Each I2C device connected to the bus should be described in a subnode. All
 properties described in Documentation/devicetree/bindings/i2c/i2c.txt are
 valid here, but several new properties have been added.
 
-New required properties:
-------------------------
-- i3c-lvr: 32 bits integer property (only the lowest 8 bits are meaningful)
-	   describing device capabilities as described in the I3C
-	   specification.
+New constraint on existing properties:
+--------------------------------------
+- reg: contains 3 cells
+  + first cell : still encoding the I2C address
 
-	   bit[31:8]: unused
-	   bit[7:5]: I2C device index. Possible values
-	    * 0: I2C device has a 50 ns spike filter
-	    * 1: I2C device does not have a 50 ns spike filter but supports
-		 high frequency on SCL
-	    * 2: I2C device does not have a 50 ns spike filter and is not
-		 tolerant to high frequencies
-	    * 3-7: reserved
+  + second cell: should have bit 31 set to 1 signify that this is an I2C
+		 device. Bits 0 to 7 encode the I3C LVR (Legacy Virtual
+		 Register):
 
-	   bit[4]: tell whether the device operates in FM (Fast Mode) or FM+
-		   mode
-	    * 0: FM+ mode
-	    * 1: FM mode
+	bit[7:5]: I2C device index. Possible values
+	* 0: I2C device has a 50 ns spike filter
+	* 1: I2C device does not have a 50 ns spike filter but supports high
+	     frequency on SCL
+	* 2: I2C device does not have a 50 ns spike filter and is not tolerant
+	     to high frequencies
+	* 3-7: reserved
 
-	   bit[3:0]: device type
-	    * 0-15: reserved
+	bit[4]: tell whether the device operates in FM (Fast Mode) or FM+ mode
+	* 0: FM+ mode
+	* 1: FM mode
+
+	bit[3:0]: device type
+	* 0-15: reserved
+
+  + third cell: should be 0
 
 I3C devices
 ===========
@@ -74,23 +77,30 @@ I3C device has a static address and we want to assign it a specific dynamic
 address before the DAA takes place (so that other devices on the bus can't
 take this dynamic address).
 
-The I3C device should be names <device-type>.<i3c-pid>[@<static-address>],
+The I3C device should be names <device-type>@<static-address>,<i3c-pid>,
 where device-type is describing the type of device connected on the bus
 (gpio-controller, sensor, ...).
 
 Required properties
 -------------------
-- i3c-pid: PID (Provisional ID). 64-bit property which is used to match a
-	   device discovered during DAA with its device tree definition. The
-	   PID is supposed to be unique on a given bus, which guarantees a 1:1
-	   match. This property becomes optional if a reg property is defined,
-	   meaning that the device has a static address.
+- reg: contains 3 cells
+  + first cell : encodes the I2C address. Should be 0 if the device does not
+		 have one (0 is not a valid I3C address).
+
+  + second and third cells: should encode the ProvisionalID. The second cell
+			    contains the manufacturer ID right-shifted by 1.
+			    The third cell contains ORing of the part ID
+			    right-shifted by 16, the instance ID right-shifted
+			    by 12 and the extra information. This encoding is
+			    following the PID definition provided by the I3C
+			    specification.
 
 Optional properties
 -------------------
-- reg: static address. Only valid if the device has a static address.
-- i3c-dynamic-address: dynamic address to be assigned to this device. This
-		       property depends on the reg property.
+- assigned-address: dynamic address to be assigned to this device. This
+		    property is only valid if the I3C device has a static
+		    address (first cell of the reg property != 0).
+
 
 Example:
 
@@ -100,7 +110,7 @@ Example:
 		clock-names = "pclk", "sysclk";
 		interrupts = <3 0>;
 		reg = <0x0d040000 0x1000>;
-		#address-cells = <1>;
+		#address-cells = <3>;
 		#size-cells = <0>;
 
 		status = "okay";
@@ -109,23 +119,21 @@ Example:
 		/* I2C device. */
 		nunchuk: nunchuk@52 {
 			compatible = "nintendo,nunchuk";
-			reg = <0x52>;
-			i3c-lvr = <0x10>;
+			reg = <0x52 0x80000010 0x0>;
 		};
 
 		/* I3C device with a static address. */
-		thermal_sensor: sensor.39200144004@68 {
-			reg = <0x68>;
-			i3c-pid = /bits/ 64 <0x39200144004>;
-			i3c-dynamic-address = <0xa>;
+		thermal_sensor: sensor@68,39200144004 {
+			reg = <0x68 0x392 0x144004>;
+			assigned-address = <0xa>;
 		};
 
 		/*
 		 * I3C device without a static address but requiring resources
 		 * described in the DT.
 		 */
-		sensor.39200154004 {
-			i3c-pid = /bits/ 64 <0x39200154004>;
+		sensor@0,39200154004 {
+			reg = <0x0 0x392 0x154004>;
 			clocks = <&clock_provider 0>;
 		};
 	};

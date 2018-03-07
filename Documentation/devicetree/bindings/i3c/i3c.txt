@@ -88,9 +88,9 @@ Required properties
 		 have one (0 is not a valid I3C address).
 
   + second and third cells: should encode the ProvisionalID. The second cell
-			    contains the manufacturer ID right-shifted by 1.
+			    contains the manufacturer ID left-shifted by 1.
 			    The third cell contains ORing of the part ID
-			    right-shifted by 16, the instance ID right-shifted
+			    left-shifted by 16, the instance ID left-shifted
 			    by 12 and the extra information. This encoding is
 			    following the PID definition provided by the I3C
 			    specification.

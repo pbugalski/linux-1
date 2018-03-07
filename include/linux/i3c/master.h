@@ -135,12 +135,35 @@ struct i3c_device_ibi_info {
 };
 
 /**
+ * enum i3c_device_state - Possible I3C states
+ * @I3C_DEVICE_NOT_DISCOVERED: the device has not yet been discovered on the
+ *			       bus. This happens when board specific
+ *			       information have been defined and have to be
+ *			       attached to the device when it's appearing on
+ *			       the bus. It also happens when one wants to
+ *			       assign a dynamic address to an I3C device that
+ *			       has a static address with SETDASA
+ * @I3C_DEVICE_REACHABLE: the device is reachable. Every device ends up in this
+ *			  state after being discovered
+ * @I3C_DEVICE_UNREACHABLE: the device is not reachable. Ends up in this state
+ *			    when the device is not longer replying to the
+ *			    mandatory GETSTATUS CCC command
+ */
+enum i3c_device_state {
+	I3C_DEVICE_NOT_DISCOVERED,
+	I3C_DEVICE_REACHABLE,
+	I3C_DEVICE_UNREACHABLE,
+};
+
+/**
  * struct i3c_device - I3C device object
  * @common: inherit common I3C/I2C description
  * @dev: device object to register the I3C dev to the device model
- * @new: true if the device has not yet been registered to the device model.
- *	 Will be set to false after device_add() is called on this device
- *	 even if device_add() fails
+ * @state: device state. See &enum_i3c_device_state for more details
+ * @regfailed: true if the device has already been registered to the device
+ *	       model and this operation failed. The goal it to not try
+ *	       register the device everytime a new device is discovered on
+ *	       the bus
  * @info: I3C device information. Will be automatically filled when you create
  *	  your device with i3c_master_add_i3c_dev_locked()
  * @ibi_lock: lock used to protect the &struct_i3c_device->ibi
@@ -153,7 +176,8 @@ struct i3c_device_ibi_info {
 struct i3c_device {
 	struct i3c_i2c_dev common;
 	struct device dev;
-	bool new;
+	enum i3c_device_state state;
+	bool regfailed;
 	struct i3c_device_info info;
 	struct mutex ibi_lock;
 	struct i3c_device_ibi_info *ibi;
@@ -341,8 +365,9 @@ struct i3c_master_controller_ops {
 	int (*priv_xfers)(struct i3c_device *dev,
 			  const struct i3c_priv_xfer *xfers,
 			  int nxfers);
-	int (*i2c_xfers)(struct i3c_master_controller *master,
+	int (*i2c_xfers)(struct i2c_device *dev,
 			 const struct i2c_msg *xfers, int nxfers);
+	u32 (*i2c_funcs)(struct i3c_master_controller *master);
 	int (*request_ibi)(struct i3c_device *dev,
 			   const struct i3c_ibi_setup *req);
 	void (*free_ibi)(struct i3c_device *dev);
@@ -510,6 +535,18 @@ static inline void i2c_device_set_master_data(struct i2c_device *dev,
  */
 static inline struct i3c_master_controller *
 i3c_device_get_master(struct i3c_device *dev)
+{
+	return dev->common.master;
+}
+
+/**
+ * i2c_device_get_master() - get master used to communicate with a device
+ * @dev: I2C dev
+ *
+ * Return: the master controller driving @dev
+ */
+static inline struct i3c_master_controller *
+i2c_device_get_master(struct i2c_device *dev)
 {
 	return dev->common.master;
 }

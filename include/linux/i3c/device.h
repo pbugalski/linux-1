@@ -27,11 +27,18 @@ enum i3c_hdr_mode {
 	I3C_HDR_TSL,
 };
 
+#define I3C_HDR_GEN_WRITE_CMD(id)	(id)
+#define I3C_HDR_VENDOR_WRITE_CMD(id)	(0x20 + (id))
+#define I3C_HDR_IS_READ_CMD		BIT(7)
+#define I3C_HDR_GEN_READ_CMD(id)	(0x80 + (id))
+#define I3C_HDR_VENDOR_READ_CMD(id)	(0xa0 + (id))
+
 /**
  * struct i3c_hdr_cmd - I3C HDR command
  * @mode: HDR mode selected for this command
- * @code: command opcode
- * @ndatawords: number of data words (a word is 16bits wide)
+ * @code: command opcode. Bit 7 encodes the direction of the data transfer, if
+ *	  set this is a read, otherwise this is a write
+ * @ndatawords: number of data words (a word is 16bits wide) to transfer
  * @data: input/output buffer
  */
 struct i3c_hdr_cmd {

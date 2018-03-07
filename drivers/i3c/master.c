@@ -127,51 +127,19 @@ int i3c_master_do_priv_xfers_locked(struct i3c_device *dev,
 	return master->ops->priv_xfers(dev, xfers, nxfers);
 }
 
-/**
- * i3c_master_do_i2c_xfers() - do I2C transfers on the I3C bus
- * @master: master used to send frames on the bus
- * @xfers: array of I2C transfers
- * @nxfers: number of transfers
- *
- * Does one or several I2C transfers.
- *
- * This function can sleep and thus cannot be called in atomic context.
- *
- * Return: 0 in case of success, a negative error code otherwise.
- */
-int i3c_master_do_i2c_xfers(struct i3c_master_controller *master,
-			    const struct i2c_msg *xfers,
-			    int nxfers)
+static struct i2c_device *
+i3c_master_find_i2c_dev_by_addr(const struct i3c_master_controller *master,
+				u16 addr)
 {
-	int ret, i;
+	struct i2c_device *dev;
 
-	if (!xfers || !master || nxfers <= 0)
-		return -EINVAL;
-
-	if (!master->ops->i2c_xfers)
-		return -ENOTSUPP;
-
-	i3c_bus_normaluse_lock(master->bus);
-
-	for (i = 0; i < nxfers; i++) {
-		enum i3c_addr_slot_status status;
-
-		status = i3c_bus_get_addr_slot_status(master->bus,
-						      xfers[i].addr);
-		if (status != I3C_ADDR_SLOT_I2C_DEV) {
-			ret = -EINVAL;
-			goto out;
-		}
+	i3c_bus_for_each_i2cdev(master->bus, dev) {
+		if (dev->client->addr == addr)
+			return dev;
 	}
 
-	ret = master->ops->i2c_xfers(master, xfers, nxfers);
-
-out:
-	i3c_bus_normaluse_unlock(master->bus);
-
-	return ret;
+	return NULL;
 }
-EXPORT_SYMBOL_GPL(i3c_master_do_i2c_xfers);
 
 /**
  * i3c_master_get_free_addr() - get a free address on the bus
@@ -193,6 +161,17 @@ EXPORT_SYMBOL_GPL(i3c_master_get_free_addr);
 static void i3c_device_release(struct device *dev)
 {
 	struct i3c_device *i3cdev = dev_to_i3cdev(dev);
+	struct i3c_master_controller *master = i3c_device_get_master(i3cdev);
+
+	if (i3cdev->info.static_addr)
+		i3c_bus_set_addr_slot_status(master->bus,
+					     i3cdev->info.static_addr,
+					     I3C_ADDR_SLOT_FREE);
+
+	if (i3cdev->info.dyn_addr)
+		i3c_bus_set_addr_slot_status(master->bus,
+					     i3cdev->info.dyn_addr,
+					     I3C_ADDR_SLOT_FREE);
 
 	of_node_put(dev->of_node);
 	kfree(i3cdev);
@@ -215,12 +194,18 @@ i3c_master_alloc_i3c_dev(struct i3c_master_controller *master,
 	dev->dev.bus = &i3c_bus_type;
 	dev->dev.release = i3c_device_release;
 	dev->info = *info;
-	dev->new = true;
 	mutex_init(&dev->ibi_lock);
 	dev_set_name(&dev->dev, "%d-%llx", master->bus->id, info->pid);
 
 	device_initialize(&dev->dev);
 
+	if (info->static_addr)
+		i3c_bus_set_addr_slot_status(master->bus, info->static_addr,
+					     I3C_ADDR_SLOT_I3C_DEV);
+
+	if (info->dyn_addr)
+		i3c_bus_set_addr_slot_status(master->bus, info->dyn_addr,
+					     I3C_ADDR_SLOT_I3C_DEV);
 	return dev;
 }
 
@@ -270,8 +255,6 @@ int i3c_master_set_info(struct i3c_master_controller *master,
 	master->this = i3cdev;
 	master->bus->cur_master = master->this;
 	list_add_tail(&i3cdev->common.node, &master->bus->devs.i3c);
-	i3c_bus_set_addr_slot_status(master->bus, info->dyn_addr,
-				     I3C_ADDR_SLOT_I3C_DEV);
 
 	return 0;
 }
@@ -806,6 +789,10 @@ i3c_master_add_i3c_dev_locked(struct i3c_master_controller *master, u8 addr)
 	if (status != I3C_ADDR_SLOT_FREE)
 		return ERR_PTR(-EINVAL);
 
+	/*
+	 * We must mark the addr slot as being reserved by an I3C device to be
+	 * able to send CCC commands.
+	 */
 	i3c_bus_set_addr_slot_status(master->bus, addr, I3C_ADDR_SLOT_I3C_DEV);
 
 	ret = i3c_master_retrieve_dev_info(master, &info, addr);
@@ -818,6 +805,7 @@ i3c_master_add_i3c_dev_locked(struct i3c_master_controller *master, u8 addr)
 		goto err_release_addr;
 	}
 
+	i3cdev->state = I3C_DEVICE_REACHABLE;
 	list_add_tail(&i3cdev->common.node, &master->bus->devs.i3c);
 
 	return i3cdev;
@@ -829,27 +817,17 @@ err_release_addr:
 }
 EXPORT_SYMBOL_GPL(i3c_master_add_i3c_dev_locked);
 
-static int of_i3c_master_add_dev(struct i3c_master_controller *master,
-				 struct device_node *node)
+#define OF_I3C_REG1_IS_I2C_DEV			BIT(31)
+
+static int of_i3c_master_add_i2c_dev(struct i3c_master_controller *master,
+				     struct device_node *node, u32 *reg)
 {
 	struct device *dev = master->parent;
 	struct i2c_board_info info = { };
 	struct i2c_device *i2cdev;
-	u32 lvr, addr;
+	/* LVR is encoded in the lowest byte of reg[1]. */
+	u8 lvr = reg[1];
 	int ret;
-
-	if (!master || !node)
-		return -EINVAL;
-
-	/*
-	 * This node is not describing an I2C device, skip it.
-	 * We only add I2C devices here (i.e. nodes with an i3c-lvr property).
-	 * I3C devices will be discovered during DAA, even if they have a
-	 * static address.
-	 */
-	if (of_property_read_u32(node, "reg", &addr) ||
-	    of_property_read_u32(node, "i3c-lvr", &lvr))
-		return 0;
 
 	ret = of_i2c_get_board_info(master->parent, node, &info);
 	if (ret)
@@ -864,7 +842,7 @@ static int of_i3c_master_add_dev(struct i3c_master_controller *master,
 	 */
 	i2cdev = i3c_master_alloc_i2c_dev(master, &info, lvr);
 	if (IS_ERR(i2cdev)) {
-		dev_err(dev, "Failed to allocate device %02x\n", addr);
+		dev_err(dev, "Failed to allocate device %04x\n", info.addr);
 		return ret;
 	}
 
@@ -874,6 +852,74 @@ static int of_i3c_master_add_dev(struct i3c_master_controller *master,
 	list_add_tail(&i2cdev->common.node, &master->bus->devs.i2c);
 
 	return 0;
+}
+
+static int of_i3c_master_add_i3c_dev(struct i3c_master_controller *master,
+				     struct device_node *node, u32 *reg)
+{
+	struct i3c_device_info info = { };
+	enum i3c_addr_slot_status addrstatus;
+	struct i3c_device *i3cdev;
+	u32 dyn_addr = 0;
+
+	if (reg[0]) {
+		if (reg[0] > I3C_MAX_ADDR)
+			return -EINVAL;
+
+		addrstatus = i3c_bus_get_addr_slot_status(master->bus,
+								  reg[0]);
+		if (addrstatus != I3C_ADDR_SLOT_FREE)
+			return -EINVAL;
+	}
+
+	info.static_addr = reg[0];
+
+	if (!of_property_read_u32(node, "assigned-address", &dyn_addr)) {
+		if (dyn_addr > I3C_MAX_ADDR)
+			return -EINVAL;
+
+		addrstatus = i3c_bus_get_addr_slot_status(master->bus,
+							  dyn_addr);
+		if (addrstatus != I3C_ADDR_SLOT_FREE)
+			return -EINVAL;
+	}
+
+	info.dyn_addr = dyn_addr;
+	info.pid = ((u64)reg[1] << 32) | reg[2];
+
+	if ((info.pid & GENMASK_ULL(63, 48)) ||
+	    I3C_PID_RND_LOWER_32BITS(info.pid))
+		return -EINVAL;
+
+	i3cdev = i3c_master_alloc_i3c_dev(master, &info, &i3c_device_type);
+	if (IS_ERR(i3cdev))
+		return PTR_ERR(i3cdev);
+
+	i3cdev->dev.of_node = node;
+	list_add_tail(&i3cdev->common.node, &master->bus->devs.i3c);
+
+	return 0;
+}
+
+static int of_i3c_master_add_dev(struct i3c_master_controller *master,
+				 struct device_node *node)
+{
+	u32 reg[3];
+	int ret;
+
+	if (!master || !node)
+		return -EINVAL;
+
+	ret = of_property_read_u32_array(node, "reg", reg, ARRAY_SIZE(reg));
+	if (ret)
+		return ret;
+
+	if (reg[1] & OF_I3C_REG1_IS_I2C_DEV)
+		ret = of_i3c_master_add_i2c_dev(master, node, reg);
+	else
+		ret = of_i3c_master_add_i3c_dev(master, node, reg);
+
+	return ret;
 }
 
 static int of_populate_i3c_bus(struct i3c_master_controller *master)
@@ -911,27 +957,39 @@ static int i3c_master_i2c_adapter_xfer(struct i2c_adapter *adap,
 				       struct i2c_msg *xfers, int nxfers)
 {
 	struct i3c_master_controller *master = i2c_adapter_to_i3c_master(adap);
+	struct i2c_device *dev;
 	int i, ret;
+	u16 addr;
 
-	for (i = 0; i < nxfers; i++) {
-		enum i3c_addr_slot_status status;
+	if (!xfers || !master || nxfers <= 0)
+		return -EINVAL;
 
-		status = i3c_bus_get_addr_slot_status(master->bus,
-						      xfers[i].addr);
-		if (status != I3C_ADDR_SLOT_I2C_DEV)
-			return -EINVAL;
+	if (!master->ops->i2c_xfers)
+		return -ENOTSUPP;
+
+	/* Doing transfers to different devices is not supported. */
+	addr = xfers[0].addr;
+	for (i = 1; i < nxfers; i++) {
+		if (addr != xfers[i].addr)
+			return -ENOTSUPP;
 	}
 
-	ret = i3c_master_do_i2c_xfers(master, xfers, nxfers);
-	if (ret)
-		return ret;
+	i3c_bus_normaluse_lock(master->bus);
+	dev = i3c_master_find_i2c_dev_by_addr(master, addr);
+	if (!dev)
+		ret = -ENOENT;
+	else
+		ret = master->ops->i2c_xfers(dev, xfers, nxfers);
+	i3c_bus_normaluse_unlock(master->bus);
 
-	return nxfers;
+	return ret ? ret : nxfers;
 }
 
 static u32 i3c_master_i2c_functionalities(struct i2c_adapter *adap)
 {
-	return I2C_FUNC_SMBUS_EMUL | I2C_FUNC_I2C | I2C_FUNC_10BIT_ADDR;
+	struct i3c_master_controller *master = i2c_adapter_to_i3c_master(adap);
+
+	return master->ops->i2c_funcs(master);
 }
 
 static const struct i2c_algorithm i3c_master_i2c_algo = {
@@ -944,6 +1002,9 @@ static int i3c_master_i2c_adapter_init(struct i3c_master_controller *master)
 	struct i2c_adapter *adap = i3c_master_to_i2c_adapter(master);
 	struct i2c_device *i2cdev;
 	int ret;
+
+	if (!master->ops->i2c_xfers || !master->ops->i2c_funcs)
+		return -EINVAL;
 
 	adap->dev.parent = master->parent;
 	adap->owner = master->parent->driver->owner;
@@ -1193,15 +1254,15 @@ void i3c_master_register_new_i3c_devs(struct i3c_master_controller *master)
 	int ret;
 
 	i3c_bus_for_each_i3cdev(master->bus, i3cdev) {
-		if (!i3cdev->new)
+		if (i3cdev->regfailed || device_is_registered(&i3cdev->dev))
 			continue;
 
 		ret = device_add(&i3cdev->dev);
-		if (ret)
+		if (ret) {
 			dev_err(master->parent,
 				"Failed to add I3C device (err = %d)\n", ret);
-
-		i3cdev->new = false;
+			i3cdev->regfailed = true;
+		}
 	}
 }
 EXPORT_SYMBOL_GPL(i3c_master_register_new_i3c_devs);

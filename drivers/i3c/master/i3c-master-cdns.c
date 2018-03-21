@@ -270,14 +270,18 @@
 #define TTO_PRESCL_CTRL1_DIVA(x)	(x)
 
 #define DEVS_CTRL			0xb8
+#define DEVS_CTRL_DEV_CLR_SHIFT		16
 #define DEVS_CTRL_DEV_CLR_ALL		GENMASK(31, 16)
 #define DEVS_CTRL_DEV_CLR(dev)		BIT(16 + (dev))
 #define DEVS_CTRL_DEV_ACTIVE(dev)	BIT(dev)
+#define DEVS_CTRL_DEVS_ACTIVE_MASK	GENMASK(15, 0)
+#define MAX_DEVS			16
 
 #define DEV_ID_RR0(d)			(0xc0 + ((d) * 0x10))
 #define DEV_ID_RR0_LVR_EXT_ADDR		BIT(11)
 #define DEV_ID_RR0_HDR_CAP		BIT(10)
 #define DEV_ID_RR0_IS_I3C		BIT(9)
+#define DEV_ID_RR0_DEV_ADDR_MASK	(GENMASK(6, 0) | GENMASK(15, 13))
 #define DEV_ID_RR0_SET_DEV_ADDR(a)	(((a) & GENMASK(6, 0)) |	\
 					 (((a) & GENMASK(9, 7)) << 6))
 #define DEV_ID_RR0_GET_DEV_ADDR(x)	((((x) >> 1) & GENMASK(6, 0)) |	\
@@ -385,7 +389,8 @@ struct cdns_i3c_xfer {
 struct cdns_i3c_master {
 	struct work_struct hj_work;
 	struct i3c_master_controller base;
-	unsigned long free_dev_slots;
+	u32 free_rr_slots;
+	unsigned int maxdevs;
 	struct {
 		unsigned int num_slots;
 		struct i3c_device **slots;
@@ -956,9 +961,10 @@ out_free_buf:
 	return ret;
 }
 
-static int cdns_i3c_master_i2c_xfers(struct i3c_master_controller *m,
+static int cdns_i3c_master_i2c_xfers(struct i2c_device *dev,
 				     const struct i2c_msg *xfers, int nxfers)
 {
+	struct i3c_master_controller *m = i2c_device_get_master(dev);
 	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
 	unsigned int nrxwords = 0, ntxwords = 0;
 	struct cdns_i3c_xfer *xfer;
@@ -1015,6 +1021,11 @@ static int cdns_i3c_master_i2c_xfers(struct i3c_master_controller *m,
 	return ret;
 }
 
+static u32 cdns_i3c_master_i2c_funcs(struct i3c_master_controller *m)
+{
+	return I2C_FUNC_SMBUS_EMUL | I2C_FUNC_I2C | I2C_FUNC_10BIT_ADDR;
+}
+
 struct cdns_i3c_i2c_dev_data {
 	u16 id;
 	s16 ibi;
@@ -1038,75 +1049,162 @@ static u32 prepare_rr0_dev_address(u32 addr)
 	return ret;
 }
 
-static int cdns_i3c_master_attach_i3c_dev(struct cdns_i3c_master *master,
-					  struct i3c_device *dev)
+static void cdns_i3c_master_upd_i3c_addr(struct i3c_device *dev)
 {
-	struct cdns_i3c_i2c_dev_data *data;
-	u32 val;
+	struct i3c_master_controller *m = i3c_device_get_master(dev);
+	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
+	struct cdns_i3c_i2c_dev_data *data = i3c_device_get_master_data(dev);
+	u32 rr;
 
-	if (!master->free_dev_slots)
-		return -ENOMEM;
+	rr = prepare_rr0_dev_address(dev->info.dyn_addr ?
+				     dev->info.dyn_addr :
+				     dev->info.static_addr);
+	writel(DEV_ID_RR0_IS_I3C | rr, master->regs + DEV_ID_RR0(data->id));
+}
+
+static int cdns_i3c_master_get_rr_slot(struct cdns_i3c_master *master,
+				       u8 dyn_addr)
+{
+	u32 activedevs, rr;
+	int i;
+
+	if (!dyn_addr) {
+		if (!master->free_rr_slots)
+			return -ENOSPC;
+
+		return ffs(master->free_rr_slots) - 1;
+	}
+
+	activedevs = readl(master->regs + DEVS_CTRL) &
+		     DEVS_CTRL_DEVS_ACTIVE_MASK;
+
+	for (i = 1; i <= master->maxdevs; i++) {
+		if (!(BIT(i) & activedevs))
+			continue;
+
+		rr = readl(master->regs + DEV_ID_RR0(i));
+		if (!(rr & DEV_ID_RR0_IS_I3C) ||
+		    DEV_ID_RR0_GET_DEV_ADDR(rr) != dyn_addr)
+			continue;
+
+		return i;
+	}
+
+	return -EINVAL;
+}
+
+static void cdns_i3c_master_reattach_i3c_dev(struct i3c_device *dev,
+					     u8 old_dyn_addr)
+{
+	struct i3c_master_controller *m = i3c_device_get_master(dev);
+
+	cdns_i3c_master_upd_i3c_addr(dev);
+	if (!old_dyn_addr)
+		return;
+
+	/* Now, make sure we re-enable the IBI if needed. */
+	mutex_lock(&dev->ibi_lock);
+	if (dev->ibi && dev->ibi->enabled) {
+		int ret;
+
+		ret = i3c_master_enec_locked(m, dev->info.dyn_addr,
+					     I3C_CCC_EVENT_SIR);
+		if (ret)
+			dev_err(&dev->dev, "Could not re-enable IBIs");
+	}
+	mutex_unlock(&dev->ibi_lock);
+}
+
+static int cdns_i3c_master_attach_i3c_dev(struct i3c_device *dev)
+{
+	struct i3c_master_controller *m = i3c_device_get_master(dev);
+	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
+	struct cdns_i3c_i2c_dev_data *data;
+	unsigned long max_fscl;
+	int slot;
+
+	slot = cdns_i3c_master_get_rr_slot(master, dev->info.dyn_addr);
+	if (slot < 0)
+		return slot;
 
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 
-	data->id = ffs(master->free_dev_slots) - 1;
-	clear_bit(data->id, &master->free_dev_slots);
+	data->ibi = -1;
+	data->id = slot;
 	i3c_device_set_master_data(dev, data);
+	master->free_rr_slots &= ~BIT(slot);
 
-	if (dev->info.dyn_addr)
-		val = prepare_rr0_dev_address(dev->info.dyn_addr) |
-		      DEV_ID_RR0_IS_I3C;
-	else
-		val = prepare_rr0_dev_address(dev->info.static_addr);
+	if (!dev->info.dyn_addr) {
+		cdns_i3c_master_upd_i3c_addr(dev);
+		writel(readl(master->regs + DEVS_CTRL) |
+		       DEVS_CTRL_DEV_ACTIVE(data->id),
+		       master->regs + DEVS_CTRL);
+		return 0;
+	}
 
-	if (dev->info.dcr & I3C_BCR_HDR_CAP)
-		val |= DEV_ID_RR0_HDR_CAP;
+	max_fscl = max(I3C_CCC_MAX_SDR_FSCL(dev->info.max_read_ds),
+		       I3C_CCC_MAX_SDR_FSCL(dev->info.max_write_ds));
+	switch (max_fscl) {
+	case I3C_SDR1_FSCL_8MHZ:
+		max_fscl = 8000000;
+		break;
+	case I3C_SDR2_FSCL_6MHZ:
+		max_fscl = 6000000;
+		break;
+	case I3C_SDR3_FSCL_4MHZ:
+		max_fscl = 4000000;
+		break;
+	case I3C_SDR4_FSCL_2MHZ:
+		max_fscl = 2000000;
+		break;
+	case I3C_SDR0_FSCL_MAX:
+	default:
+		max_fscl = 0;
+		break;
+	}
 
-	writel(val, master->regs + DEV_ID_RR0(data->id));
-	writel(DEV_ID_RR1_PID_MSB(dev->info.pid),
-	       master->regs + DEV_ID_RR1(data->id));
-	writel(DEV_ID_RR2_DCR(dev->info.dcr) | DEV_ID_RR2_BCR(dev->info.bcr) |
-	       DEV_ID_RR2_PID_LSB(dev->info.pid),
-	       master->regs + DEV_ID_RR2(data->id));
-	writel(readl(master->regs + DEVS_CTRL) |
-	       DEVS_CTRL_DEV_ACTIVE(data->id), master->regs + DEVS_CTRL);
+	/* Update SCL limitation in I3C SDR mode. */
+	if (max_fscl &&
+	    (master->i3c_scl_lim > max_fscl || !master->i3c_scl_lim))
+		master->i3c_scl_lim = max_fscl;
 
 	return 0;
 }
 
-static void cdns_i3c_master_detach_i3c_dev(struct cdns_i3c_master *master,
-					   struct i3c_device *dev)
+static void cdns_i3c_master_detach_i3c_dev(struct i3c_device *dev)
 {
+	struct i3c_master_controller *m = i3c_device_get_master(dev);
+	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
 	struct cdns_i3c_i2c_dev_data *data = i3c_device_get_master_data(dev);
 
-	if (!data)
-		return;
-
-	set_bit(data->id, &master->free_dev_slots);
 	writel(readl(master->regs + DEVS_CTRL) |
 	       DEVS_CTRL_DEV_CLR(data->id),
 	       master->regs + DEVS_CTRL);
 
 	i3c_device_set_master_data(dev, NULL);
+	master->free_rr_slots |= BIT(data->id);
 	kfree(data);
 }
 
-static int cdns_i3c_master_attach_i2c_dev(struct cdns_i3c_master *master,
-					  struct i2c_device *dev)
+static int cdns_i3c_master_attach_i2c_dev(struct i2c_device *dev)
 {
+	struct i3c_master_controller *m = i2c_device_get_master(dev);
+	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
 	struct cdns_i3c_i2c_dev_data *data;
+	int slot;
 
-	if (!master->free_dev_slots)
-		return -ENOMEM;
+	slot = cdns_i3c_master_get_rr_slot(master, 0);
+	if (slot < 0)
+		return slot;
 
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 
-	data->id = ffs(master->free_dev_slots) - 1;
-	clear_bit(data->id, &master->free_dev_slots);
+	data->id = slot;
+	master->free_rr_slots &= ~BIT(slot);
 	i2c_device_set_master_data(dev, data);
 
 	writel(prepare_rr0_dev_address(dev->info.addr) |
@@ -1120,18 +1218,16 @@ static int cdns_i3c_master_attach_i2c_dev(struct cdns_i3c_master *master,
 	return 0;
 }
 
-static void cdns_i3c_master_detach_i2c_dev(struct cdns_i3c_master *master,
-					   struct i2c_device *dev)
+static void cdns_i3c_master_detach_i2c_dev(struct i2c_device *dev)
 {
+	struct i3c_master_controller *m = i2c_device_get_master(dev);
+	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
 	struct cdns_i3c_i2c_dev_data *data = i2c_device_get_master_data(dev);
 
-	if (!data)
-		return;
-
-	set_bit(data->id, &master->free_dev_slots);
 	writel(readl(master->regs + DEVS_CTRL) |
 	       DEVS_CTRL_DEV_CLR(data->id),
 	       master->regs + DEVS_CTRL);
+	master->free_rr_slots |= BIT(data->id);
 
 	i2c_device_set_master_data(dev, NULL);
 	kfree(data);
@@ -1140,16 +1236,8 @@ static void cdns_i3c_master_detach_i2c_dev(struct cdns_i3c_master *master,
 static void cdns_i3c_master_bus_cleanup(struct i3c_master_controller *m)
 {
 	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
-	struct i2c_device *i2cdev;
-	struct i3c_device *i3cdev;
 
 	cdns_i3c_master_disable(master);
-
-	i3c_bus_for_each_i2cdev(m->bus, i2cdev)
-		cdns_i3c_master_detach_i2c_dev(master, i2cdev);
-
-	i3c_bus_for_each_i3cdev(m->bus, i3cdev)
-		cdns_i3c_master_detach_i3c_dev(master, i3cdev);
 }
 
 static void cdns_i3c_master_dev_rr_to_info(struct cdns_i3c_master *master,
@@ -1168,102 +1256,103 @@ static void cdns_i3c_master_dev_rr_to_info(struct cdns_i3c_master *master,
 	info->pid |= (u64)readl(master->regs + DEV_ID_RR1(slot)) << 16;
 }
 
-static int cdns_i3c_master_do_daa_locked(struct cdns_i3c_master *master)
+static void cdns_i3c_master_upd_i3c_scl_lim(struct cdns_i3c_master *master)
 {
-	unsigned long i3c_lim_period, pres_step, i3c_scl_lim;
-	struct i3c_device_info devinfo;
-	struct i3c_device *i3cdev;
-	u32 prescl1, ctrl, devs;
-	int ret, slot, ncycles;
+	unsigned long i3c_lim_period, pres_step, ncycles;
+	u32 prescl1, ctrl;
+
+	pres_step = 1000000000UL / (master->base.bus->scl_rate.i3c * 4);
+
+	/* Configure PP_LOW to meet I3C slave limitations. */
+	prescl1 = readl(master->regs + PRESCL_CTRL1) &
+		  ~PRESCL_CTRL1_PP_LOW_MASK;
+	ctrl = readl(master->regs + CTRL);
+
+	i3c_lim_period = DIV_ROUND_UP(1000000000, master->i3c_scl_lim);
+	ncycles = DIV_ROUND_UP(i3c_lim_period, pres_step) - 4;
+	if (ncycles < 0)
+		ncycles = 0;
+
+	prescl1 |= PRESCL_CTRL1_PP_LOW(ncycles);
+
+	/* Disable I3C master before updating PRESCL_CTRL1. */
+	if (ctrl & CTRL_DEV_EN)
+		cdns_i3c_master_disable(master);
+
+	writel(prescl1, master->regs + PRESCL_CTRL1);
+
+	if (ctrl & CTRL_DEV_EN)
+		cdns_i3c_master_enable(master);
+}
+
+static int cdns_i3c_master_do_daa(struct i3c_master_controller *m)
+{
+	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
+	unsigned long old_i3c_scl_lim;
+	u32 olddevs, newdevs;
+	int ret, slot;
+	u8 addrs[MAX_DEVS] = { };
+	u8 last_addr = 0;
+
+	olddevs = readl(master->regs + DEVS_CTRL) & DEVS_CTRL_DEVS_ACTIVE_MASK;
+
+	/* Prepare RR slots before launching DAA. */
+	for (slot = 1; slot <= master->maxdevs; slot++) {
+		if (olddevs & BIT(slot))
+			continue;
+
+		ret = i3c_master_get_free_addr(m, last_addr + 1);
+		if (ret < 0)
+			return -ENOSPC;
+
+		last_addr = ret;
+		addrs[slot] = last_addr;
+		writel(prepare_rr0_dev_address(last_addr) | DEV_ID_RR0_IS_I3C,
+		       master->regs + DEV_ID_RR0(slot));
+		writel(0, master->regs + DEV_ID_RR1(slot));
+		writel(0, master->regs + DEV_ID_RR2(slot));
+	}
 
 	ret = i3c_master_entdaa_locked(&master->base);
 	if (ret)
 		return ret;
 
-	/* Now, add discovered devices to the bus. */
-	i3c_scl_lim = master->i3c_scl_lim;
-	devs = readl(master->regs + DEVS_CTRL);
-	for (slot = find_next_bit(&master->free_dev_slots, BITS_PER_LONG, 1);
-	     slot < BITS_PER_LONG;
-	     slot = find_next_bit(&master->free_dev_slots,
-				  BITS_PER_LONG, slot + 1)) {
-		struct cdns_i3c_i2c_dev_data *data;
-		u32 rr, max_fscl = 0;
-		u8 addr;
+	newdevs = readl(master->regs + DEVS_CTRL) & DEVS_CTRL_DEVS_ACTIVE_MASK;
+	newdevs &= ~olddevs;
 
-		if (!(devs & DEVS_CTRL_DEV_ACTIVE(slot)))
-			continue;
+	/* Save the old limitation before add devices. */
+	old_i3c_scl_lim = master->i3c_scl_lim;
 
-		data = kzalloc(sizeof(*data), GFP_KERNEL);
-		if (!data)
-			return -ENOMEM;
-
-		data->ibi = -1;
-		data->id = slot;
-		rr = readl(master->regs + DEV_ID_RR0(slot));
-		addr = DEV_ID_RR0_GET_DEV_ADDR(rr);
-		i3cdev = i3c_master_add_i3c_dev_locked(&master->base, addr);
-		if (IS_ERR(i3cdev))
-			return PTR_ERR(i3cdev);
-
-		i3c_device_get_info(i3cdev, &devinfo);
-		clear_bit(data->id, &master->free_dev_slots);
-		i3c_device_set_master_data(i3cdev, data);
-
-		max_fscl = max(I3C_CCC_MAX_SDR_FSCL(devinfo.max_read_ds),
-			       I3C_CCC_MAX_SDR_FSCL(devinfo.max_write_ds));
-		switch (max_fscl) {
-		case I3C_SDR1_FSCL_8MHZ:
-			max_fscl = 8000000;
-			break;
-		case I3C_SDR2_FSCL_6MHZ:
-			max_fscl = 6000000;
-			break;
-		case I3C_SDR3_FSCL_4MHZ:
-			max_fscl = 4000000;
-			break;
-		case I3C_SDR4_FSCL_2MHZ:
-			max_fscl = 2000000;
-			break;
-		case I3C_SDR0_FSCL_MAX:
-		default:
-			max_fscl = 0;
-			break;
-		}
-
-		if (max_fscl && (max_fscl < i3c_scl_lim || !i3c_scl_lim))
-			i3c_scl_lim = max_fscl;
+	/*
+	 * Clear all retaining registers filled during DAA. We already
+	 * have the addressed assigned to them in the addrs array.
+	 */
+	for (slot = 1; slot <= master->maxdevs; slot++) {
+		if (newdevs & BIT(slot))
+			i3c_master_add_i3c_dev_locked(m, addrs[slot]);
 	}
+
+	/*
+	 * Clear slots that ended up not being used. Can be caused by I3C
+	 * device creation failure or when the I3C device was already known
+	 * by the system but with a different address (in this case the device
+	 * already has a slot and does not need a new one).
+	 */
+	writel(readl(master->regs + DEVS_CTRL) |
+	       master->free_rr_slots << DEVS_CTRL_DEV_CLR_SHIFT,
+	       master->regs + DEVS_CTRL);
 
 	i3c_master_defslvs_locked(&master->base);
 
-	pres_step = 1000000000UL / (master->base.bus->scl_rate.i3c * 4);
+	/* Only update PRESCL_CTRL1 if the I3C SCL limitation has changed. */
+	if (old_i3c_scl_lim != master->i3c_scl_lim)
+		cdns_i3c_master_upd_i3c_scl_lim(master);
 
-	/* No bus limitation to apply, bail out. */
-	if (!i3c_scl_lim ||
-	    (master->i3c_scl_lim && master->i3c_scl_lim <= i3c_scl_lim))
-		return 0;
+	/* Unmask Hot-Join and Mastership request interrupts. */
+	i3c_master_enec_locked(m, I3C_BROADCAST_ADDR,
+			       I3C_CCC_EVENT_HJ | I3C_CCC_EVENT_MR);
 
-	/* Configure PP_LOW to meet I3C slave limitations. */
-	prescl1 = readl(master->regs + PRESCL_CTRL1) &
-		  ~PRESCL_CTRL1_PP_LOW_MASK;
-	ctrl = readl(master->regs + CTRL) & ~CTRL_DEV_EN;
-
-	i3c_lim_period = DIV_ROUND_UP(1000000000, i3c_scl_lim);
-	ncycles = DIV_ROUND_UP(i3c_lim_period, pres_step) - 4;
-	if (ncycles < 0)
-		ncycles = 0;
-	prescl1 |= PRESCL_CTRL1_PP_LOW(ncycles);
-
-	/* Disable I3C master before updating PRESCL_CTRL1. */
-	ret = cdns_i3c_master_disable(master);
-	if (!ret) {
-		writel(prescl1, master->regs + PRESCL_CTRL1);
-		master->i3c_scl_lim = i3c_scl_lim;
-	}
-	cdns_i3c_master_enable(master);
-
-	return ret;
+	return 0;
 }
 
 static int cdns_i3c_master_bus_init(struct i3c_master_controller *m)
@@ -1272,11 +1361,7 @@ static int cdns_i3c_master_bus_init(struct i3c_master_controller *m)
 	unsigned long pres_step, sysclk_rate, max_i2cfreq;
 	u32 ctrl, prescl0, prescl1, pres, low;
 	struct i3c_device_info info = { };
-	struct i3c_ccc_events events;
-	struct i2c_device *i2cdev;
-	struct i3c_device *i3cdev;
-	int ret, slot, ncycles;
-	u8 last_addr = 0;
+	int ret, ncycles;
 
 	switch (m->bus->mode) {
 	case I3C_BUS_MODE_PURE:
@@ -1319,15 +1404,6 @@ static int cdns_i3c_master_bus_init(struct i3c_master_controller *m)
 	m->bus->scl_rate.i2c = sysclk_rate / ((pres + 1) * 5);
 
 	prescl0 |= PRESCL_CTRL0_I2C(pres);
-
-	writel(DEVS_CTRL_DEV_CLR_ALL, master->regs + DEVS_CTRL);
-
-	i3c_bus_for_each_i2cdev(m->bus, i2cdev) {
-		ret = cdns_i3c_master_attach_i2c_dev(master, i2cdev);
-		if (ret)
-			goto err_detach_devs;
-	}
-
 	writel(prescl0, master->regs + PRESCL_CTRL0);
 
 	/* Calculate OD and PP low. */
@@ -1338,16 +1414,10 @@ static int cdns_i3c_master_bus_init(struct i3c_master_controller *m)
 	prescl1 = PRESCL_CTRL1_OD_LOW(ncycles);
 	writel(prescl1, master->regs + PRESCL_CTRL1);
 
-	i3c_bus_for_each_i3cdev(m->bus, i3cdev) {
-		ret = cdns_i3c_master_attach_i3c_dev(master, i3cdev);
-		if (ret)
-			goto err_detach_devs;
-	}
-
 	/* Get an address for the master. */
 	ret = i3c_master_get_free_addr(m, 0);
 	if (ret < 0)
-		goto err_detach_devs;
+		return ret;
 
 	writel(prepare_rr0_dev_address(ret) | DEV_ID_RR0_IS_I3C,
 	       master->regs + DEV_ID_RR0(0));
@@ -1358,23 +1428,7 @@ static int cdns_i3c_master_bus_init(struct i3c_master_controller *m)
 
 	ret = i3c_master_set_info(&master->base, &info);
 	if (ret)
-		goto err_detach_devs;
-
-	/* Prepare RR slots before launching DAA. */
-	for (slot = find_next_bit(&master->free_dev_slots, BITS_PER_LONG, 1);
-	     slot < BITS_PER_LONG;
-	     slot = find_next_bit(&master->free_dev_slots,
-				  BITS_PER_LONG, slot + 1)) {
-		ret = i3c_master_get_free_addr(m, last_addr + 1);
-		if (ret < 0)
-			goto err_disable_master;
-
-		last_addr = ret;
-		writel(prepare_rr0_dev_address(last_addr) | DEV_ID_RR0_IS_I3C,
-		       master->regs + DEV_ID_RR0(slot));
-		writel(0, master->regs + DEV_ID_RR1(slot));
-		writel(0, master->regs + DEV_ID_RR2(slot));
-	}
+		return ret;
 
 	/*
 	 * Enable Hot-Join, and, when a Hot-Join request happens, disable all
@@ -1387,41 +1441,7 @@ static int cdns_i3c_master_bus_init(struct i3c_master_controller *m)
 
 	cdns_i3c_master_enable(master);
 
-	/*
-	 * Reset all dynamic addresses on the bus, because we don't know what
-	 * happened before this point (the bootloader may have assigned dynamic
-	 * addresses that we're not aware of).
-	 */
-	ret = i3c_master_rstdaa_locked(m, I3C_BROADCAST_ADDR);
-	if (ret)
-		goto err_disable_master;
-
-	/* Disable all slave events (interrupts) before starting DAA. */
-	events.events = I3C_CCC_EVENT_SIR | I3C_CCC_EVENT_MR |
-			I3C_CCC_EVENT_HJ;
-	ret = i3c_master_disec_locked(m, I3C_BROADCAST_ADDR, &events);
-	if (ret)
-		goto err_disable_master;
-
-	ret = cdns_i3c_master_do_daa_locked(master);
-	if (ret < 0)
-		goto err_disable_master;
-
-	/* Unmask Hot-Join and Mastership request interrupts. */
-	events.events = I3C_CCC_EVENT_HJ | I3C_CCC_EVENT_MR;
-	ret = i3c_master_enec_locked(m, I3C_BROADCAST_ADDR, &events);
-	if (ret)
-		dev_err(m->parent, "Failed to re-enable Hot-Join");
-
 	return 0;
-
-err_disable_master:
-	cdns_i3c_master_disable(master);
-
-err_detach_devs:
-	cdns_i3c_master_bus_cleanup(m);
-
-	return ret;
 }
 
 static void cdns_i3c_master_handle_ibi(struct cdns_i3c_master *master,
@@ -1526,7 +1546,6 @@ static irqreturn_t cdns_i3c_master_interrupt(int irq, void *data)
 
 int cdns_i3c_master_disable_ibi(struct i3c_device *dev)
 {
-	struct i3c_ccc_events events = { .events = I3C_CCC_EVENT_SIR };
 	struct i3c_master_controller *m = i3c_device_get_master(dev);
 	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
 	struct cdns_i3c_i2c_dev_data *data = i3c_device_get_master_data(dev);
@@ -1534,7 +1553,8 @@ int cdns_i3c_master_disable_ibi(struct i3c_device *dev)
 	u32 sirmap;
 	int ret;
 
-	ret = i3c_master_disec_locked(m, dev->info.dyn_addr, &events);
+	ret = i3c_master_disec_locked(m, dev->info.dyn_addr,
+				      I3C_CCC_EVENT_SIR);
 	if (ret)
 		return ret;
 
@@ -1552,7 +1572,6 @@ int cdns_i3c_master_disable_ibi(struct i3c_device *dev)
 int cdns_i3c_master_enable_ibi(struct i3c_device *dev)
 {
 	struct i3c_master_controller *m = i3c_device_get_master(dev);
-	struct i3c_ccc_events events = { .events = I3C_CCC_EVENT_SIR };
 	struct cdns_i3c_master *master = to_cdns_i3c_master(m);
 	struct cdns_i3c_i2c_dev_data *data = i3c_device_get_master_data(dev);
 	unsigned long flags;
@@ -1574,7 +1593,8 @@ int cdns_i3c_master_enable_ibi(struct i3c_device *dev)
 	writel(sirmap, master->regs + SIR_MAP_DEV_REG(data->ibi));
 	spin_unlock_irqrestore(&master->ibi.lock, flags);
 
-	ret = i3c_master_enec_locked(m, dev->info.dyn_addr, &events);
+	ret = i3c_master_enec_locked(m, dev->info.dyn_addr,
+				     I3C_CCC_EVENT_SIR);
 	if (ret) {
 		spin_lock_irqsave(&master->ibi.lock, flags);
 		sirmap = readl(master->regs + SIR_MAP_DEV_REG(data->ibi));
@@ -1646,11 +1666,18 @@ static void cdns_i3c_master_recycle_ibi_slot(struct i3c_device *dev,
 static const struct i3c_master_controller_ops cdns_i3c_master_ops = {
 	.bus_init = cdns_i3c_master_bus_init,
 	.bus_cleanup = cdns_i3c_master_bus_cleanup,
+	.do_daa = cdns_i3c_master_do_daa,
+	.attach_i3c_dev = cdns_i3c_master_attach_i3c_dev,
+	.reattach_i3c_dev = cdns_i3c_master_reattach_i3c_dev,
+	.detach_i3c_dev = cdns_i3c_master_detach_i3c_dev,
+	.attach_i2c_dev = cdns_i3c_master_attach_i2c_dev,
+	.detach_i2c_dev = cdns_i3c_master_detach_i2c_dev,
 	.supports_ccc_cmd = cdns_i3c_master_supports_ccc_cmd,
 	.send_ccc_cmd = cdns_i3c_master_send_ccc_cmd,
 	.send_hdr_cmds = cdns_i3c_master_send_hdr_cmd,
 	.priv_xfers = cdns_i3c_master_priv_xfers,
 	.i2c_xfers = cdns_i3c_master_i2c_xfers,
+	.i2c_funcs = cdns_i3c_master_i2c_funcs,
 	.enable_ibi = cdns_i3c_master_enable_ibi,
 	.disable_ibi = cdns_i3c_master_disable_ibi,
 	.request_ibi = cdns_i3c_master_request_ibi,
@@ -1663,12 +1690,8 @@ static void cdns_i3c_master_hj(struct work_struct *work)
 	struct cdns_i3c_master *master = container_of(work,
 						      struct cdns_i3c_master,
 						      hj_work);
-	struct i3c_bus *bus = i3c_master_get_bus(&master->base);
 
-	i3c_bus_maintenance_lock(bus);
-	cdns_i3c_master_do_daa_locked(master);
-	i3c_master_register_new_i3c_devs(&master->base);
-	i3c_bus_maintenance_unlock(bus);
+	i3c_master_do_daa(&master->base);
 }
 
 static int cdns_i3c_master_probe(struct platform_device *pdev)
@@ -1728,7 +1751,8 @@ static int cdns_i3c_master_probe(struct platform_device *pdev)
 	val = readl(master->regs + CONF_STATUS0);
 
 	/* Device ID0 is reserved to describe this master. */
-	master->free_dev_slots = GENMASK(CONF_STATUS0_DEVS_NUM(val), 1);
+	master->maxdevs = CONF_STATUS0_DEVS_NUM(val);
+	master->free_rr_slots = GENMASK(master->maxdevs, 1);
 
 	val = readl(master->regs + CONF_STATUS1);
 	master->caps.cmdfifodepth = CONF_STATUS1_CMD_DEPTH(val);
@@ -1748,6 +1772,7 @@ static int cdns_i3c_master_probe(struct platform_device *pdev)
 
 	writel(IBIR_THR(1), master->regs + CMD_IBI_THR_CTRL);
 	writel(MST_INT_IBIR_THR, master->regs + MST_IER);
+	writel(DEVS_CTRL_DEV_CLR_ALL, master->regs + DEVS_CTRL);
 
 	ret = i3c_master_register(&master->base, &pdev->dev,
 				  &cdns_i3c_master_ops, false);

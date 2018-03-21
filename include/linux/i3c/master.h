@@ -84,7 +84,7 @@ struct i2c_device {
  * IBI comes in.
  * Every time an IBI comes in, the I3C master driver should find a free IBI
  * slot in its IBI slot pool, retrieve the IBI payload and queue the IBI using
- * i3c_device_queue_ibi().
+ * i3c_master_queue_ibi().
  *
  * How IBI slots are allocated is left to the I3C master driver, though, for
  * simple kmalloc-based allocation, the generic IBI slot pool can be used.
@@ -267,64 +267,84 @@ struct i3c_master_controller;
 
 /**
  * struct i3c_master_controller_ops - I3C master methods
- * @bus_init: hook responsible for the I3C bus initialization. This
- *	      initialization should follow the steps described in the I3C
- *	      specification. This hook is called with the bus lock held in
- *	      write mode, which means all _locked() helpers can safely be
- *	      called from there
+ * @bus_init: hook responsible for the I3C bus initialization. You should at
+ *	      least call master_set_info() from there and set the bus mode.
+ *	      You can also put controller specific initialization in there.
+ *	      This method is mandatory.
  * @bus_cleanup: cleanup everything done in
- *		 &i3c_master_controller_ops->bus_init(). This function is
- *		 optional and should only be implemented if
- *		 &i3c_master_controller_ops->bus_init() attached private data
- *		 to I3C/I2C devices. This hook is called with the bus lock
- *		 held in write mode, which means all _locked() helpers can
- *		 safely be called from there
+ *		 &i3c_master_controller_ops->bus_init().
+ *		 This method is optional.
+ * @attach_i3c_dev: called every time an I3C device is attached to the bus. It
+ *		    can be after a DAA or when a device is statically declared
+ *		    by the FW, in which case it will only have a static address
+ *		    and the dynamic address will be 0.
+ *		    This is a good place to attach master controller specific
+ *		    data to I3C devices.
+ *		    This method is optional.
+ * @reattach_i3c_dev: called every time an I3C device has its addressed
+ *		      changed. It can be because the device has been powered
+ *		      down and has lost its address, or it can happen when a
+ *		      device had a static address and has been assigned a
+ *		      dynamic address with SETDASA.
+ *		      This method is optional.
+ * @detach_i3c_dev: called when an I3C device is detached from the bus. Usually
+ *		    happens when the master device is unregistered.
+ *		    This method is optional.
+ * @do_daa: do a DAA (Dynamic Address Assignment) procedure. This is procedure
+ *	    should send an ENTDAA CCC command and then add all devices
+ *	    discovered sure the DAA using i3c_master_add_i3c_dev_locked().
+ *	    Add devices added with i3c_master_add_i3c_dev_locked() will then be
+ *	    attached or re-attached to the controller.
+ *	    This method is mandatory.
  * @supports_ccc_cmd: should return true if the CCC command is supported, false
- *		      otherwise
+ *		      otherwise.
+ *		      This method is optional, if not provided the core assumes
+ *		      all CCC commands are supported.
  * @send_ccc_cmd: send a CCC command
+ *		  This method is mandatory.
  * @send_hdr_cmds: send one or several HDR commands. If there is more than one
  *		   command, they should ideally be sent in the same HDR
- *		   transaction
+ *		   transaction.
+ *		   This method is optional.
  * @priv_xfers: do one or several private I3C SDR transfers
- * @i2c_xfers: do one or several I2C transfers
+ *		This method is mandatory.
+ * @attach_i2c_dev: called every time an I2C device is attached to the bus.
+ *		    This is a good place to attach master controller specific
+ *		    data to I2C devices.
+ *		    This method is optional.
+ * @detach_i2c_dev: called when an I2C device is detached from the bus. Usually
+ *		    happens when the master device is unregistered.
+ *		    This method is optional.
+ * @i2c_xfers: do one or several I2C transfers.
+ *	       This method is mandatory.
+ * @i2c_funcs: expose the supported I2C functionalities.
+ *	       This method is mandatory.
  * @request_ibi: attach an IBI handler to an I3C device. This implies defining
  *		 an IBI handler and the constraints of the IBI (maximum payload
  *		 length and number of pre-allocated slots).
  *		 Some controllers support less IBI-capable devices than regular
  *		 devices, so this method might return -%EBUSY if there's no
  *		 more space for an extra IBI registration
+ *		 This method is optional.
  * @free_ibi: free an IBI previously requested with ->request_ibi(). The IBI
  *	      should have been disabled with ->disable_irq() prior to that
+ *	      This method is mandatory only if ->request_ibi is not NULL.
  * @enable_ibi: enable the IBI. Only valid if ->request_ibi() has been called
  *		prior to ->enable_ibi(). The controller should first enable
  *		the IBI on the controller end (for example, unmask the hardware
  *		IRQ) and then send the ENEC CCC command (with the IBI flag set)
- *		to the I3C device
+ *		to the I3C device.
+ *		This method is mandatory only if ->request_ibi is not NULL.
  * @disable_ibi: disable an IBI. First send the DISEC CCC command with the IBI
  *		 flag set and then deactivate the hardware IRQ on the
- *		 controller end
+ *		 controller end.
+ *		 This method is mandatory only if ->request_ibi is not NULL.
  * @recycle_ibi_slot: recycle an IBI slot. Called every time an IBI has been
  *		      processed by its handler. The IBI slot should be put back
  *		      in the IBI slot pool so that the controller can re-use it
  *		      for a future IBI
- *
- * One of the most important hooks in these ops is
- * &i3c_master_controller_ops->bus_init(). Here is a non-exhaustive list of
- * things that should be done in &i3c_master_controller_ops->bus_init():
- *
- * 1) call i3c_master_set_info() with all information describing the master
- * 2) ask all slaves to drop their dynamic address by sending the RSTDAA CCC
- *    with i3c_master_rstdaa_locked()
- * 3) ask all slaves to disable IBIs using i3c_master_disec_locked()
- * 4) start a DDA procedure by sending the ENTDAA CCC with
- *    i3c_master_entdaa_locked(), or using the internal DAA logic provided by
- *    your controller
- * 5) assign a dynamic address to each I3C device discovered during DAA and
- *    for each of them, call i3c_master_add_i3c_dev_locked()
- * 6) propagate device table to secondary masters by calling
- *    i3c_master_defslvs_locked()
- *
- * Note that these steps do not include all controller specific initialization.
+ *		      This method is mandatory only if ->request_ibi is not
+ *		      NULL.
  */
 struct i3c_master_controller_ops {
 	int (*bus_init)(struct i3c_master_controller *master);
@@ -425,7 +445,6 @@ int i3c_master_disec_locked(struct i3c_master_controller *master, u8 addr,
 			    u8 evts);
 int i3c_master_enec_locked(struct i3c_master_controller *master, u8 addr,
 			   u8 evts);
-int i3c_master_rstdaa_locked(struct i3c_master_controller *master, u8 addr);
 int i3c_master_entdaa_locked(struct i3c_master_controller *master);
 int i3c_master_defslvs_locked(struct i3c_master_controller *master);
 
@@ -557,8 +576,6 @@ static inline struct i3c_bus *i3c_device_get_bus(struct i3c_device *dev)
 
 struct i3c_generic_ibi_pool;
 
-void i3c_device_init_ibi_slot(struct i3c_device *dev,
-			      struct i3c_ibi_slot *slot);
 struct i3c_generic_ibi_pool *
 i3c_generic_ibi_alloc_pool(struct i3c_device *dev,
 			   const struct i3c_ibi_setup *req);
@@ -569,8 +586,8 @@ i3c_generic_ibi_get_free_slot(struct i3c_generic_ibi_pool *pool);
 void i3c_generic_ibi_recycle_slot(struct i3c_generic_ibi_pool *pool,
 				  struct i3c_ibi_slot *slot);
 
-void i3c_device_queue_ibi(struct i3c_device *dev, struct i3c_ibi_slot *slot);
+void i3c_master_queue_ibi(struct i3c_device *dev, struct i3c_ibi_slot *slot);
 
-struct i3c_ibi_slot *i3c_device_ibi_get_free_slot(struct i3c_device *dev);
+struct i3c_ibi_slot *i3c_master_get_free_ibi_slot(struct i3c_device *dev);
 
 #endif /* I3C_MASTER_H */

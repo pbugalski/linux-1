@@ -35,12 +35,18 @@ int i3c_device_do_priv_xfers(struct i3c_device *dev,
 	struct i3c_master_controller *master;
 	int ret;
 
+	if (nxfers < 1)
+		return 0;
+
 	master = i3c_device_get_master(dev);
-	if (!master)
+	if (!master || !xfers)
 		return -EINVAL;
 
+	if (!master->ops->priv_xfers)
+		return -ENOTSUPP;
+
 	i3c_bus_normaluse_lock(master->bus);
-	ret = i3c_master_do_priv_xfers_locked(dev, xfers, nxfers);
+	ret = master->ops->priv_xfers(dev, xfers, nxfers);
 	i3c_bus_normaluse_unlock(master->bus);
 
 	return ret;
@@ -71,6 +77,9 @@ int i3c_device_send_hdr_cmds(struct i3c_device *dev,
 	if (ncmds < 1)
 		return 0;
 
+	if (!cmds)
+		return -EINVAL;
+
 	mode = cmds[0].mode;
 	for (i = 1; i < ncmds; i++) {
 		if (mode != cmds[i].mode)
@@ -81,8 +90,16 @@ int i3c_device_send_hdr_cmds(struct i3c_device *dev,
 	if (!master)
 		return -EINVAL;
 
+	if (!master->ops->send_hdr_cmds)
+		return -ENOTSUPP;
+
+	for (i = 0; i < ncmds; i++) {
+		if (!(master->this->info.hdr_cap & BIT(cmds->mode)))
+			return -ENOTSUPP;
+	}
+
 	i3c_bus_normaluse_lock(master->bus);
-	ret = i3c_master_send_hdr_cmds_locked(dev, cmds, ncmds);
+	ret = master->ops->send_hdr_cmds(dev, cmds, ncmds);
 	i3c_bus_normaluse_unlock(master->bus);
 
 	return ret;

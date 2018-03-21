@@ -183,6 +183,24 @@ static inline struct i3c_driver *drv_to_i3cdrv(struct device_driver *drv)
 	return container_of(drv, struct i3c_driver, driver);
 }
 
+struct device *i3cdev_to_dev(struct i3c_device *i3cdev);
+struct i3c_device *dev_to_i3cdev(struct device *dev);
+
+static inline void i3cdev_set_drvdata(struct i3c_device *i3cdev,
+				      void *data)
+{
+	struct device *dev = i3cdev_to_dev(i3cdev);
+
+	dev_set_drvdata(dev, data);
+}
+
+static inline void *i3cdev_get_drvdata(struct i3c_device *i3cdev)
+{
+	struct device *dev = i3cdev_to_dev(i3cdev);
+
+	return dev_get_drvdata(dev);
+}
+
 const struct i3c_device_id *
 i3c_device_match_id(struct i3c_device *i3cdev,
 		    const struct i3c_device_id *id_table);

@@ -135,37 +135,16 @@ struct i3c_device_ibi_info {
 };
 
 /**
- * enum i3c_device_state - Possible I3C states
- * @I3C_DEVICE_NOT_DISCOVERED: the device has not yet been discovered on the
- *			       bus. This happens when board specific
- *			       information have been defined and have to be
- *			       attached to the device when it's appearing on
- *			       the bus. It also happens when one wants to
- *			       assign a dynamic address to an I3C device that
- *			       has a static address with SETDASA
- * @I3C_DEVICE_REACHABLE: the device is reachable. Every device ends up in this
- *			  state after being discovered
- * @I3C_DEVICE_UNREACHABLE: the device is not reachable. Ends up in this state
- *			    when the device is not longer replying to the
- *			    mandatory GETSTATUS CCC command
- */
-enum i3c_device_state {
-	I3C_DEVICE_NOT_DISCOVERED,
-	I3C_DEVICE_REACHABLE,
-	I3C_DEVICE_UNREACHABLE,
-};
-
-/**
  * struct i3c_device - I3C device object
  * @common: inherit common I3C/I2C description
  * @dev: device object to register the I3C dev to the device model
- * @state: device state. See &enum_i3c_device_state for more details
  * @regfailed: true if the device has already been registered to the device
  *	       model and this operation failed. The goal it to not try
  *	       register the device everytime a new device is discovered on
  *	       the bus
  * @info: I3C device information. Will be automatically filled when you create
  *	  your device with i3c_master_add_i3c_dev_locked()
+ * @init_dyn_addr: initial dynamic address requested by the FW
  * @ibi_lock: lock used to protect the &struct_i3c_device->ibi
  * @ibi: IBI info attached to a device. Should be NULL until
  *	 i3c_device_request_ibi() is called
@@ -176,9 +155,9 @@ enum i3c_device_state {
 struct i3c_device {
 	struct i3c_i2c_dev common;
 	struct device dev;
-	enum i3c_device_state state;
 	bool regfailed;
 	struct i3c_device_info info;
+	u8 init_dyn_addr;
 	struct mutex ibi_lock;
 	struct i3c_device_ibi_info *ibi;
 };
@@ -284,11 +263,6 @@ struct i3c_bus {
 	struct rw_semaphore lock;
 };
 
-static inline struct i3c_device *dev_to_i3cdev(struct device *dev)
-{
-	return container_of(dev, struct i3c_device, dev);
-}
-
 struct i3c_master_controller;
 
 /**
@@ -355,6 +329,10 @@ struct i3c_master_controller;
 struct i3c_master_controller_ops {
 	int (*bus_init)(struct i3c_master_controller *master);
 	void (*bus_cleanup)(struct i3c_master_controller *master);
+	int (*attach_i3c_dev)(struct i3c_device *dev);
+	void (*reattach_i3c_dev)(struct i3c_device *dev, u8 old_dyn_addr);
+	void (*detach_i3c_dev)(struct i3c_device *dev);
+	int (*do_daa)(struct i3c_master_controller *master);
 	bool (*supports_ccc_cmd)(struct i3c_master_controller *master,
 				 const struct i3c_ccc_cmd *cmd);
 	int (*send_ccc_cmd)(struct i3c_master_controller *master,
@@ -365,6 +343,8 @@ struct i3c_master_controller_ops {
 	int (*priv_xfers)(struct i3c_device *dev,
 			  const struct i3c_priv_xfer *xfers,
 			  int nxfers);
+	int (*attach_i2c_dev)(struct i2c_device *dev);
+	void (*detach_i2c_dev)(struct i2c_device *dev);
 	int (*i2c_xfers)(struct i2c_device *dev,
 			 const struct i2c_msg *xfers, int nxfers);
 	u32 (*i2c_funcs)(struct i3c_master_controller *master);
@@ -405,6 +385,7 @@ struct i3c_master_controller {
 	struct i2c_adapter i2c;
 	const struct i3c_master_controller_ops *ops;
 	bool secondary;
+	bool init_done;
 	struct i3c_bus *bus;
 	struct workqueue_struct *wq;
 };
@@ -441,9 +422,9 @@ int i3c_master_do_i2c_xfers(struct i3c_master_controller *master,
 			    int nxfers);
 
 int i3c_master_disec_locked(struct i3c_master_controller *master, u8 addr,
-			    const struct i3c_ccc_events *evts);
+			    u8 evts);
 int i3c_master_enec_locked(struct i3c_master_controller *master, u8 addr,
-			   const struct i3c_ccc_events *evts);
+			   u8 evts);
 int i3c_master_rstdaa_locked(struct i3c_master_controller *master, u8 addr);
 int i3c_master_entdaa_locked(struct i3c_master_controller *master);
 int i3c_master_defslvs_locked(struct i3c_master_controller *master);
@@ -451,9 +432,9 @@ int i3c_master_defslvs_locked(struct i3c_master_controller *master);
 int i3c_master_get_free_addr(struct i3c_master_controller *master,
 			     u8 start_addr);
 
-struct i3c_device *
-i3c_master_add_i3c_dev_locked(struct i3c_master_controller *master, u8 addr);
-void i3c_master_register_new_i3c_devs(struct i3c_master_controller *master);
+int i3c_master_add_i3c_dev_locked(struct i3c_master_controller *master,
+				  u8 addr);
+int i3c_master_do_daa(struct i3c_master_controller *master);
 
 int i3c_master_set_info(struct i3c_master_controller *master,
 			const struct i3c_device_info *info);
@@ -571,7 +552,7 @@ i3c_master_get_bus(struct i3c_master_controller *master)
  */
 static inline struct i3c_bus *i3c_device_get_bus(struct i3c_device *dev)
 {
-	return i3c_master_get_bus(i3c_device_get_master(dev));
+	return dev->common.bus;
 }
 
 struct i3c_generic_ibi_pool;

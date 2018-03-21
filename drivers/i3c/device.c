@@ -111,15 +111,14 @@ int i3c_device_disable_ibi(struct i3c_device *dev)
 	struct i3c_master_controller *master = i3c_device_get_master(dev);
 	int ret;
 
+	i3c_bus_normaluse_lock(master->bus);
 	mutex_lock(&dev->ibi_lock);
 	if (!dev->ibi) {
 		ret = -EINVAL;
 		goto out;
 	}
 
-	i3c_bus_normaluse_lock(master->bus);
 	ret = master->ops->disable_ibi(dev);
-	i3c_bus_normaluse_unlock(master->bus);
 	if (ret)
 		goto out;
 
@@ -131,6 +130,7 @@ int i3c_device_disable_ibi(struct i3c_device *dev)
 
 out:
 	mutex_unlock(&dev->ibi_lock);
+	i3c_bus_normaluse_unlock(master->bus);
 
 	return 0;
 }
@@ -154,20 +154,20 @@ int i3c_device_enable_ibi(struct i3c_device *dev)
 	struct i3c_master_controller *master = i3c_device_get_master(dev);
 	int ret;
 
+	i3c_bus_normaluse_lock(master->bus);
 	mutex_lock(&dev->ibi_lock);
 	if (!dev->ibi) {
 		ret = -EINVAL;
 		goto out;
 	}
 
-	i3c_bus_normaluse_lock(master->bus);
 	ret = master->ops->enable_ibi(dev);
-	i3c_bus_normaluse_unlock(master->bus);
 	if (!ret)
 		dev->ibi->enabled = true;
 
 out:
 	mutex_unlock(&dev->ibi_lock);
+	i3c_bus_normaluse_unlock(master->bus);
 
 	return ret;
 }
@@ -197,16 +197,17 @@ int i3c_device_request_ibi(struct i3c_device *dev,
 	if (!req->handler || !req->num_slots)
 		return -EINVAL;
 
+	i3c_bus_normaluse_lock(master->bus);
 	mutex_lock(&dev->ibi_lock);
 	if (dev->ibi) {
 		ret = -EBUSY;
-		goto err_unlock_dev;
+		goto out;
 	}
 
 	ibi = kzalloc(sizeof(*ibi), GFP_KERNEL);
 	if (!ibi) {
 		ret = -ENOMEM;
-		goto err_unlock_dev;
+		goto out;
 	}
 
 	atomic_set(&ibi->pending_ibis, 0);
@@ -215,22 +216,15 @@ int i3c_device_request_ibi(struct i3c_device *dev,
 	ibi->max_payload_len = req->max_payload_len;
 
 	dev->ibi = ibi;
-	i3c_bus_normaluse_lock(master->bus);
 	ret = master->ops->request_ibi(dev, req);
+	if (ret) {
+		kfree(ibi);
+		dev->ibi = NULL;
+	}
+
+out:
+	mutex_unlock(&dev->ibi_lock);
 	i3c_bus_normaluse_unlock(master->bus);
-	if (ret)
-		goto err_free_ibi;
-
-	mutex_unlock(&dev->ibi_lock);
-
-	return 0;
-
-err_free_ibi:
-	kfree(ibi);
-	dev->ibi = NULL;
-
-err_unlock_dev:
-	mutex_unlock(&dev->ibi_lock);
 
 	return ret;
 }
@@ -248,6 +242,7 @@ void i3c_device_free_ibi(struct i3c_device *dev)
 {
 	struct i3c_master_controller *master = i3c_device_get_master(dev);
 
+	i3c_bus_normaluse_lock(master->bus);
 	mutex_lock(&dev->ibi_lock);
 	if (!dev->ibi)
 		goto out;
@@ -255,16 +250,39 @@ void i3c_device_free_ibi(struct i3c_device *dev)
 	if (WARN_ON(dev->ibi->enabled))
 		BUG_ON(i3c_device_disable_ibi(dev));
 
-	i3c_bus_normaluse_lock(master->bus);
 	master->ops->free_ibi(dev);
-	i3c_bus_normaluse_unlock(master->bus);
 	kfree(dev->ibi);
 	dev->ibi = NULL;
 
 out:
 	mutex_unlock(&dev->ibi_lock);
+	i3c_bus_normaluse_unlock(master->bus);
 }
 EXPORT_SYMBOL_GPL(i3c_device_free_ibi);
+
+/**
+ * i3cdev_to_dev() - Returns the device embedded in @i3cdev
+ * @i3cdev: I3C device
+ *
+ * Return: a pointer to a device object.
+ */
+struct device *i3cdev_to_dev(struct i3c_device *i3cdev)
+{
+	return &i3cdev->dev;
+}
+EXPORT_SYMBOL_GPL(i3cdev_to_dev);
+
+/**
+ * dev_to_i3cdev() - Returns the I3C device containing @dev
+ * @dev: device object
+ *
+ * Return: a pointer to an I3C device object.
+ */
+struct i3c_device *dev_to_i3cdev(struct device *dev)
+{
+	return container_of(dev, struct i3c_device, dev);
+}
+EXPORT_SYMBOL_GPL(dev_to_i3cdev);
 
 /**
  * i3c_device_match_id() - Find the I3C device ID entry matching an I3C dev

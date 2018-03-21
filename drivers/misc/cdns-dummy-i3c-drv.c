@@ -182,6 +182,7 @@ static const struct i3c_device_id dummy_i3c_ids[] = {
 	I3C_DEVICE(0x1c9, 0x14, NULL),
 	{ /* sentinel */ },
 };
+MODULE_DEVICE_TABLE(i3c, dummy_i3c_ids);
 
 static struct i3c_driver dummy_i3c_drv = {
 	.driver = {

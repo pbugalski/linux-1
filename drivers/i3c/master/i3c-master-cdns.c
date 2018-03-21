@@ -598,6 +598,8 @@ static void cdns_i3c_master_end_xfer_locked(struct cdns_i3c_master *master,
 		case CMDR_MST_ABORT:
 		case CMDR_NACK_RESP:
 		case CMDR_DDR_DROPPED:
+			pr_info("%s:%i error = %d\n", __func__, __LINE__,
+				xfer->cmds[i].error);
 			ret = -EIO;
 			break;
 
@@ -1059,7 +1061,11 @@ static void cdns_i3c_master_upd_i3c_addr(struct i3c_device *dev)
 	rr = prepare_rr0_dev_address(dev->info.dyn_addr ?
 				     dev->info.dyn_addr :
 				     dev->info.static_addr);
+	pr_info("%s:%i rr0 = %08x new rr0 = %08lx\n", __func__, __LINE__,
+		readl(master->regs + DEV_ID_RR0(data->id)), DEV_ID_RR0_IS_I3C | rr);
 	writel(DEV_ID_RR0_IS_I3C | rr, master->regs + DEV_ID_RR0(data->id));
+	pr_info("%s:%i rr0 = %08x\n", __func__, __LINE__,
+		readl(master->regs + DEV_ID_RR0(data->id)));
 }
 
 static int cdns_i3c_master_get_rr_slot(struct cdns_i3c_master *master,
@@ -1098,10 +1104,13 @@ static void cdns_i3c_master_reattach_i3c_dev(struct i3c_device *dev,
 {
 	struct i3c_master_controller *m = i3c_device_get_master(dev);
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	cdns_i3c_master_upd_i3c_addr(dev);
+	pr_info("%s:%i\n", __func__, __LINE__);
 	if (!old_dyn_addr)
 		return;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	/* Now, make sure we re-enable the IBI if needed. */
 	mutex_lock(&dev->ibi_lock);
 	if (dev->ibi && dev->ibi->enabled) {
@@ -1123,6 +1132,7 @@ static int cdns_i3c_master_attach_i3c_dev(struct i3c_device *dev)
 	unsigned long max_fscl;
 	int slot;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	slot = cdns_i3c_master_get_rr_slot(master, dev->info.dyn_addr);
 	if (slot < 0)
 		return slot;
@@ -1141,6 +1151,8 @@ static int cdns_i3c_master_attach_i3c_dev(struct i3c_device *dev)
 		writel(readl(master->regs + DEVS_CTRL) |
 		       DEVS_CTRL_DEV_ACTIVE(data->id),
 		       master->regs + DEVS_CTRL);
+		pr_info("%s:%i devsctrl = %08x\n", __func__, __LINE__,
+			readl(master->regs + DEVS_CTRL));
 		return 0;
 	}
 
@@ -1195,14 +1207,17 @@ static int cdns_i3c_master_attach_i2c_dev(struct i2c_device *dev)
 	struct cdns_i3c_i2c_dev_data *data;
 	int slot;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	slot = cdns_i3c_master_get_rr_slot(master, 0);
 	if (slot < 0)
 		return slot;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	data->id = slot;
 	master->free_rr_slots &= ~BIT(slot);
 	i2c_device_set_master_data(dev, data);
@@ -1214,6 +1229,8 @@ static int cdns_i3c_master_attach_i2c_dev(struct i2c_device *dev)
 	writel(readl(master->regs + DEVS_CTRL) |
 	       DEVS_CTRL_DEV_ACTIVE(data->id),
 	       master->regs + DEVS_CTRL);
+	pr_info("%s:%i devsctrl = %08x\n", __func__, __LINE__,
+		readl(master->regs + DEVS_CTRL));
 
 	return 0;
 }
@@ -1294,7 +1311,11 @@ static int cdns_i3c_master_do_daa(struct i3c_master_controller *m)
 	u8 addrs[MAX_DEVS] = { };
 	u8 last_addr = 0;
 
+	pr_info("%s:%i free rr slots = %04x\n", __func__, __LINE__,
+		master->free_rr_slots);
+	pr_info("%s:%i\n", __func__, __LINE__);
 	olddevs = readl(master->regs + DEVS_CTRL) & DEVS_CTRL_DEVS_ACTIVE_MASK;
+	pr_info("%s:%i olddevs = %08x\n", __func__, __LINE__, olddevs);
 
 	/* Prepare RR slots before launching DAA. */
 	for (slot = 1; slot <= master->maxdevs; slot++) {
@@ -1313,12 +1334,20 @@ static int cdns_i3c_master_do_daa(struct i3c_master_controller *m)
 		writel(0, master->regs + DEV_ID_RR2(slot));
 	}
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	ret = i3c_master_entdaa_locked(&master->base);
+	pr_info("%s:%i newdevs = %04x olddevs = %04x\n", __func__, __LINE__,
+		readl(master->regs + DEVS_CTRL), olddevs);
+	pr_info("%s:%i\n", __func__, __LINE__);
 	if (ret)
 		return ret;
 
 	newdevs = readl(master->regs + DEVS_CTRL) & DEVS_CTRL_DEVS_ACTIVE_MASK;
+	pr_info("%s:%i newdevs = %04x olddevs = %04x\n", __func__, __LINE__,
+		newdevs, olddevs);
 	newdevs &= ~olddevs;
+	pr_info("%s:%i newdevs = %04x olddevs = %04x\n", __func__, __LINE__,
+		newdevs, olddevs);
 
 	/* Save the old limitation before add devices. */
 	old_i3c_scl_lim = master->i3c_scl_lim;
@@ -1328,8 +1357,10 @@ static int cdns_i3c_master_do_daa(struct i3c_master_controller *m)
 	 * have the addressed assigned to them in the addrs array.
 	 */
 	for (slot = 1; slot <= master->maxdevs; slot++) {
+		pr_info("%s:%i slot  = %d\n", __func__, __LINE__, slot);
 		if (newdevs & BIT(slot))
 			i3c_master_add_i3c_dev_locked(m, addrs[slot]);
+		pr_info("%s:%i addr = %02x\n", __func__, __LINE__, addrs[slot]);
 	}
 
 	/*
@@ -1338,6 +1369,8 @@ static int cdns_i3c_master_do_daa(struct i3c_master_controller *m)
 	 * by the system but with a different address (in this case the device
 	 * already has a slot and does not need a new one).
 	 */
+	pr_info("%s:%i free rr slots = %04x\n", __func__, __LINE__,
+		master->free_rr_slots);
 	writel(readl(master->regs + DEVS_CTRL) |
 	       master->free_rr_slots << DEVS_CTRL_DEV_CLR_SHIFT,
 	       master->regs + DEVS_CTRL);
@@ -1363,16 +1396,20 @@ static int cdns_i3c_master_bus_init(struct i3c_master_controller *m)
 	struct i3c_device_info info = { };
 	int ret, ncycles;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	switch (m->bus->mode) {
 	case I3C_BUS_MODE_PURE:
+		pr_info("%s:%i\n", __func__, __LINE__);
 		ctrl = CTRL_PURE_BUS_MODE;
 		break;
 
 	case I3C_BUS_MODE_MIXED_FAST:
+		pr_info("%s:%i\n", __func__, __LINE__);
 		ctrl = CTRL_MIXED_FAST_BUS_MODE;
 		break;
 
 	case I3C_BUS_MODE_MIXED_SLOW:
+		pr_info("%s:%i\n", __func__, __LINE__);
 		ctrl = CTRL_MIXED_SLOW_BUS_MODE;
 		break;
 
@@ -1388,6 +1425,7 @@ static int cdns_i3c_master_bus_init(struct i3c_master_controller *m)
 	if (pres > PRESCL_CTRL0_MAX)
 		return -ERANGE;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	m->bus->scl_rate.i3c = sysclk_rate / ((pres + 1) * 4);
 
 	prescl0 = PRESCL_CTRL0_I3C(pres);
@@ -1416,20 +1454,24 @@ static int cdns_i3c_master_bus_init(struct i3c_master_controller *m)
 
 	/* Get an address for the master. */
 	ret = i3c_master_get_free_addr(m, 0);
+	pr_info("%s:%i\n", __func__, __LINE__);
 	if (ret < 0)
 		return ret;
 
 	writel(prepare_rr0_dev_address(ret) | DEV_ID_RR0_IS_I3C,
 	       master->regs + DEV_ID_RR0(0));
+	pr_info("%s:%i\n", __func__, __LINE__);
 
 	cdns_i3c_master_dev_rr_to_info(master, 0, &info);
 	if (info.bcr & I3C_BCR_HDR_CAP)
 		info.hdr_cap = I3C_CCC_HDR_MODE(I3C_HDR_DDR);
+	pr_info("%s:%i\n", __func__, __LINE__);
 
 	ret = i3c_master_set_info(&master->base, &info);
 	if (ret)
 		return ret;
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	/*
 	 * Enable Hot-Join, and, when a Hot-Join request happens, disable all
 	 * events coming from this device.
@@ -1753,6 +1795,7 @@ static int cdns_i3c_master_probe(struct platform_device *pdev)
 	/* Device ID0 is reserved to describe this master. */
 	master->maxdevs = CONF_STATUS0_DEVS_NUM(val);
 	master->free_rr_slots = GENMASK(master->maxdevs, 1);
+	pr_info("%s:%i maxdevs = %d free_rr_slots = %08x\n", __func__, __LINE__, master->maxdevs, master->free_rr_slots);
 
 	val = readl(master->regs + CONF_STATUS1);
 	master->caps.cmdfifodepth = CONF_STATUS1_CMD_DEPTH(val);

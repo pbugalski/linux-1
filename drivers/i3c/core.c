@@ -146,9 +146,11 @@ static ssize_t address_show(struct device *dev,
 			    char *buf)
 {
 	struct i3c_device *i3cdev = dev_to_i3cdev(dev);
+	pr_info("%s:%i dev = %p\n", __func__, __LINE__, i3cdev);
 	struct i3c_bus *bus = i3c_device_get_bus(i3cdev);
 	ssize_t ret;
 
+	pr_info("%s:%i bus = %p \n", __func__, __LINE__, bus);
 	i3c_bus_normaluse_lock(bus);
 	ret = sprintf(buf, "%02x\n", i3cdev->info.dyn_addr);
 	i3c_bus_normaluse_unlock(bus);
@@ -436,6 +438,8 @@ static void i3c_busdev_release(struct device *dev)
 {
 	struct i3c_bus *bus = container_of(dev, struct i3c_bus, dev);
 
+	pr_info("%s:%i bus = %p\n", __func__, __LINE__, bus);
+
 	while (!list_empty(&bus->devs.i2c)) {
 		struct i2c_device *i2cdev;
 
@@ -451,10 +455,13 @@ static void i3c_busdev_release(struct device *dev)
 
 		i3cdev = list_first_entry(&bus->devs.i3c, struct i3c_device,
 					  common.node);
+		pr_info("%s:%i i3cdev = %p\n", __func__, __LINE__, i3cdev);
 		list_del(&i3cdev->common.node);
 		put_device(&i3cdev->dev);
+		pr_info("%s:%i i3cdev = %p\n", __func__, __LINE__, i3cdev);
 	}
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	mutex_lock(&i3c_core_lock);
 	idr_remove(&i3c_bus_idr, bus->id);
 	mutex_unlock(&i3c_core_lock);
@@ -500,6 +507,7 @@ struct i3c_bus *i3c_bus_create(struct device *parent)
 
 	i3cbus->id = ret;
 	device_initialize(&i3cbus->dev);
+	pr_info("%s:%i bus = %p\n", __func__, __LINE__, i3cbus);
 
 	return i3cbus;
 
@@ -511,6 +519,7 @@ err_free_bus:
 
 void i3c_bus_unregister(struct i3c_bus *bus)
 {
+	pr_info("%s:%i bus = %p\n", __func__, __LINE__, bus);
 	device_unregister(&bus->dev);
 }
 

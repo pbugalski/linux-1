@@ -1482,7 +1482,7 @@ static void cdns_i3c_master_handle_ibi(struct cdns_i3c_master *master,
 	}
 	slot->len = min_t(unsigned int, IBIR_XFER_BYTES(ibir),
 			  dev->ibi->max_payload_len);
-	i3c_device_queue_ibi(dev, slot);
+	i3c_master_queue_ibi(dev, slot);
 	data_consumed = true;
 
 out_unlock:

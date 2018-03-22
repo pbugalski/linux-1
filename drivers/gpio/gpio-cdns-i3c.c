@@ -21,6 +21,8 @@ struct cdns_i3c_gpio {
 	struct irq_chip irqc;
 	struct i3c_device *i3cdev;
 	struct mutex irq_lock;
+	u8 dir;
+	u8 ovr;
 	u8 imr;
 	u8 itr[3];
 };
@@ -70,36 +72,55 @@ static int cdns_i3c_gpio_write_reg(struct cdns_i3c_gpio *gpioc, u8 reg,
 static int cdns_i3c_gpio_get_direction(struct gpio_chip *g, unsigned offset)
 {
 	struct cdns_i3c_gpio *gpioc = gpioc_to_cdns_gpioc(g);
-	u8 dirmode;
+
+	return gpioc->dir & BIT(offset);
+}
+
+static void cdns_i3c_gpio_set_multiple(struct gpio_chip *g,
+				       unsigned long *mask,
+				       unsigned long *bits)
+{
+	struct cdns_i3c_gpio *gpioc = gpioc_to_cdns_gpioc(g);
+	u8 newovr;
 	int ret;
 
-	ret = cdns_i3c_gpio_read_reg(gpioc, DIR_MODE, &dirmode);
-	if (ret)
-		return ret;
+	newovr = (gpioc->ovr & ~(*mask)) | (*bits & *mask);
+	if (newovr == gpioc->ovr)
+		return;
 
-	return dirmode & BIT(offset);
+	ret = cdns_i3c_gpio_write_reg(gpioc, OVR, newovr);
+	if (!ret)
+		gpioc->ovr = newovr;
+}
+
+static void cdns_i3c_gpio_set(struct gpio_chip *g, unsigned offset, int value)
+{
+	unsigned long mask = BIT(offset), bits = value ? BIT(offset) : 0;
+
+	cdns_i3c_gpio_set_multiple(g, &mask, &bits);
 }
 
 static int cdns_i3c_gpio_set_dir(struct cdns_i3c_gpio *gpioc, unsigned pin,
 				 bool in)
 {
-	u8 dirmode, newdirmode;
+	u8 newdir;
 	int ret;
 
-	ret = cdns_i3c_gpio_read_reg(gpioc, DIR_MODE, &dirmode);
-	if (ret)
-		return ret;
-
-	newdirmode = dirmode;
+	newdir = gpioc->dir;
 	if (in)
-		newdirmode |= BIT(pin);
+		newdir |= BIT(pin);
 	else
-		newdirmode &= ~BIT(pin);
+		newdir &= ~BIT(pin);
 
-	if (dirmode == newdirmode)
+	if (newdir == gpioc->dir)
 		return 0;
 
-	return cdns_i3c_gpio_write_reg(gpioc, DIR_MODE, dirmode);
+	gpioc->dir = newdir;
+	ret = cdns_i3c_gpio_write_reg(gpioc, DIR_MODE, newdir);
+	if (!ret)
+		gpioc->dir = newdir;
+
+	return ret;
 }
 
 static int cdns_i3c_gpio_dir_input(struct gpio_chip *g, unsigned offset)
@@ -113,20 +134,10 @@ static int cdns_i3c_gpio_dir_output(struct gpio_chip *g, unsigned offset,
 				    int val)
 {
 	struct cdns_i3c_gpio *gpioc = gpioc_to_cdns_gpioc(g);
-	u8 oldovr, newovr;
-	int ret;
 
-	ret = cdns_i3c_gpio_read_reg(gpioc, OVR, &oldovr);
-	if (ret)
-		return ret;
+	cdns_i3c_gpio_set(g, offset, val);
 
-	newovr = oldovr;
-	if (val)
-		newovr |= BIT(offset);
-	else
-		newovr &= ~BIT(offset);
-
-	return cdns_i3c_gpio_write_reg(gpioc, OVR, newovr);
+	return cdns_i3c_gpio_set_dir(gpioc, offset, true);
 }
 
 static int cdns_i3c_gpio_get_multiple(struct gpio_chip *g,
@@ -141,7 +152,9 @@ static int cdns_i3c_gpio_get_multiple(struct gpio_chip *g,
 	if (ret)
 		return ret;
 
-	*bits = ivr & *mask;
+	*bits = ivr & *mask & gpioc->dir;
+	*bits |= gpioc->ovr & *mask & ~gpioc->dir;
+
 	return 0;
 }
 
@@ -155,32 +168,6 @@ static int cdns_i3c_gpio_get(struct gpio_chip *g, unsigned offset)
 		return ret;
 
 	return mask & bits;
-}
-
-static void cdns_i3c_gpio_set_multiple(struct gpio_chip *g,
-				       unsigned long *mask,
-				       unsigned long *bits)
-{
-	struct cdns_i3c_gpio *gpioc = gpioc_to_cdns_gpioc(g);
-	u8 oldovr, newovr;
-	int ret;
-
-	ret = cdns_i3c_gpio_read_reg(gpioc, OVR, &oldovr);
-	if (ret)
-		return;
-
-	newovr = (oldovr & ~(*mask)) | (*bits & *mask);
-	if (newovr == oldovr)
-		return;
-
-	cdns_i3c_gpio_write_reg(gpioc, OVR, newovr);
-}
-
-static void cdns_i3c_gpio_set(struct gpio_chip *g, unsigned offset, int value)
-{
-	unsigned long mask = BIT(offset), bits = value ? BIT(offset) : 0;
-
-	cdns_i3c_gpio_set_multiple(g, &mask, &bits);
 }
 
 static void cdns_i3c_gpio_ibi_handler(struct i3c_device *i3cdev,
@@ -297,6 +284,31 @@ static int cdns_i3c_gpio_probe(struct i3c_device *i3cdev)
 	gpioc->i3cdev = i3cdev;
 	i3cdev_set_drvdata(i3cdev, gpioc);
 
+	/* Mask all interrupts. */
+	ret = cdns_i3c_gpio_write_reg(gpioc, IMR, 0);
+	if (ret)
+		return ret;
+
+	/*
+	 * Clear the ISR after reading it, not when the IBI is is Acked by the
+	 * I3C master. This way we make sure we don't lose events.
+	 */
+	ret = cdns_i3c_gpio_write_reg(gpioc, ITR(3), 0xff);
+	if (ret)
+		return ret;
+
+	ret = cdns_i3c_gpio_read_reg(gpioc, DIR_MODE, &gpioc->dir);
+	if (ret)
+		return ret;
+
+	ret = cdns_i3c_gpio_read_reg(gpioc, OVR, &gpioc->ovr);
+	if (ret)
+		return ret;
+
+	ret = i3c_device_request_ibi(i3cdev, &ibisetup);
+	if (ret)
+		return ret;
+
 	gpioc->gpioc.label = dev_name(parent);
 	gpioc->gpioc.owner = THIS_MODULE;
 	gpioc->gpioc.parent = parent;
@@ -327,21 +339,18 @@ static int cdns_i3c_gpio_probe(struct i3c_device *i3cdev)
 	ret = gpiochip_irqchip_add_nested(&gpioc->gpioc, &gpioc->irqc, 0,
 					  handle_simple_irq, IRQ_TYPE_NONE);
 	if (ret)
-		return ret;
+		goto err_free_ibi;
 
-	ret = cdns_i3c_gpio_write_reg(gpioc, IMR, 0);
+	ret = i3c_device_enable_ibi(i3cdev);
 	if (ret)
-		return ret;
+		goto err_free_ibi;
 
-	/*
-	 * Clear the ISR after reading it, not when the IBI is is Acked by the
-	 * I3C master. This way we make sure we don't lose events.
-	 */
-	ret = cdns_i3c_gpio_write_reg(gpioc, ITR(3), 0xff);
-	if (ret)
-		return ret;
+	return 0;
 
-	return i3c_device_request_ibi(i3cdev, &ibisetup);
+err_free_ibi:
+	i3c_device_free_ibi(i3cdev);
+
+	return ret;
 }
 
 static int cdns_i3c_gpio_remove(struct i3c_device *i3cdev)

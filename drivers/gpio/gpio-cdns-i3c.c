@@ -59,7 +59,7 @@ static int cdns_i3c_gpio_write_reg(struct cdns_i3c_gpio *gpioc, u8 reg,
 		},
 		{
 			.len = sizeof(val),
-			.data.in = &val,
+			.data.out = &val,
 		},
 	};
 

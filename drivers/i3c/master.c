@@ -54,11 +54,11 @@ i3c_master_alloc_i2c_dev(struct i3c_master_controller *master,
 static int i3c_master_send_ccc_cmd_locked(struct i3c_master_controller *master,
 					  struct i3c_ccc_cmd *cmd)
 {
-	if (WARN_ON(!rwsem_is_locked(&master->bus->lock)))
-		return -EINVAL;
-
 	if (!cmd || !master)
 		return -EINVAL;
+
+	if (WARN_ON(master->init_done &&
+		    !rwsem_is_locked(&master->bus->lock)))
 
 	if (!master->ops->send_ccc_cmd)
 		return -ENOTSUPP;
@@ -759,6 +759,10 @@ static int i3c_master_attach_i3c_dev(struct i3c_master_controller *master,
 
 	dev->common.master = master;
 
+	/* Do not attach the master device itself. */
+	if (master->this == dev)
+		return 0;
+
 	if (!master->ops->attach_i3c_dev)
 		return 0;
 
@@ -787,6 +791,10 @@ static void i3c_master_detach_i3c_dev(struct i3c_device *dev)
 	struct i3c_master_controller *master = i3c_device_get_master(dev);
 
 	if (!master)
+		return;
+
+	/* Do not detach the master device itself. */
+	if (master->this == dev)
 		return;
 
 	if (master->ops->detach_i3c_dev)
@@ -1647,7 +1655,9 @@ int i3c_master_register(struct i3c_master_controller *master,
 	 * register I3C devices dicovered during the initial DAA.
 	 */
 	master->init_done = true;
+	i3c_bus_normaluse_lock(master->bus);
 	i3c_master_register_new_i3c_devs(master);
+	i3c_bus_normaluse_unlock(master->bus);
 
 	return 0;
 

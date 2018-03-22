@@ -33,7 +33,7 @@ int i3c_device_do_priv_xfers(struct i3c_device *dev,
 			     int nxfers)
 {
 	struct i3c_master_controller *master;
-	int ret;
+	int ret, i;
 
 	if (nxfers < 1)
 		return 0;
@@ -44,6 +44,11 @@ int i3c_device_do_priv_xfers(struct i3c_device *dev,
 
 	if (!master->ops->priv_xfers)
 		return -ENOTSUPP;
+
+	for (i = 0; i < nxfers; i++) {
+		if (!xfers[i].len || !xfers[i].data.in)
+			return -EINVAL;
+	}
 
 	i3c_bus_normaluse_lock(master->bus);
 	ret = master->ops->priv_xfers(dev, xfers, nxfers);

@@ -60,7 +60,7 @@ struct i3c_hdr_cmd {
 struct i3c_priv_xfer {
 	bool rnw;
 	u16 len;
-	struct {
+	union {
 		void *in;
 		const void *out;
 	} data;

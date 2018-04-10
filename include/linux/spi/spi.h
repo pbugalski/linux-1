@@ -16,6 +16,7 @@
 #define __LINUX_SPI_H
 
 #include <linux/device.h>
+#include <linux/dma-direction.h>
 #include <linux/mod_devicetable.h>
 #include <linux/slab.h>
 #include <linux/kthread.h>
@@ -613,6 +614,31 @@ static inline bool spi_controller_is_slave(struct spi_controller *ctlr)
 /* PM calls that need to be issued by the driver */
 extern int spi_controller_suspend(struct spi_controller *ctlr);
 extern int spi_controller_resume(struct spi_controller *ctlr);
+
+/*
+ * Helpers needed by the spi-mem logic. Should not be used outside of
+ * spi-mem.c
+ */
+#ifdef CONFIG_HAS_DMA
+int spi_map_buf(struct spi_controller *ctlr, struct device *dev,
+		struct sg_table *sgt, void *buf, size_t len,
+		enum dma_data_direction dir);
+void spi_unmap_buf(struct spi_controller *ctlr, struct device *dev,
+		   struct sg_table *sgt, enum dma_data_direction dir);
+#else /* !CONFIG_HAS_DMA */
+static inline int spi_map_buf(struct spi_controller *ctlr, struct device *dev,
+			      struct sg_table *sgt, void *buf, size_t len,
+			      enum dma_data_direction dir)
+{
+	return -EINVAL;
+}
+
+static inline void spi_unmap_buf(struct spi_controller *ctlr,
+				 struct device *dev, struct sg_table *sgt,
+				 enum dma_data_direction dir)
+{
+}
+#endif /* CONFIG_HAS_DMA */
 
 /* Calls the driver make to interact with the message queue */
 extern struct spi_message *spi_get_next_queued_message(struct spi_controller *ctlr);

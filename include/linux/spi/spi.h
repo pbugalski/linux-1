@@ -619,6 +619,8 @@ extern int spi_controller_resume(struct spi_controller *ctlr);
  * Helpers needed by the spi-mem logic. Should not be used outside of
  * spi-mem.c
  */
+void spi_flush_queue(struct spi_controller *ctrl);
+
 #ifdef CONFIG_HAS_DMA
 int spi_map_buf(struct spi_controller *ctlr, struct device *dev,
 		struct sg_table *sgt, void *buf, size_t len,

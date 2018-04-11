@@ -285,7 +285,7 @@ static int spinand_wait(struct spinand_device *spinand, u8 *s)
 
 	do {
 		spinand_read_status(spinand, &status);
-		if ((status & STATUS_OIP_MASK) == STATUS_READY)
+		if (!(status & STATUS_BUSY))
 			goto out;
 	} while (time_before(jiffies, timeo));
 
@@ -294,11 +294,12 @@ static int spinand_wait(struct spinand_device *spinand, u8 *s)
 	 * since our last check
 	 */
 	spinand_read_status(spinand, &status);
+
 out:
 	if (s)
 		*s = status;
 
-	return (status & STATUS_OIP_MASK) == STATUS_READY ? 0 :	-ETIMEDOUT;
+	return status & STATUS_BUSY ? -ETIMEDOUT : 0;
 }
 
 static int spinand_read_id_op(struct spinand_device *spinand, u8 *buf)
@@ -357,7 +358,7 @@ static int spinand_write_page(struct spinand_device *spinand,
 	spinand_program_op(spinand, req);
 
 	ret = spinand_wait(spinand, &status);
-	if (!ret && (status & STATUS_P_FAIL_MASK) == STATUS_P_FAIL)
+	if (!ret && (status & STATUS_PROG_FAILED))
 		ret = -EIO;
 
 	if (ret < 0)
@@ -488,7 +489,7 @@ static int spinand_erase(struct nand_device *nand, const struct nand_pos *pos)
 
 	ret = spinand_wait(spinand, &status);
 
-	if (!ret && (status & STATUS_E_FAIL_MASK) == STATUS_E_FAIL)
+	if (!ret && (status & STATUS_ERASE_FAILED))
 		ret = -EIO;
 
 	if (ret)

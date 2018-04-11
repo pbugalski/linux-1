@@ -118,27 +118,18 @@
 
 /* feature register */
 #define REG_BLOCK_LOCK		0xa0
-#define REG_CFG			0xb0
-#define REG_STATUS		0xc0
-
-/* status register */
-#define STATUS_OIP_MASK		BIT(0)
-#define STATUS_CRBSY_MASK	BIT(7)
-#define STATUS_READY		0
-#define STATUS_BUSY		BIT(0)
-
-#define STATUS_E_FAIL_MASK	BIT(2)
-#define STATUS_E_FAIL		BIT(2)
-
-#define STATUS_P_FAIL_MASK	BIT(3)
-#define STATUS_P_FAIL		BIT(3)
+#define BL_ALL_UNLOCKED		0x00
 
 /* configuration register */
+#define REG_CFG			0xb0
 #define CFG_ECC_ENABLE		BIT(4)
 #define CFG_QUAD_ENABLE		BIT(0)
 
-/* block lock register */
-#define BL_ALL_UNLOCKED		0X00
+/* status register */
+#define REG_STATUS		0xc0
+#define STATUS_BUSY		BIT(0)
+#define STATUS_ERASE_FAILED	BIT(2)
+#define STATUS_PROG_FAILED	BIT(3)
 
 struct spinand_op;
 struct spinand_device;

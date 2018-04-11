@@ -254,6 +254,7 @@ struct spinand_info {
  * @buf: bounce buffer for data
  * @oobbuf: bounce buffer for OOB data
  * @manufacturer: SPI NAND manufacturer information
+ * @priv: manufacturer private data
  */
 struct spinand_device {
 	struct nand_device base;
@@ -270,10 +271,8 @@ struct spinand_device {
 
 	u8 *buf;
 	u8 *oobbuf;
-	struct {
-		const struct spinand_manufacturer *manu;
-		void *priv;
-	} manufacturer;
+	const struct spinand_manufacturer *manufacturer;
+	void *priv;
 };
 
 /**

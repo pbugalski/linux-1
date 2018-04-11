@@ -561,7 +561,7 @@ static int spinand_manufacturer_detect(struct spinand_device *spinand)
 	for (i = 0; i < ARRAY_SIZE(spinand_manufacturers); i++) {
 		ret = spinand_manufacturers[i]->ops->detect(spinand);
 		if (ret > 0) {
-			spinand->manufacturer.manu = spinand_manufacturers[i];
+			spinand->manufacturer = spinand_manufacturers[i];
 			return 0;
 		} else if (ret < 0) {
 			return ret;
@@ -573,8 +573,8 @@ static int spinand_manufacturer_detect(struct spinand_device *spinand)
 
 static int spinand_manufacturer_init(struct spinand_device *spinand)
 {
-	if (spinand->manufacturer.manu->ops->init)
-		return spinand->manufacturer.manu->ops->init(spinand);
+	if (spinand->manufacturer->ops->init)
+		return spinand->manufacturer->ops->init(spinand);
 
 	return 0;
 }
@@ -582,8 +582,8 @@ static int spinand_manufacturer_init(struct spinand_device *spinand)
 static void spinand_manufacturer_cleanup(struct spinand_device *spinand)
 {
 	/* Release manufacturer private data */
-	if (spinand->manufacturer.manu->ops->cleanup)
-		return spinand->manufacturer.manu->ops->cleanup(spinand);
+	if (spinand->manufacturer->ops->cleanup)
+		return spinand->manufacturer->ops->cleanup(spinand);
 }
 
 static const struct spi_mem_op *
@@ -687,10 +687,12 @@ static int spinand_detect(struct spinand_device *spinand)
 		return ret;
 	}
 
-	pr_info("%s SPI NAND was found.\n", spinand->manufacturer.manu->name);
-	pr_info("%llu MiB, block size: %zu KiB, page size: %zu, OOB size: %u\n",
-		nanddev_size(nand) >> 20, nanddev_eraseblock_size(nand) >> 10,
-		nanddev_page_size(nand), nanddev_per_page_oobsize(nand));
+	dev_info(&spinand->spimem->spi->dev,
+		 "%s SPI NAND was found.\n", spinand->manufacturer->name);
+	dev_info(&spinand->spimem->spi->dev,
+		 "%llu MiB, block size: %zu KiB, page size: %zu, OOB size: %u\n",
+		 nanddev_size(nand) >> 20, nanddev_eraseblock_size(nand) >> 10,
+		 nanddev_page_size(nand), nanddev_per_page_oobsize(nand));
 
 	return 0;
 }

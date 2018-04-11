@@ -134,8 +134,8 @@
 #define STATUS_P_FAIL		BIT(3)
 
 /* configuration register */
-#define CFG_ECC_MASK		BIT(4)
 #define CFG_ECC_ENABLE		BIT(4)
+#define CFG_QUAD_ENABLE		BIT(0)
 
 /* block lock register */
 #define BL_ALL_UNLOCKED		0X00
@@ -197,17 +197,6 @@ struct spinand_manufacturer {
 extern const struct spinand_manufacturer micron_spinand_manufacturer;
 extern const struct spinand_manufacturer winbond_spinand_manufacturer;
 
-#define SPINAND_CAP_RD_X1	BIT(0)
-#define SPINAND_CAP_RD_X2	BIT(1)
-#define SPINAND_CAP_RD_X4	BIT(2)
-#define SPINAND_CAP_RD_DUAL	BIT(3)
-#define SPINAND_CAP_RD_QUAD	BIT(4)
-#define SPINAND_CAP_WR_X1	BIT(5)
-#define SPINAND_CAP_WR_X2	BIT(6)
-#define SPINAND_CAP_WR_X4	BIT(7)
-#define SPINAND_CAP_WR_DUAL	BIT(8)
-#define SPINAND_CAP_WR_QUAD	BIT(9)
-
 struct spinand_op_variants {
 	const struct spi_mem_op *ops;
 	unsigned int nops;
@@ -220,9 +209,12 @@ struct spinand_op_variants {
 		        sizeof(struct spi_mem_op),				\
 	}
 
+#define SPINAND_HAS_QE_BIT		BIT(0)
+
 struct spinand_info {
 	const char *model;
 	u8 devid;
+	u32 flags;
 	struct nand_memory_organization memorg;
 	struct nand_ecc_req eccreq;
 	struct {
@@ -239,13 +231,15 @@ struct spinand_info {
 		.update_cache = __update,				\
 	}
 
-#define SPINAND_INFO(__model, __id, __memorg, __eccreq, __op_variants)	\
+#define SPINAND_INFO(__model, __id, __memorg, __eccreq, __op_variants,	\
+		     __flags)						\
 	{								\
 		.model = __model,					\
 		.devid = __id,						\
 		.memorg = __memorg,					\
 		.eccreq = __eccreq,					\
 		.op_variants = __op_variants,				\
+		.flags = __flags,					\
 	}
 
 /**
@@ -253,11 +247,11 @@ struct spinand_info {
  * @base: NAND device instance
  * @lock: lock used to serialize accesses to the NAND
  * @id: NAND ID as returned by READ_ID
+ * @flags: NAND flags
  * @read_cache_op: opcode for the "read from cache" operation
  * @write_cache_op: opcode for the "write to cache" operation
  * @buf: bounce buffer for data
  * @oobbuf: bounce buffer for OOB data
- * @rw_modes: supported read/write mode (combination of SPINAND_CAP_XXX flags)
  * @manufacturer: SPI NAND manufacturer information
  */
 struct spinand_device {
@@ -265,6 +259,7 @@ struct spinand_device {
 	struct spi_mem *spimem;
 	struct mutex lock;
 	struct spinand_id id;
+	u32 flags;
 
 	struct {
 		const struct spi_mem_op *read_cache;
@@ -274,7 +269,6 @@ struct spinand_device {
 
 	u8 *buf;
 	u8 *oobbuf;
-	u32 rw_modes;
 	struct {
 		const struct spinand_manufacturer *manu;
 		void *priv;

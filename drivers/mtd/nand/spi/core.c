@@ -62,13 +62,37 @@ static int spinand_set_cfg(struct spinand_device *spinand, u8 cfg)
 	return spinand_write_reg_op(spinand, REG_CFG, cfg);
 }
 
+static void spinand_init_quad_enable(struct spinand_device *spinand)
+{
+	bool enable = false;
+	u8 newcfg, cfg = 0;
+
+	if (!(spinand->flags & SPINAND_HAS_QE_BIT))
+		return;
+
+	if (spinand->op_templates.read_cache->data.buswidth == 4 ||
+	    spinand->op_templates.write_cache->data.buswidth == 4 ||
+	    spinand->op_templates.update_cache->data.buswidth == 4)
+		enable = true;
+
+	spinand_get_cfg(spinand, &cfg);
+
+	if (enable)
+		newcfg = cfg | CFG_QUAD_ENABLE;
+	else
+		newcfg = cfg & ~CFG_QUAD_ENABLE;
+
+	if (cfg != newcfg)
+		spinand_set_cfg(spinand, newcfg);
+}
+
 static void spinand_disable_ecc(struct spinand_device *spinand)
 {
 	u8 cfg = 0;
 
 	spinand_get_cfg(spinand, &cfg);
 
-	if ((cfg & CFG_ECC_MASK) == CFG_ECC_ENABLE) {
+	if (cfg & CFG_ECC_ENABLE) {
 		cfg &= ~CFG_ECC_ENABLE;
 		spinand_set_cfg(spinand, cfg);
 	}
@@ -611,6 +635,7 @@ int spinand_match_and_init(struct spinand_device *spinand,
 
 		nand->memorg = table[i].memorg;
 		nand->eccreq = table[i].eccreq;
+		spinand->flags = table[i].flags;
 
 		op = spinand_select_op_variant(spinand,
 					       info->op_variants.read_cache);
@@ -629,6 +654,8 @@ int spinand_match_and_init(struct spinand_device *spinand,
 		op = spinand_select_op_variant(spinand,
 					       info->op_variants.update_cache);
 		spinand->op_templates.update_cache = op;
+
+		spinand_init_quad_enable(spinand);
 
 		return 0;
 	}

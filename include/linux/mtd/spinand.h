@@ -130,6 +130,10 @@
 #define STATUS_BUSY		BIT(0)
 #define STATUS_ERASE_FAILED	BIT(2)
 #define STATUS_PROG_FAILED	BIT(3)
+#define STATUS_ECC_MASK		GENMASK(5, 4)
+#define STATUS_ECC_NO_BITFLIPS	(0 << 4)
+#define STATUS_ECC_HAS_BITFLIPS	(1 << 4)
+#define STATUS_ECC_UNCOR_ERROR	(2 << 4)
 
 struct spinand_op;
 struct spinand_device;
@@ -201,6 +205,11 @@ struct spinand_op_variants {
 		        sizeof(struct spi_mem_op),				\
 	}
 
+struct spinand_ecc_info {
+	int (*get_status)(struct spinand_device *spinand, u8 status);
+	const struct mtd_ooblayout_ops *ooblayout;
+};
+
 #define SPINAND_HAS_QE_BIT		BIT(0)
 
 struct spinand_info {
@@ -209,6 +218,7 @@ struct spinand_info {
 	u32 flags;
 	struct nand_memory_organization memorg;
 	struct nand_ecc_req eccreq;
+	struct spinand_ecc_info eccinfo;
 	struct {
 		const struct spinand_op_variants *read_cache;
 		const struct spinand_op_variants *write_cache;
@@ -223,13 +233,22 @@ struct spinand_info {
 		.update_cache = __update,				\
 	}
 
-#define SPINAND_INFO(__model, __id, __memorg, __eccreq, __op_variants,	\
-		     __flags)						\
+#define SPINAND_INFO_ECC(__ooblayout, __get_status)			\
+	{								\
+		.ooblayout = __ooblayout,				\
+		.get_status = __get_status,				\
+	}
+
+#define SPINAND_INFO_NO_ECC		{ }
+
+#define SPINAND_INFO(__model, __id, __memorg, __eccreq, __eccinfo,	\
+		     __op_variants, __flags)				\
 	{								\
 		.model = __model,					\
 		.devid = __id,						\
 		.memorg = __memorg,					\
 		.eccreq = __eccreq,					\
+		.eccinfo = __eccinfo,					\
 		.op_variants = __op_variants,				\
 		.flags = __flags,					\
 	}
@@ -259,6 +278,8 @@ struct spinand_device {
 		const struct spi_mem_op *write_cache;
 		const struct spi_mem_op *update_cache;
 	} op_templates;
+
+	struct spinand_ecc_info eccinfo;
 
 	u8 *buf;
 	u8 *oobbuf;

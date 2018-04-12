@@ -34,10 +34,40 @@ static SPINAND_OP_VARIANTS(update_cache_variants,
 		SPINAND_PROG_LOAD_X4(false, 0, NULL, 0),
 		SPINAND_PROG_LOAD(false, 0, NULL, 0));
 
+static int w25m02gv_ooblayout_ecc(struct mtd_info *mtd, int section,
+				  struct mtd_oob_region *region)
+{
+	if (section > 3)
+		return -ERANGE;
+
+	region->offset = (16 * section) + 4;
+	region->length = 12;
+
+	return 0;
+}
+
+static int w25m02gv_ooblayout_free(struct mtd_info *mtd, int section,
+				   struct mtd_oob_region *region)
+{
+	if (section > 3)
+		return -ERANGE;
+
+	region->offset = (16 * section) + 2;
+	region->length = 2;
+
+	return 0;
+}
+
+static const struct mtd_ooblayout_ops w25m02gv_ooblayout = {
+	.ecc = w25m02gv_ooblayout_ecc,
+	.free = w25m02gv_ooblayout_free,
+};
+
 static const struct spinand_info winbond_spinand_table[] = {
 	SPINAND_INFO("W25M02GV", 0xAB,
 		     NAND_MEMORG(1, 2048, 64, 64, 1024, 1, 1, 1),
 		     NAND_ECCREQ(8, 512),
+		     SPINAND_INFO_ECC(&w25m02gv_ooblayout, NULL),
 		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
 					      &write_cache_variants,
 					      &update_cache_variants),

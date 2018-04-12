@@ -25,10 +25,85 @@ static SPINAND_OP_VARIANTS(update_cache_variants,
 		SPINAND_PROG_LOAD_X4(false, 0, NULL, 0),
 		SPINAND_PROG_LOAD(false, 0, NULL, 0));
 
+static int mx35lf1ge4ab_ooblayout_ecc(struct mtd_info *mtd, int section,
+				      struct mtd_oob_region *region)
+{
+	if (section > 3)
+		return -ERANGE;
+
+	region->offset = (16 * section) + 4;
+	region->length = 12;
+
+	return 0;
+}
+
+static int mx35lf1ge4ab_ooblayout_free(struct mtd_info *mtd, int section,
+				       struct mtd_oob_region *region)
+{
+	if (section > 3)
+		return -ERANGE;
+
+	region->offset = (16 * section) + 2;
+	region->length = 2;
+
+	return 0;
+}
+
+static const struct mtd_ooblayout_ops mx35lf1ge4ab_ooblayout = {
+	.ecc = mx35lf1ge4ab_ooblayout_ecc,
+	.free = mx35lf1ge4ab_ooblayout_free,
+};
+
+static int mx35lf1ge4ab_get_eccsr(struct spinand_device *spinand, u8 *eccsr)
+{
+	struct spi_mem_op op = SPI_MEM_OP(SPI_MEM_OP_CMD(0x7c, 1),
+					  SPI_MEM_OP_NO_ADDR,
+					  SPI_MEM_OP_DUMMY(1, 1),
+					  SPI_MEM_OP_DATA_IN(1, eccsr, 1));
+
+	return spi_mem_exec_op(spinand->spimem, &op);
+}
+
+static int mx35lf1ge4ab_ecc_get_status(struct spinand_device *spinand,
+				       u8 status)
+{
+	struct nand_device *nand = spinand_to_nand(spinand);
+	u8 eccsr;
+
+	switch (status & STATUS_ECC_MASK) {
+	case STATUS_ECC_NO_BITFLIPS:
+		return 0;
+
+	case STATUS_ECC_UNCOR_ERROR:
+		return -EBADMSG;
+
+	case STATUS_ECC_HAS_BITFLIPS:
+		/*
+		 * Let's try to retrieve the real maximum number of bitflips
+		 * in order to avoid forcing the wear-leveling layer to move
+		 * data around if it's not necessary.
+		 */
+		if (mx35lf1ge4ab_get_eccsr(spinand, &eccsr))
+			return nand->eccreq.strength;
+
+		if (WARN_ON(eccsr > nand->eccreq.strength || !eccsr))
+			return nand->eccreq.strength;
+
+		return eccsr;
+
+	default:
+		break;
+	}
+
+	return -EINVAL;
+}
+
 static const struct spinand_info macronix_spinand_table[] = {
 	SPINAND_INFO("MX35LF1GE4AB", 0x12,
 		     NAND_MEMORG(1, 2048, 64, 64, 1024, 1, 1, 1),
 		     NAND_ECCREQ(4, 512),
+		     SPINAND_INFO_ECC(&mx35lf1ge4ab_ooblayout,
+				      mx35lf1ge4ab_ecc_get_status),
 		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
 					      &write_cache_variants,
 					      &update_cache_variants),

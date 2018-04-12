@@ -86,16 +86,20 @@ static void spinand_init_quad_enable(struct spinand_device *spinand)
 		spinand_set_cfg(spinand, newcfg);
 }
 
-static void spinand_disable_ecc(struct spinand_device *spinand)
+static void spinand_ecc_enable(struct spinand_device *spinand,
+			       bool enable)
 {
-	u8 cfg = 0;
+	u8 newcfg, cfg = 0;
 
 	spinand_get_cfg(spinand, &cfg);
 
-	if (cfg & CFG_ECC_ENABLE) {
-		cfg &= ~CFG_ECC_ENABLE;
-		spinand_set_cfg(spinand, cfg);
-	}
+	if (enable)
+		newcfg = cfg | CFG_ECC_ENABLE;
+	else
+		newcfg = cfg & ~CFG_ECC_ENABLE;
+
+	if (cfg != newcfg)
+		spinand_set_cfg(spinand, newcfg);
 }
 
 static int spinand_write_enable_op(struct spinand_device *spinand)
@@ -120,6 +124,7 @@ static int spinand_read_from_cache_op(struct spinand_device *spinand,
 {
 	struct spi_mem_op op = *spinand->op_templates.read_cache;
 	struct nand_device *nand = spinand_to_nand(spinand);
+	struct mtd_info *mtd = nanddev_to_mtd(nand);
 	struct nand_page_io_req adjreq = *req;
 	unsigned int nbytes = 0;
 	void *buf = NULL;
@@ -173,9 +178,16 @@ static int spinand_read_from_cache_op(struct spinand_device *spinand,
 		memcpy(req->databuf.in, spinand->buf + req->dataoffs,
 		       req->datalen);
 
-	if (req->ooblen)
-		memcpy(req->oobbuf.in, spinand->oobbuf + req->ooboffs,
-		       req->ooblen);
+	if (req->ooblen) {
+		if (req->mode == MTD_OPS_AUTO_OOB)
+			mtd_ooblayout_get_databytes(mtd, req->oobbuf.in,
+						    spinand->oobbuf,
+						    req->ooboffs,
+						    req->ooblen);
+		else
+			memcpy(req->oobbuf.in, spinand->oobbuf + req->ooboffs,
+			       req->ooblen);
+	}
 
 	return 0;
 }
@@ -185,6 +197,7 @@ static int spinand_write_to_cache_op(struct spinand_device *spinand,
 {
 	struct spi_mem_op op =* spinand->op_templates.write_cache;
 	struct nand_device *nand = spinand_to_nand(spinand);
+	struct mtd_info *mtd = nanddev_to_mtd(nand);
 	struct nand_page_io_req adjreq = *req;
 	unsigned int nbytes = 0;
 	void *buf = NULL;
@@ -206,8 +219,15 @@ static int spinand_write_to_cache_op(struct spinand_device *spinand,
 	}
 
 	if (req->ooblen) {
-		memcpy(spinand->oobbuf + req->ooboffs, req->oobbuf.out,
-		       req->ooblen);
+		if (req->mode == MTD_OPS_AUTO_OOB)
+			mtd_ooblayout_set_databytes(mtd, req->oobbuf.out,
+						    spinand->oobbuf,
+						    req->ooboffs,
+						    req->ooblen);
+		else
+			memcpy(spinand->oobbuf + req->ooboffs, req->oobbuf.out,
+			       req->ooblen);
+
 		adjreq.ooblen = nanddev_per_page_oobsize(nand);
 		adjreq.ooboffs = 0;
 		nbytes += nanddev_per_page_oobsize(nand);
@@ -326,15 +346,46 @@ static int spinand_lock_block(struct spinand_device *spinand, u8 lock)
 	return spinand_write_reg_op(spinand, REG_BLOCK_LOCK, lock);
 }
 
-static int spinand_read_page(struct spinand_device *spinand,
-			     const struct nand_page_io_req *req)
+static int spinand_check_ecc_status(struct spinand_device *spinand, u8 status)
 {
 	struct nand_device *nand = spinand_to_nand(spinand);
+
+	if (spinand->eccinfo.get_status)
+		return spinand->eccinfo.get_status(spinand, status);
+
+	switch (status & STATUS_ECC_MASK) {
+	case STATUS_ECC_NO_BITFLIPS:
+		return 0;
+
+	case STATUS_ECC_HAS_BITFLIPS:
+		/*
+		 * We have no way to know exactly how many bitflips have been
+		 * fixed, so let's return the maximum possible value so that
+		 * wear-leveling layers move the data immediately.
+		 */
+		return nand->eccreq.strength;
+
+	case STATUS_ECC_UNCOR_ERROR:
+		return -EBADMSG;
+
+	default:
+		break;
+	}
+
+	return -EINVAL;
+}
+
+static int spinand_read_page(struct spinand_device *spinand,
+			     const struct nand_page_io_req *req,
+			     bool ecc_enabled)
+{
+	struct nand_device *nand = spinand_to_nand(spinand);
+	u8 status;
 	int ret;
 
 	spinand_load_page_op(spinand, req);
 
-	ret = spinand_wait(spinand, NULL);
+	ret = spinand_wait(spinand, &status);
 	if (ret < 0) {
 		pr_err("failed to load page @%llx (err = %d)\n",
 		       nanddev_pos_to_offs(nand, &req->pos), ret);
@@ -343,7 +394,10 @@ static int spinand_read_page(struct spinand_device *spinand,
 
 	spinand_read_from_cache_op(spinand, req);
 
-	return 0;
+	if (!ecc_enabled)
+		return 0;
+
+	return spinand_check_ecc_status(spinand, status);
 }
 
 static int spinand_write_page(struct spinand_device *spinand,
@@ -352,6 +406,7 @@ static int spinand_write_page(struct spinand_device *spinand,
 	struct nand_device *nand = spinand_to_nand(spinand);
 	u8 status;
 	int ret = 0;
+
 
 	spinand_write_enable_op(spinand);
 	spinand_write_to_cache_op(spinand, req);
@@ -373,21 +428,42 @@ static int spinand_mtd_read(struct mtd_info *mtd, loff_t from,
 {
 	struct spinand_device *spinand = mtd_to_spinand(mtd);
 	struct nand_device *nand = mtd_to_nanddev(mtd);
+	unsigned int max_bitflips = 0;
 	struct nand_io_iter iter;
-	int ret;
+	bool enable_ecc = false;
+	int ret = 0;
+
+	if (ops->mode != MTD_OPS_RAW && spinand->eccinfo.ooblayout)
+		enable_ecc = true;
 
 	mutex_lock(&spinand->lock);
+
+	if (enable_ecc)
+		spinand_ecc_enable(spinand, true);
+
 	nanddev_io_for_each_page(nand, from, ops, &iter) {
-		ret = spinand_read_page(spinand, &iter.req);
-		if (ret)
+		ret = spinand_read_page(spinand, &iter.req, enable_ecc);
+		if (ret < 0 && ret != -EBADMSG)
 			break;
+
+		if (ret == -EBADMSG) {
+			mtd->ecc_stats.failed++;
+			ret = 0;
+		} else {
+			mtd->ecc_stats.corrected += ret;
+			max_bitflips = max_t(unsigned int, max_bitflips, ret);
+		}
 
 		ops->retlen += iter.req.datalen;
 		ops->oobretlen += iter.req.ooblen;
 	}
+
+	if (enable_ecc)
+		spinand_ecc_enable(spinand, false);
+
 	mutex_unlock(&spinand->lock);
 
-	return ret;
+	return ret ? ret : max_bitflips;
 }
 
 static int spinand_mtd_write(struct mtd_info *mtd, loff_t to,
@@ -396,9 +472,17 @@ static int spinand_mtd_write(struct mtd_info *mtd, loff_t to,
 	struct spinand_device *spinand = mtd_to_spinand(mtd);
 	struct nand_device *nand = mtd_to_nanddev(mtd);
 	struct nand_io_iter iter;
+	bool enable_ecc = false;
 	int ret = 0;
 
+	if (ops->mode != MTD_OPS_RAW && mtd->ooblayout)
+		enable_ecc = true;
+
 	mutex_lock(&spinand->lock);
+
+	if (enable_ecc)
+		spinand_ecc_enable(spinand, true);
+
 	nanddev_io_for_each_page(nand, to, ops, &iter) {
 		ret = spinand_write_page(spinand, &iter.req);
 		if (ret)
@@ -407,6 +491,10 @@ static int spinand_mtd_write(struct mtd_info *mtd, loff_t to,
 		ops->retlen += iter.req.datalen;
 		ops->oobretlen += iter.req.ooblen;
 	}
+
+	if (enable_ecc)
+		spinand_ecc_enable(spinand, false);
+
 	mutex_unlock(&spinand->lock);
 
 	return ret;
@@ -420,10 +508,11 @@ static bool spinand_isbad(struct nand_device *nand, const struct nand_pos *pos)
 		.ooblen = 2,
 		.ooboffs = 0,
 		.oobbuf.in = spinand->oobbuf,
+		.mode = MTD_OPS_RAW,
 	};
 
 	memset(spinand->oobbuf, 0, 2);
-	spinand_read_page(spinand, &req);
+	spinand_read_page(spinand, &req, false);
 	if (spinand->oobbuf[0] != 0xff || spinand->oobbuf[1] != 0xff)
 		return true;
 
@@ -637,6 +726,7 @@ int spinand_match_and_init(struct spinand_device *spinand,
 
 		nand->memorg = table[i].memorg;
 		nand->eccreq = table[i].eccreq;
+		spinand->eccinfo = table[i].eccinfo;
 		spinand->flags = table[i].flags;
 
 		op = spinand_select_op_variant(spinand,
@@ -698,6 +788,30 @@ static int spinand_detect(struct spinand_device *spinand)
 	return 0;
 }
 
+static int spinand_noecc_ooblayout_ecc(struct mtd_info *mtd, int section,
+				       struct mtd_oob_region *region)
+{
+	return -ERANGE;
+}
+
+static int spinand_noecc_ooblayout_free(struct mtd_info *mtd, int section,
+					struct mtd_oob_region *region)
+{
+	if (section)
+		return -ERANGE;
+
+	/* Reserve 2 bytes for the BBM. */
+	region->offset = 2;
+	region->length = 62;
+
+	return 0;
+}
+
+static const struct mtd_ooblayout_ops spinand_noecc_ooblayout = {
+	.ecc = spinand_noecc_ooblayout_ecc,
+	.free = spinand_noecc_ooblayout_free,
+};
+
 static int spinand_init(struct spinand_device *spinand)
 {
 	struct mtd_info *mtd = spinand_to_mtd(spinand);
@@ -746,8 +860,21 @@ static int spinand_init(struct spinand_device *spinand)
 
 	/* After power up, all blocks are locked, so unlock it here. */
 	spinand_lock_block(spinand, BL_ALL_UNLOCKED);
-	/* Right now, we don't support ECC, so disable on-die ECC */
-	spinand_disable_ecc(spinand);
+
+	/*
+	 * Disable ECC by default, will enable it in the read/write path when
+	 * needed.
+	 */
+	spinand_ecc_enable(spinand, false);
+
+	if (spinand->eccinfo.ooblayout)
+		mtd_set_ooblayout(mtd, spinand->eccinfo.ooblayout);
+	else
+		mtd_set_ooblayout(mtd, &spinand_noecc_ooblayout);
+
+	ret = mtd_ooblayout_count_freebytes(mtd);
+	if (ret < 0)
+		goto err_free_buf;
 
 	return 0;
 

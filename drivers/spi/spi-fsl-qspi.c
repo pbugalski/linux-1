@@ -558,7 +558,7 @@ void fsl_qspi_fill_txfifo(struct fsl_qspi *q,
 		for (i = 0; i < op->data.nbytes; i += 4) {
 			u32 val = 0;
 
-			memcpy(&val, buf + i, min_t(unsigned int, op->data.nbytes, 4));
+			memcpy(&val, buf + i, min_t(unsigned int, op->data.nbytes - i, 4));
 			if (q->big_endian)
 				val = cpu_to_be32(val);
 

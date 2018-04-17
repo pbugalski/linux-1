@@ -18,6 +18,8 @@
 #include <linux/spi/spi.h>
 #include <linux/spi/spi-mem.h>
 
+#include <linux/iopoll.h>
+
 static void spinand_cache_op_adjust_colum(struct spinand_device *spinand,
 					  const struct nand_page_io_req *req,
 					  u16 *column)
@@ -98,8 +100,12 @@ static void spinand_ecc_enable(struct spinand_device *spinand,
 	else
 		newcfg = cfg & ~CFG_ECC_ENABLE;
 
+	pr_info("%s:%i newcfg = %02x oldcfg = %02x\n", __func__, __LINE__, newcfg, cfg);
 	if (cfg != newcfg)
 		spinand_set_cfg(spinand, newcfg);
+
+	spinand_get_cfg(spinand, &cfg);
+	WARN_ON(cfg != newcfg);
 }
 
 static int spinand_write_enable_op(struct spinand_device *spinand)
@@ -132,7 +138,8 @@ static int spinand_read_from_cache_op(struct spinand_device *spinand,
 	int ret;
 
 	if (req->datalen) {
-		adjreq.datalen = nanddev_page_size(nand);
+//		adjreq.datalen = nanddev_page_size(nand);
+		adjreq.datalen = nanddev_page_size(nand) + nanddev_per_page_oobsize(nand);
 		adjreq.dataoffs = 0;
 		adjreq.databuf.in = spinand->buf;
 		buf = spinand->buf;
@@ -140,11 +147,13 @@ static int spinand_read_from_cache_op(struct spinand_device *spinand,
 	}
 
 	if (req->ooblen) {
+		pr_info("%s:%i\n", __func__, __LINE__);
 		adjreq.ooblen = nanddev_per_page_oobsize(nand);
 		adjreq.ooboffs = 0;
 		adjreq.oobbuf.in = spinand->oobbuf;
 		nbytes += nanddev_per_page_oobsize(nand);
 		if (!buf) {
+			pr_info("%s:%i\n", __func__, __LINE__);
 			buf = spinand->oobbuf;
 			column = nanddev_page_size(nand);
 		}
@@ -152,6 +161,7 @@ static int spinand_read_from_cache_op(struct spinand_device *spinand,
 
 	spinand_cache_op_adjust_colum(spinand, &adjreq, &column);
 	op.addr.val = column;
+	pr_info("%s:%i opcode = %02x\n", __func__, __LINE__, op.cmd.opcode);
 
 	/*
 	 * Some controllers are limited in term of max RX data size. In this
@@ -169,6 +179,11 @@ static int spinand_read_from_cache_op(struct spinand_device *spinand,
 		if (ret)
 			return ret;
 
+		pr_info("%s:%i column = %lld nbytes = %d\n", __func__, __LINE__,
+			op.addr.val, op.data.nbytes);
+		pr_info("%s:%i buf = %*phx\n", __func__, __LINE__,
+			op.data.nbytes < 16 ? op.data.nbytes : 16,
+			op.data.buf.in);
 		buf += op.data.nbytes;
 		nbytes -= op.data.nbytes;
 		op.addr.val += op.data.nbytes;
@@ -219,6 +234,7 @@ static int spinand_write_to_cache_op(struct spinand_device *spinand,
 	}
 
 	if (req->ooblen) {
+		pr_info("%s:%i\n", __func__, __LINE__);
 		if (req->mode == MTD_OPS_AUTO_OOB)
 			mtd_ooblayout_set_databytes(mtd, req->oobbuf.out,
 						    spinand->oobbuf,
@@ -235,12 +251,27 @@ static int spinand_write_to_cache_op(struct spinand_device *spinand,
 			buf = spinand->oobbuf;
 			column = nanddev_page_size(nand);
 		}
+	} else {
+		int i;
+
+		pr_info("%s:%i oobsize = %d \n", __func__, __LINE__,
+			nanddev_per_page_oobsize(nand));
+		for (i = 0; i < nanddev_per_page_oobsize(nand); i++) {
+			if (((u8 *)spinand->oobbuf)[i] != 0xff)
+				break;
+		}
+
+		WARN(i != nanddev_per_page_oobsize(nand),
+		     "oob[%d] = %02x instead of 0xff\n",
+		     i, ((u8 *)spinand->oobbuf)[i]);
+		nbytes += nanddev_per_page_oobsize(nand);
 	}
 
 	spinand_cache_op_adjust_colum(spinand, &adjreq, &column);
 
 	op = *spinand->op_templates.write_cache;
 	op.addr.val = column;
+	pr_info("%s:%i column = %d nbytes = %d\n", __func__, __LINE__, column, nbytes);
 
 	/*
 	 * Some controllers are limited in term of max TX data size. In this
@@ -248,12 +279,17 @@ static int spinand_write_to_cache_op(struct spinand_device *spinand,
 	 * LOAD RANDOM CACHE.
 	 */
 	while (nbytes) {
-		op.data.buf.in = buf;
+		op.data.buf.out = buf;
 		op.data.nbytes = nbytes;
-
 		ret = spi_mem_adjust_op_size(spinand->spimem, &op);
 		if (ret)
 			return ret;
+
+		pr_info("%s:%i column = %lld nbytes = %d\n", __func__, __LINE__,
+			op.addr.val, op.data.nbytes);
+		pr_info("%s:%i buf = %*phx\n", __func__, __LINE__,
+			op.data.nbytes < 16 ? op.data.nbytes : 16,
+			op.data.buf.out);
 
 		ret = spi_mem_exec_op(spinand->spimem, &op);
 		if (ret)
@@ -285,6 +321,7 @@ static int spinand_program_op(struct spinand_device *spinand,
 	unsigned int row = nanddev_pos_to_row(nand, &req->pos);
 	struct spi_mem_op op = SPINAND_PROG_EXEC_OP(row);
 
+	pr_info("%s:%i row %d\n", __func__, __LINE__, row);
 	return spi_mem_exec_op(spinand->spimem, &op);
 }
 
@@ -295,6 +332,7 @@ static int spinand_erase_op(struct spinand_device *spinand,
 	unsigned int row = nanddev_pos_to_row(nand, pos);
 	struct spi_mem_op op = SPINAND_BLK_ERASE_OP(row);
 
+	pr_info("%s:%i\n", __func__, __LINE__);
 	return spi_mem_exec_op(spinand->spimem, &op);
 }
 
@@ -337,6 +375,7 @@ static int spinand_reset_op(struct spinand_device *spinand)
 	ret = spi_mem_exec_op(spinand->spimem, &op);
 	if (ret)
 		return ret;
+	pr_info("%s:%i\n", __func__, __LINE__);
 
 	return spinand_wait(spinand, NULL);
 }
@@ -352,6 +391,8 @@ static int spinand_check_ecc_status(struct spinand_device *spinand, u8 status)
 
 	if (spinand->eccinfo.get_status)
 		return spinand->eccinfo.get_status(spinand, status);
+
+	pr_info("%s:%i status = %02x\n", __func__, __LINE__, status);
 
 	switch (status & STATUS_ECC_MASK) {
 	case STATUS_ECC_NO_BITFLIPS:
@@ -407,12 +448,17 @@ static int spinand_write_page(struct spinand_device *spinand,
 	u8 status;
 	int ret = 0;
 
-
+	pr_info("%s:%i\n", __func__, __LINE__);
 	spinand_write_enable_op(spinand);
+	pr_info("%s:%i\n", __func__, __LINE__);
 	spinand_write_to_cache_op(spinand, req);
+	pr_info("%s:%i\n", __func__, __LINE__);
 	spinand_program_op(spinand, req);
+	pr_info("%s:%i\n", __func__, __LINE__);
 
 	ret = spinand_wait(spinand, &status);
+	udelay(20);
+	pr_info("%s:%i status = %02x\n", __func__, __LINE__, status);
 	if (!ret && (status & STATUS_PROG_FAILED))
 		ret = -EIO;
 
@@ -438,8 +484,7 @@ static int spinand_mtd_read(struct mtd_info *mtd, loff_t from,
 
 	mutex_lock(&spinand->lock);
 
-	if (enable_ecc)
-		spinand_ecc_enable(spinand, true);
+	spinand_ecc_enable(spinand, enable_ecc);
 
 	nanddev_io_for_each_page(nand, from, ops, &iter) {
 		ret = spinand_read_page(spinand, &iter.req, enable_ecc);
@@ -458,8 +503,7 @@ static int spinand_mtd_read(struct mtd_info *mtd, loff_t from,
 		ops->oobretlen += iter.req.ooblen;
 	}
 
-	if (enable_ecc)
-		spinand_ecc_enable(spinand, false);
+	spinand_ecc_enable(spinand, false);
 
 	mutex_unlock(&spinand->lock);
 
@@ -478,22 +522,22 @@ static int spinand_mtd_write(struct mtd_info *mtd, loff_t to,
 	if (ops->mode != MTD_OPS_RAW && mtd->ooblayout)
 		enable_ecc = true;
 
+	pr_info("%s:%i enable_ecc = %d ops->mode = %d\n", __func__, __LINE__, enable_ecc, ops->mode);
 	mutex_lock(&spinand->lock);
 
-	if (enable_ecc)
-		spinand_ecc_enable(spinand, true);
+	spinand_ecc_enable(spinand, enable_ecc);
 
 	nanddev_io_for_each_page(nand, to, ops, &iter) {
 		ret = spinand_write_page(spinand, &iter.req);
 		if (ret)
 			break;
 
+		udelay(20);
 		ops->retlen += iter.req.datalen;
 		ops->oobretlen += iter.req.ooblen;
 	}
 
-	if (enable_ecc)
-		spinand_ecc_enable(spinand, false);
+	spinand_ecc_enable(spinand, false);
 
 	mutex_unlock(&spinand->lock);
 
